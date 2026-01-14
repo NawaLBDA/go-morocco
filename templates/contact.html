@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+	<div class="col-md-8">
+		<h2>Contact Us</h2>
+		{% if success %}
+			<div class="alert alert-success">Thank you — your message has been sent.</div>
+		{% endif %}
+		<form method="post">
+			{% csrf_token %}
+			<div class="mb-2">
+				<label class="form-label">Name</label>
+				<input name="name" class="form-control" required>
+			</div>
+			<div class="mb-2">
+				<label class="form-label">Email</label>
+				<input type="email" name="email" class="form-control" required>
+			</div>
+			<div class="mb-2">
+				<label class="form-label">Subject</label>
+				<input name="subject" class="form-control">
+			</div>
+			<div class="mb-2">
+				<label class="form-label">Message</label>
+				<textarea name="message" class="form-control" rows="6" required></textarea>
+			</div>
+			<button class="btn btn-primary">Send message</button>
+		</form>
+	</div>
+</div>
+{% endblock %}

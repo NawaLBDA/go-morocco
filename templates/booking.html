@@ -1,0 +1,67 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<div class="row">
+	<div class="col-lg-8">
+		<h2 class="mb-3">Booking {{ tour.title }}</h2>
+		<div class="card mb-3">
+			<div class="overflow-hidden">
+			{% if tour.image %}
+				<img src="{{ tour.image.url }}" class="tour-cover">
+			{% elif tour.destination.image %}
+				<img src="{{ tour.destination.image.url }}" class="tour-cover">
+			{% else %}
+				<img src="/static/img/placeholder.jpg" class="tour-cover">
+			{% endif %}
+			</div>
+			<div class="card-body">
+				<h5 class="card-title">About this tour</h5>
+				<p>{{ tour.description|default:tour.destination.description|linebreaks }}</p>
+			</div>
+		</div>
+	</div>
+
+	<div class="col-lg-4">
+		<div class="card p-3 sticky-top">
+			<h5>Book Now</h5>
+			<p class="mb-1">Price per person / night</p>
+			<p class="fs-5"><strong id="display-base">{{ tour.price_per_night|default:1000 }} MAD</strong></p>
+			<form method="post" action="{% url 'book_tour' tour.id %}">
+				{% csrf_token %}
+				<input type="hidden" id="base-price" value="{{ tour.price_per_night|default:1000 }}">
+				<div class="mb-2">
+					<label class="form-label">Nights</label>
+					<input id="nights" name="nights" type="number" min="1" value="1" class="form-control">
+				</div>
+				<div class="mb-2">
+					<label class="form-label">Persons</label>
+					<input id="persons" name="persons" type="number" min="1" value="1" class="form-control">
+				</div>
+				<p class="small text-muted">Group discount: 10% for 5 or more persons</p>
+				<p class="mt-2">Total: <strong id="live-price">0 MAD</strong></p>
+				<button class="btn btn-primary w-100" type="submit">Confirm booking</button>
+			</form>
+		</div>
+	</div>
+</div>
+
+<script>
+	(function(){
+		const base = parseFloat(document.getElementById('base-price').value || 1000);
+		const nights = document.getElementById('nights');
+		const persons = document.getElementById('persons');
+		const live = document.getElementById('live-price');
+		function update(){
+			const n = parseInt(nights.value||1);
+			const p = parseInt(persons.value||1);
+			let total = base * n * p;
+			if(p >= 5) total = total * 0.9; // 10% discount
+			live.textContent = total.toFixed(2) + ' MAD';
+		}
+		nights.addEventListener('input', update);
+		persons.addEventListener('input', update);
+		update();
+	})();
+</script>
+
+{% endblock %}

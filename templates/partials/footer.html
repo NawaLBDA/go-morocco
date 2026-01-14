@@ -1,0 +1,26 @@
+<footer class="site-footer mt-5">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-4">
+        <h5>Oma Travels Agency</h5>
+        <p>Professional tours & tailored experiences. Replace these texts and images in admin.</p>
+      </div>
+      <div class="col-md-4">
+        <h6>Useful Links</h6>
+        <ul class="list-unstyled">
+          <li><a href="/">Home</a></li>
+          <li><a href="{% url 'blog_list' %}">Blog</a></li>
+          <li><a href="{% url 'contact' %}">Contact</a></li>
+        </ul>
+      </div>
+      <div class="col-md-4">
+        <h6>Contact</h6>
+        <p>Email: info@example.com</p>
+        <p>Phone: +212 600 000 000</p>
+      </div>
+    </div>
+    <div class="row mt-4">
+      <div class="col-12 text-center small">© {{ now.year }} Oma Travels Agency. All rights reserved.</div>
+    </div>
+  </div>
+</footer>
