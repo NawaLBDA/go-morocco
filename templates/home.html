@@ -1,69 +1,151 @@
-
 {% extends 'base.html' %}
 {% load static %}
+{% block page %}home{% endblock %}
+
 {% block content %}
-<section class="hero mb-4" style="background-image:url('{% static "img/hero.jpg" %}');background-size:cover;background-position:center;padding:80px 0;color:#fff">
-  <div class="container text-center">
-    <h1 class="display-5 fw-bold">Discover Your Next Adventure</h1>
-    <p class="lead">Find top destinations, tours and great offers. Book online in minutes.</p>
-    <form method="get" class="row g-2 justify-content-center mt-3" style="max-width:800px;margin:0 auto;">
-      <div class="col-12 col-md-5">
-        <input name="q" class="form-control search-input" placeholder="Where to?" value="{{ request.GET.q }}">
+
+
+<!-- ================= HERO ================= -->
+<section class="hero-home text-white">
+  <div class="hero-overlay"></div>
+
+  <div class="container hero-content">
+    <h1 class="display-4 fw-bold">
+      Discover Morocco, Beyond the Ordinary
+    </h1>
+
+    <p class="lead mb-4">
+      Authentic Moroccan journeys, expertly planned
+    </p>
+
+    <form method="get" class="row g-3 hero-search">
+      <div class="col-md-5">
+        <input name="q" class="form-control form-control-lg"
+               placeholder="Destination (Marrakech, Sahara, Atlas...)">
       </div>
-      <div class="col-12 col-md-3">
-        <input name="date" class="form-control" placeholder="Dates (optional)">
+
+      <div class="col-md-3">
+        <input type="date" name="date" class="form-control form-control-lg">
       </div>
-      <div class="col-12 col-md-2">
-        <button class="btn btn-dark w-100">Find Now</button>
+
+      <div class="col-md-2">
+        <button class="btn btn-primary btn-lg w-100">Search</button>
       </div>
     </form>
   </div>
 </section>
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h2>Available Tours</h2>
-  <form method="get" class="d-flex" style="max-width:360px">
-    <input name="q" class="form-control me-2" placeholder="Search destination or tour" value="{{ request.GET.q }}">
-    <button class="btn btn-outline-light btn-primary">Search</button>
-  </form>
-</div>
-<div class="row">
-  {% for tour in tours %}
-  <div class="col-md-4">
-    <div class="card mb-3 shadow-sm">
-      <div class="card-cover">
-      {% if tour.destination.image %}
-        <img src="{{ tour.destination.image.url }}" style="width:100%;height:220px;object-fit:cover">
-      {% elif tour.image %}
-        <img src="{{ tour.image.url }}" style="width:100%;height:220px;object-fit:cover">
-      {% else %}
-        <img src="/static/img/placeholder.jpg" style="width:100%;height:220px;object-fit:cover">
-      {% endif %}
-      <div class="overlay">
-        <div class="actions">
-          <a href="{% url 'tour_detail' tour.id %}" class="btn btn-sm btn-light">View</a>
-          <a href="{% url 'book_tour' tour.id %}" class="btn btn-sm btn-primary ms-2">Book</a>
-        </div>
-      </div>
-      </div>
-      <div class="card-body">
-        <h5 class="card-title">{{ tour.title }}</h5>
-        <p class="card-text small text-muted">{{ tour.destination.name }}</p>
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            {% if tour.is_promotion and tour.discount_percent %}
-              <div class="price-old">{{ tour.price_per_night }} MAD</div>
-              <div class="price-new">{{ tour.discounted_price }} MAD</div>
-            {% else %}
-              <div class="fs-5">{{ tour.price_per_night }} MAD</div>
+
+<!-- ================= AVAILABLE TOURS ================= -->
+<section id="available-tours" class="container my-5 available-tours-section">
+
+  <!-- Title -->
+  <div class="section-header text-center mb-5">
+    <h2 class="fw-bold section-title">Available Tours</h2>
+    <div class="section-divider"></div>
+  </div>
+
+  <!-- Cards grid -->
+  <div class="row g-4">
+
+    {% for tour in tours %}
+    <div class="col-12 col-md-6 col-lg-4 d-flex">
+
+      <div class="card tour-card shadow-sm border-0 w-100">
+
+        <!-- IMAGE + BADGES -->
+        <div class="position-relative">
+
+          <img src="{{ tour.image.url }}"
+               class="card-img-top"
+               alt="{{ tour.title }}">
+
+          {% if tour.is_promotion and tour.discount_percent > 0 %}
+            <span class="tour-badge promo">
+              -{{ tour.discount_percent }}% PROMO
+            </span>
+          {% endif %}
+
+          {% if user.is_authenticated and tour.user_reservation %}
+            {% if tour.user_reservation.status == 'pending' %}
+              <span class="tour-badge pending">Pending</span>
+
+            {% elif tour.user_reservation.status == 'booked' %}
+              <div class="booked-overlay">
+                <img src="{% static 'img/booked.png' %}" alt="Booked">
+              </div>
+
+            {% elif tour.user_reservation.status == 'rejected' %}
+              <span class="tour-badge rejected">Rejected</span>
             {% endif %}
-          </div>
+          {% endif %}
+
+        </div>
+
+        <!-- CONTENT -->
+        <div class="card-body d-flex flex-column justify-content-between">
+
           <div>
-            <a href="{% url 'tour_detail' tour.id %}" class="btn btn-sm btn-primary">View</a>
+            <h5 class="fw-bold">{{ tour.title }}</h5>
+
+            <p class="text-muted mb-2">
+              <i class="fa-solid fa-location-dot text-success"></i>
+              {{ tour.destination.name }}
+            </p>
           </div>
+
+          <!-- PRICE + BUTTON -->
+          <div class="d-flex justify-content-between align-items-center mt-3">
+
+            <div class="price-inline">
+              {% if tour.promo_price %}
+                <span class="old-price">
+                  {{ tour.price_per_night }} $
+                </span>
+                <span class="new-price">
+                  {{ tour.promo_price }} $
+                  <span class="discount-label">DISCOUNT</span>
+                </span>
+              {% else %}
+                <span class="new-price">
+                  {{ tour.price_per_night }} $
+                </span>
+              {% endif %}
+            </div>
+
+            <a href="{% url 'tour_detail' tour.id %}"
+               class="btn btn-primary btn-sm">
+              {% if tour.user_reservation %}See{% else %}Book{% endif %}
+            </a>
+
+          </div>
+
         </div>
       </div>
     </div>
+    {% endfor %}
+
   </div>
-  {% endfor %}
-</div>
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const params = new URLSearchParams(window.location.search);
+
+  // Si une recherche est faite
+  if (params.has("q") || params.has("date")) {
+
+    const target = document.getElementById("available-tours");
+
+    if (target) {
+      target.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    }
+  }
+
+});
+</script>
+
 {% endblock %}

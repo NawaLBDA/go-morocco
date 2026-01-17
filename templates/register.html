@@ -1,13 +1,87 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% load widget_tweaks %}
+{% block page %}auth{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-6">
-    <h2>Register</h2>
-    <form method="post">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button class="btn btn-primary">Create account</button>
-    </form>
+<section class="auth-hero">
+  <div class="auth-overlay"></div>
+
+  <div class="auth-container">
+    <div class="auth-card">
+
+      <h2 class="auth-title">Create account</h2>
+      <p class="auth-subtitle">
+        Start planning your journey with Oma Travels
+      </p>
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- USERNAME -->
+        <div class="mb-3">
+          <label>Username</label>
+          {{ form.username|add_class:"form-control" }}
+        </div>
+
+        <!-- EMAIL -->
+        <div class="mb-3">
+          <label>Email</label>
+          <input type="email" name="email" class="form-control" required>
+        </div>
+
+        <!-- FIRST NAME -->
+        <div class="mb-3">
+          <label>First Name</label>
+          <input type="text" name="first_name" class="form-control" required>
+        </div>
+
+        <!-- LAST NAME -->
+        <div class="mb-3">
+          <label>Last Name</label>
+          <input type="text" name="last_name" class="form-control" required>
+        </div>
+
+        <!-- PHONE -->
+        <div class="mb-3">
+          <label>Phone</label>
+          <input type="tel" name="phone" class="form-control" required>
+        </div>
+
+        <!-- COUNTRY -->
+        <div class="mb-3">
+          <label>Country</label>
+          <input type="text" name="country" class="form-control" required>
+        </div>
+
+        <!-- POSTAL CODE -->
+        <div class="mb-3">
+          <label>Postal Code</label>
+          <input type="text" name="postal_code" class="form-control" required>
+        </div>
+
+        <!-- PASSWORD -->
+        <div class="mb-3">
+          <label>Password</label>
+          {{ form.password1|add_class:"form-control" }}
+        </div>
+
+        <!-- CONFIRM PASSWORD -->
+        <div class="mb-3">
+          <label>Confirm password</label>
+          {{ form.password2|add_class:"form-control" }}
+        </div>
+
+        <button class="btn btn-primary w-100 py-2 mt-2">
+          Create account
+        </button>
+      </form>
+
+      <p class="auth-footer mt-3">
+        Already registered?
+        <a href="{% url 'login' %}">Sign in</a>
+      </p>
+
+    </div>
   </div>
-</div>
+</section>
 {% endblock %}

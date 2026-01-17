@@ -1,75 +1,132 @@
 {% extends 'base.html' %}
 {% block content %}
+
 <div class="row">
+
+  <!-- LEFT -->
   <div class="col-lg-8">
     <div class="card mb-4">
       {% if tour.image %}
-        <img src="{{ tour.image.url }}" class="card-img-top">
-      {% else %}
-        <img src="/static/img/placeholder.jpg" class="card-img-top">
+        <img src="{{ tour.image.url }}" class="tour-main-image">
       {% endif %}
       <div class="card-body">
-        <h2 class="mb-1">{{ tour.title }} {% if tour.is_promotion %}<span class="badge-prom">Promo {{ tour.discount_percent }}%</span>{% endif %}</h2>
+        <h2 class="mb-1">{{ tour.title }}</h2>
         <p class="text-muted">{{ tour.destination.name }}</p>
         <p>{{ tour.description|linebreaks }}</p>
       </div>
     </div>
-    <div class="card p-3 mb-4">
-      <h5>Highlights</h5>
-      <div class="row g-3">
-        <div class="col-6">
-          <div class="p-3 bg-light rounded">Included: transportation, visits, activities (see description)</div>
-        </div>
-        <div class="col-6">
-          <div class="p-3 bg-light rounded">Duration: variable</div>
-        </div>
-      </div>
-    </div>
   </div>
 
+  <!-- RIGHT BOOKING -->
   <div class="col-lg-4">
-    <div class="card p-3 sticky-top">
-      <h5>Booking</h5>
-      <p class="mb-1">Price per person / night:</p>
-      <p class="fs-5">
-        <strong id="display-base">{{ tour.price_per_night|default:1000 }} MAD</strong>
+    <div class="card p-4 sticky-top">
+
+      <h4 class="fw-bold mb-3">Booking</h4>
+
+      <p class="text-muted mb-1">Price per person / night</p>
+      <p class="fs-4 fw-bold text-primary">
+        {{ tour.price_per_night|default:1000 }} $
       </p>
+
       <form action="{% url 'book_tour' tour.id %}" method="post">
         {% csrf_token %}
-        <input type="hidden" id="base-price" value="{{ tour.price_per_night|default:1000 }}">
-        <label>Nights</label>
-        <input type="number" name="nights" value="1" min="1" class="form-control mb-2">
-        <label>Persons</label>
-        <input type="number" name="persons" value="1" min="1" class="form-control mb-2">
-        <p>Group discount: <small>10% for 5+ persons</small></p>
-        <p>Total: <strong id="live-price">0 MAD</strong></p>
-        <button class="btn btn-primary w-100">Confirm booking</button>
+
+        <input type="hidden" id="base-price"
+               value="{{ tour.price_per_night|default:1000 }}">
+
+        <!-- START DATE (VISIBLE) -->
+        <label class="fw-bold">Dates</label>
+        <input type="text"
+               id="date_range"
+               class="form-control booking-date mb-3"
+               placeholder="Select dates"
+               required>
+
+        <!-- HIDDEN FIELDS FOR BACKEND -->
+        <input type="hidden" name="start_date" id="start_date">
+        <input type="hidden" name="end_date" id="end_date">
+
+        <!-- PERSONS -->
+        <label class="fw-bold">Persons</label>
+        <input type="number" id="persons" name="persons"
+               value="1" min="1" class="form-control mb-3">
+
+        <div class="alert alert-success small">
+          🎉 10% discount for 5+ persons
+        </div>
+
+        <div class="d-flex justify-content-between mb-3">
+          <strong>Total</strong>
+          <strong id="live-price">0 $</strong>
+        </div>
+
+        <button class="btn btn-primary w-100">
+          Confirm booking
+        </button>
+
       </form>
     </div>
   </div>
+
 </div>
 
+<!-- LITEPICKER -->
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/litepicker/dist/css/litepicker.css">
+<script src="https://cdn.jsdelivr.net/npm/litepicker/dist/litepicker.js"></script>
+
 <script>
-  // initialize live price
-  (function(){
-    const base = parseFloat(document.getElementById('base-price').value || 1000);
-    const nights = document.querySelector('input[name="nights"]');
-    const persons = document.querySelector('input[name="persons"]');
-    const live = document.getElementById('live-price');
-    const displayBase = document.getElementById('display-base');
-    function update(){
-      const n = parseInt(nights.value||1);
-      const p = parseInt(persons.value||1);
-      let total = base * n * p;
-      // group discount 10% for 5 or more persons
-      if(p >= 5){ total = total * 0.9; }
-      live.textContent = total.toFixed(2) + ' MAD';
+document.addEventListener('DOMContentLoaded', function () {
+
+  const rangeInput  = document.getElementById('date_range');
+  const startHidden = document.getElementById('start_date');
+  const endHidden   = document.getElementById('end_date');
+  const persons     = document.getElementById('persons');
+  const base        = parseFloat(document.getElementById('base-price').value);
+  const livePrice   = document.getElementById('live-price');
+
+  const picker = new Litepicker({
+    element: rangeInput,
+    singleMode: false,
+    minDate: new Date(),
+    format: 'YYYY-MM-DD',
+    selectForward: true,
+    showTooltip: true,
+    tooltipText: { one: 'night', other: 'nights' },
+
+    setup: (picker) => {
+      picker.on('selected', (date1, date2) => {
+        startHidden.value = date1.format('YYYY-MM-DD');
+        endHidden.value   = date2.format('YYYY-MM-DD');
+        calculate();
+      });
     }
-    nights.addEventListener('input', update);
-    persons.addEventListener('input', update);
-    displayBase.textContent = base + ' MAD';
-    update();
-  })();
+  });
+
+  function calculate() {
+    if (!startHidden.value || !endHidden.value) {
+      livePrice.textContent = '0 $';
+      return;
+    }
+
+    const start = new Date(startHidden.value);
+    const end   = new Date(endHidden.value);
+    const nights = (end - start) / (1000*60*60*24);
+
+    if (nights <= 0) {
+      livePrice.textContent = '0 $';
+      return;
+    }
+
+    let total = base * nights * parseInt(persons.value || 1);
+    if (persons.value >= 5) total *= 0.9;
+
+    livePrice.textContent = total.toFixed(2) + ' $';
+  }
+
+  persons.addEventListener('input', calculate);
+
+});
 </script>
 
 {% endblock %}

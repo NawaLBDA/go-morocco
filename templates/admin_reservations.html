@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-5">
+  <h2>Reservations management</h2>
+
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Tour</th>
+        <th>Dates</th>
+        <th>Total</th>
+
+        <th>Payment</th>
+        <th>Payment Status</th>
+
+        <th>Status</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+
+    <tbody>
+    {% for r in reservations %}
+      <tr>
+        <td>{{ r.user.username }}</td>
+        <td>{{ r.tour.title }}</td>
+        <td>{{ r.start_date }} → {{ r.end_date }}</td>
+        <td>{{ r.total_price }} $</td>
+
+        <td>
+          <span class="badge {% if r.payment_method == 'card' %}bg-dark{% else %}bg-secondary{% endif %}">
+            {{ r.payment_method|upper }}
+          </span>
+        </td>
+
+        <td>
+          <span class="badge
+            {% if r.payment_status == 'paid' %}bg-success
+            {% elif r.payment_status == 'unpaid' %}bg-warning text-dark
+            {% else %}bg-danger{% endif %}
+          ">
+            {{ r.payment_status|upper }}
+          </span>
+        </td>
+
+        <td>
+          <span class="badge 
+            {% if r.status == 'pending' %}bg-warning text-dark
+            {% elif r.status == 'booked' %}bg-success
+            {% elif r.status == 'rejected' %}bg-danger
+            {% elif r.status == 'cancelled' %}bg-secondary
+
+            {% endif %}
+          ">
+            {{ r.status|upper }}
+          </span>
+        </td>
+
+<td>
+  {% if r.status == 'pending' %}
+    <a href="{% url 'validate_reservation' r.id %}" class="btn btn-success btn-sm">Validate</a>
+    <a href="{% url 'reject_reservation' r.id %}" class="btn btn-danger btn-sm">Reject</a>
+  {% endif %}
+
+  {% if r.payment_method == 'cash' and r.payment_status != 'paid' %}
+    <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-primary btn-sm ms-1">
+      Mark Paid
+    </a>
+  {% endif %}
+  {% if r.status == 'booked' and r.payment_status != 'paid' %}
+  <a href="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-warning btn-sm ms-1">
+    Cancel
+  </a>
+{% endif %}
+
+</td>
+
+
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
