@@ -1,78 +1,1522 @@
+/* ===============================
+   GLOBAL VARIABLES (GREEN TRAVEL)
+================================ */
 :root{
-  --bg:#f6f9fb;
+  --bg:#f7f8fa;
   --card:#ffffff;
   --muted:#6b7280;
-  --primary:#0b5cff; /* updated new primary (vibrant blue) */
-  --dark:#0f172a;
+
+  --primary:#2a9d8f;
+  --primary-dark:#1f776d;
+  --accent:#e9c46a;
+  --dark:#264653;
 }
-  --primary-dark:#0840b8;
-  --accent:#06b6d4;
-body{background:var(--bg);color:var(--dark);font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
-.navbar-brand{font-weight:700;letter-spacing:0.4px}
-.hero{background:linear-gradient(90deg, rgba(13,148,136,0.06), rgba(15,23,42,0.02));padding:48px;border-radius:8px}
-.hero{position:relative;padding:60px 0;border-radius:6px;overflow:hidden}
-.hero::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg, rgba(11,92,255,0.35), rgba(6,182,212,0.18));mix-blend-mode:multiply}
-.hero .display-5{color:#fff;text-shadow:0 10px 30px rgba(2,6,23,0.25)}
-.hero .lead{color:rgba(255,255,255,0.9)}
-.card{border:0;border-radius:10px;overflow:hidden;transition:transform .25s ease, box-shadow .25s ease}
-.card:hover{transform:translateY(-6px);box-shadow:0 10px 30px rgba(15,23,42,0.08)}
-.card .card-img-top{height:200px;object-fit:cover}
-.tour-cover{height:380px;object-fit:cover;width:100%;border-radius:8px}
 
-/* Home section cards */
-.section-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
-.section-card{background:var(--card);padding:18px;border-radius:10px;transition:transform .22s ease,box-shadow .22s ease}
-.section-card:hover{transform:translateY(-6px);box-shadow:0 18px 40px rgba(2,6,23,0.08)}
-.section-card img{width:100%;height:160px;object-fit:cover;border-radius:8px;margin-bottom:12px}
+/* ===============================
+   BASE
+================================ */
+body{
+  background:var(--bg);
+  color:var(--dark);
+  font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+}
 
-/* Footer */
-.site-footer{background:#0f172a;color:#cbd5e1;padding:48px 0}
-.site-footer a{color:#94a3b8}
-.newsletter-strip{background:var(--primary);color:#fff;padding:24px;border-radius:8px;margin-top:40px;text-align:center}
-.btn-primary{background:var(--primary);border:0}
-.badge-prom{background:#fde68a;color:#92400e}
-.price-old{color:var(--muted);text-decoration:line-through;font-size:0.95rem}
-.price-new{color:#dc2626;font-weight:700}
-.search-input{border-radius:999px}
+a{text-decoration:none}
+img{max-width:100%}
 
-/* Floating contact buttons */
-.floating-contact{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:12px;z-index:1200}
-.floating-contact a{width:56px;height:56px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;box-shadow:0 8px 24px rgba(2,6,23,0.12)}
-.btn-whatsapp{background:#25d366}
-.btn-chatbot{background:var(--dark)}
+/* ===============================
+   HERO
+================================ */
+/* ===============================
+   NAVBAR
+================================ */
+/* ===============================
+   NAVBAR DEFAULT (ALL PAGES)
+================================ */
 
-/* Chat widget */
-.chat-widget{position:fixed;right:20px;bottom:92px;width:320px;max-width:90%;background:var(--card);border-radius:12px;box-shadow:0 20px 40px rgba(2,6,23,0.12);overflow:hidden;display:none;z-index:1300}
-.chat-header{background:linear-gradient(90deg,var(--primary),#08928a);color:#fff;padding:12px 16px}
-.chat-messages{height:260px;overflow:auto;padding:12px;background:linear-gradient(180deg,#ffffff, #f8fafc)}
-.chat-input{display:flex;padding:10px;border-top:1px solid #eef2f7}
-.chat-input input{flex:1;border:1px solid #e6edf2;padding:8px;border-radius:8px}
-.chat-input button{margin-left:8px;background:var(--primary);border:0;color:#fff;padding:8px 12px;border-radius:8px}
-.msg{margin-bottom:10px}
-.msg.bot{background:#f1f5f9;padding:8px 10px;border-radius:10px;display:inline-block}
-.msg.user{background:var(--primary);color:#fff;padding:8px 10px;border-radius:10px;display:inline-block}
 
-/* subtle animations */
-@keyframes popIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
-.card, .hero{animation:popIn .45s cubic-bezier(.2,.9,.3,1) both}
+/* ===============================
+   HOME ONLY – NAVBAR OVER HERO
+================================ */
 
-/* hover overlay for tour cards */
-.card-cover{position:relative}
-.card-cover .overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.0),rgba(0,0,0,0.45));opacity:0;transition:opacity .25s ease}
-.card-cover:hover .overlay{opacity:1}
-.card-cover .overlay .actions{position:absolute;right:16px;bottom:16px}
-.card-cover .overlay .actions .btn{opacity:0;transform:translateY(6px);transition:all .22s ease}
-.card-cover:hover .overlay .actions .btn{opacity:1;transform:none}
-/* Blue professional theme */
+
+/* ===============================
+   HERO FULL WIDTH
+================================ */
+.hero-home{
+  position:relative;
+  min-height:100vh;
+  background:url("../img/hero-maroc.jpg") center/cover no-repeat;
+  display:flex;
+  align-items:center;
+  padding-top:80px; /* espace navbar */
+}
+
+.hero-overlay{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(
+    rgba(0,0,0,.45),
+    rgba(38,70,83,.65)
+  );
+}
+
+.hero-content{
+  position:relative;
+  z-index:2;
+  max-width:1200px;
+}
+
+/* Text white */
+.hero-home .nav-link,
+.hero-home .navbar-brand{
+  color:#fff !important;
+}
+.tour-cover-square{
+  width:100%;
+  max-height:420px;   /* 👈 réduit la hauteur */
+  object-fit:cover;
+  border-radius:16px;
+}
+
+.gallery-thumb{
+  height:120px;
+  object-fit:cover;
+  cursor:pointer;
+  transition:.25s;
+}
+.gallery-thumb:hover{
+  transform:scale(1.05);
+}
+/* BLOG */
+.blog-card img{
+  height:220px;
+  object-fit:cover;
+}
+
+.blog-content{
+  font-size:1.05rem;
+  line-height:1.8;
+}
+
+.gallery-thumb{
+  height:140px;
+  object-fit:cover;
+  cursor:pointer;
+  transition:.25s;
+}
+
+.gallery-thumb:hover{
+  transform:scale(1.05);
+}
+
+/* NAVBAR OVER HERO */
+.navbar-hero{
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  z-index:1000;
+  background:transparent !important;
+}
+
+
+
+/* Formulaire */
+.hero-search input {
+  border-radius: 8px;
+}
+
+.hero-search button {
+  border-radius: 8px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .hero-home {
+    min-height: 90vh;
+    text-align: center;
+  }
+}
+/* ===============================
+   NAVBAR
+================================ */
+.navbar{
+  padding:14px 0;
+}
+.navbar-nav .nav-link{
+  position:relative;
+  font-weight:500;
+}
+.navbar-nav .nav-link::after{
+  content:'';
+  position:absolute;
+  left:0;
+  bottom:0;
+  width:0;
+  height:2px;
+  background:#fff;
+  transition:.3s;
+}
+.navbar-nav .nav-link:hover::after{
+  width:100%;
+}
+
+/* ===============================
+   CARDS
+================================ */
+.card{
+  border:0;
+  border-radius:14px;
+  overflow:hidden;
+  transition:.25s;
+}
+.card:hover{
+  transform:translateY(-6px);
+  box-shadow:0 18px 40px rgba(0,0,0,.12);
+}
+.card-img-top{
+  height:220px;
+  object-fit:cover;
+}
+
+/* prices */
+.price-old{
+  text-decoration:line-through;
+  color:var(--muted);
+}
+.price-new{
+  color:#dc2626;
+  font-weight:700;
+}
+.price{
+  font-weight:700;
+  color:var(--primary);
+}
+
+/* ===============================
+   BUTTONS
+================================ */
+.btn-primary{
+  background:var(--primary);
+  border:0;
+}
+.btn-primary:hover{
+  background:var(--primary-dark);
+}
+
+/* ===============================
+   BOOKING CTA
+================================ */
+.booking-cta{
+  background:
+    linear-gradient(rgba(38,70,83,.85), rgba(38,70,83,.85)),
+    url("/static/img/booking-bg.jpg") center/cover no-repeat;
+  color:#fff;
+  padding:80px 0;
+}
+
+/* ===============================
+   FOOTER
+================================ */
+.site-footer{
+  background:
+    linear-gradient(rgba(103, 103, 103, 0.382), rgba(15,23,42,.85)),
+    url("/static/img/footer-bg.jpg") center/cover no-repeat;
+  color:#e5e7eb;
+  padding:80px 0 40px;
+}
+.site-footer h5{color:#fff}
+.site-footer a{color:#cbd5e1}
+.site-footer a:hover{color:#fff}
+
+/* ===============================
+   FLOATING BUTTONS
+================================ */
+/* ===============================
+   FLOATING ACTION BUTTONS
+================================ */
+.floating-contact{
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  z-index:1200;
+}
+
+.floating-contact a{
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  font-size:1.3rem;
+  box-shadow:0 12px 28px rgba(0,0,0,.25);
+  transition:.3s;
+}
+
+.floating-contact a:hover{
+  transform:scale(1.08);
+}
+
+.btn-whatsapp{
+  background:#25d366;
+}
+
+.btn-chatbot{
+  background:#2a9d8f;
+  border-radius:50%;
+}
+
+/* ===============================
+   ANIMATION
+================================ */
+@keyframes fadeUp{
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:none}
+}
+.card,.hero{animation:fadeUp .45s ease both}
+.navbar-custom{
+  background:linear-gradient(90deg,#264653,#2a9d8f);
+}
+/* ================= CHAT MODAL ================= */
+.chat-widget{
+  position:fixed;
+  right:24px;
+  bottom:100px;
+  width:340px;
+  background:#fff;
+  border-radius:16px;
+  box-shadow:0 30px 60px rgba(0,0,0,.25);
+  overflow:hidden;
+  display:none;
+  z-index:2000;
+}
+
+.chat-header{
+  background:linear-gradient(135deg,#2a9d8f,#1f776d);
+  color:#fff;
+  padding:14px 18px;
+  font-weight:600;
+}
+
+.chat-messages{
+  height:260px;
+  padding:14px;
+  overflow-y:auto;
+  background:#f8fafc;
+}
+
+.chat-input{
+  display:flex;
+  gap:8px;
+  padding:12px;
+  border-top:1px solid #e5e7eb;
+}
+
+.chat-input input{
+  flex:1;
+  border:1px solid #d1d5db;
+  border-radius:10px;
+  padding:10px;
+}
+
+.chat-input button{
+  background:#2a9d8f;
+  color:#fff;
+  border:none;
+  border-radius:10px;
+  padding:10px 16px;
+}
+
+.msg.bot{
+  background:#e6f4f1;
+  color:#264653;
+}
+
+.msg.user{
+  background:#2a9d8f;
+  color:#fff;
+}
+.price,
+.price-new,
+.text-primary{
+  color:#2a9d8f !important;
+  font-weight:700;
+}
+
+.btn-primary{
+  background:#2a9d8f;
+  border:none;
+}
+
+.btn-primary:hover{
+  background:#1f776d;
+}
+/* ================= TOUR GALLERY ================= */
+
+.main-image-wrapper{
+  width:100%;
+  overflow:hidden;
+  border-radius:18px;
+}
+
+.main-tour-image{
+  width:100%;
+  max-height:420px;
+  object-fit:cover;
+  border-radius:18px;
+  transition:opacity .3s ease;
+}
+
+/* COLLAGE GRID */
+.gallery-collage{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+  gap:12px;
+  margin-top:10px;
+}
+
+.gallery-item{
+  height:110px;
+  object-fit:cover;
+  border-radius:14px;
+  cursor:pointer;
+  transition:transform .25s ease, box-shadow .25s ease;
+}
+
+.gallery-item:hover{
+  transform:scale(1.08);
+  box-shadow:0 12px 28px rgba(0,0,0,.25);
+}
+/* ================= BLOG IMAGE ================= */
+
+.blog-main-image-wrapper{
+  width:100%;
+  overflow:hidden;
+  border-radius:18px;
+}
+
+.blog-main-image{
+  width:100%;
+  max-height:360px;   /* 👈 hauteur contrôlée */
+  object-fit:cover;
+  border-radius:18px;
+  transition:opacity .3s ease;
+}
+
+/* ================= BLOG COLLAGE ================= */
+
+.blog-gallery-collage{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(100px,1fr));
+  gap:10px;
+  margin-bottom:30px;
+}
+
+.blog-gallery-item{
+  height:100px;
+  object-fit:cover;
+  border-radius:12px;
+  cursor:pointer;
+  transition:.25s ease;
+}
+
+.blog-gallery-item:hover{
+  transform:scale(1.07);
+  box-shadow:0 10px 24px rgba(0,0,0,.25);
+}
+/* ================= IMAGE UNIQUE (QUALITÉ MAX) ================= */
+/* IMAGE UNIQUE BLOG (PAS D'ÉTIREMENT) */
+.image-single-wrapper{
+  width:100%;
+  text-align:center;
+}
+
+.image-single{
+  max-width:100%;
+  max-height:520px;
+  width:auto;
+  height:auto;
+  object-fit:contain;
+  border-radius:18px;
+  background:#f8fafc;
+}
+
+/* IMAGE PRINCIPALE (GALERIE) */
+.image-main{
+  width:100%;
+  max-height:420px;
+  object-fit:cover;
+  border-radius:18px;
+  transition:opacity .3s ease;
+}
+
+/* ================= COLLAGE GRID ================= */
+.image-collage{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+  gap:12px;
+  margin-top:12px;
+}
+
+.image-collage-item{
+  height:110px;
+  object-fit:cover;
+  border-radius:14px;
+  cursor:pointer;
+  transition:transform .25s ease, box-shadow .25s ease;
+}
+
+.image-collage-item:hover{
+  transform:scale(1.08);
+  box-shadow:0 12px 28px rgba(0,0,0,.25);
+}
+/* IMAGE SQUARE (BLOG + TOUR) */
+.image-square{
+  width:100%;
+  aspect-ratio:1/1;
+  object-fit:cover;
+  border-radius:18px;
+  background:#f3f4f6;
+}
+
+/* IMAGE UNIQUE */
+.image-single{
+  max-width:100%;
+  max-height:520px;
+  object-fit:contain;
+  border-radius:18px;
+}
+
+/* COLLAGE */
+.image-collage{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+  gap:12px;
+}
+.image-collage-item{
+  aspect-ratio:1/1;
+  object-fit:cover;
+  border-radius:14px;
+  cursor:pointer;
+  transition:.25s;
+}
+.image-collage-item:hover{
+  transform:scale(1.08);
+}
+/* FORCE SQUARE IMAGE (BLOG + TOUR) */
+.image-square{
+  width:100%;
+  aspect-ratio:1/1;
+  object-fit:cover;
+  border-radius:18px;
+  background:#f3f4f6;
+}
+
+/* BLOG MAIN IMAGE */
+.blog-main-image{
+  max-height:420px;
+}
+
+/* BLOG GALLERY */
+.blog-gallery-collage{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+  gap:12px;
+}
+
+.blog-gallery-item{
+  cursor:pointer;
+  transition:.25s;
+}
+.blog-gallery-item:hover{
+  transform:scale(1.06);
+}
+/* ===============================
+   AUTH PAGES (LOGIN / REGISTER)
+================================ */
+/* ===== STICKY FOOTER ===== */
+.layout-root{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ===== AUTH HERO ===== */
+.auth-hero{
+  position:relative;
+  min-height:calc(100vh - 80px);
+  background:url("../img/hero-maroc.jpg") center/cover no-repeat;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.auth-overlay{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(
+    rgba(0,0,0,.55),
+    rgba(38,70,83,.75)
+  );
+}
+
+.auth-container{
+  position:relative;
+  z-index:2;
+  width:100%;
+  max-width:420px;
+  padding:20px;
+}
+
+.auth-card{
+  background:#fff;
+  border-radius:18px;
+  padding:36px;
+  box-shadow:0 30px 60px rgba(0,0,0,.35);
+  animation:fadeUp .5s ease;
+}
+
+.auth-title{
+  font-weight:700;
+  text-align:center;
+  margin-bottom:8px;
+}
+
+.auth-subtitle{
+  text-align:center;
+  color:#6b7280;
+  margin-bottom:24px;
+}
+
+.auth-footer{
+  text-align:center;
+  font-size:.95rem;
+}
+
+.auth-footer a{
+  color:#2a9d8f;
+  font-weight:600;
+}
+/* ===============================
+   AUTH FORM – PROFESSIONAL
+================================ */
+
+.auth-card label{
+  font-size:0.85rem;
+  font-weight:500;
+  color:#374151;
+  margin-bottom:4px;
+}
+
+.auth-card input{
+  width:100%;
+  border:1px solid #d1d5db;
+  border-radius:4px;              /* ⬅️ PAS ARRONDI */
+  padding:10px 12px;
+  font-size:0.95rem;
+}
+
+.auth-card input::placeholder{
+  color:#9ca3af;
+  font-size:0.9rem;
+}
+
+.auth-card input:focus{
+  outline:none;
+  border-color:#2a9d8f;
+  box-shadow:0 0 0 1px rgba(42,157,143,.2);
+}
+
+/* Supprimer aides Django */
+.auth-card .helptext,
+.auth-card ul.errorlist{
+  display:none;
+}
+
+/* Form control styling for auth forms */
+.auth-card input[type="text"],
+.auth-card input[type="password"],
+.auth-card input[type="email"]{
+  width:100% !important;
+  border:1px solid #d1d5db !important;
+  border-radius:6px !important;
+  padding:10px 12px !important;
+  font-size:0.95rem !important;
+  background:#fff !important;
+  transition:all .2s ease !important;
+}
+
+.auth-card input[type="text"]:focus,
+.auth-card input[type="password"]:focus,
+.auth-card input[type="email"]:focus{
+  outline:none !important;
+  border-color:#2a9d8f !important;
+  box-shadow:0 0 0 3px rgba(42,157,143,.1) !important;
+  background:#f8fafc !important;
+}
+
+.auth-card input[type="text"]::placeholder,
+.auth-card input[type="password"]::placeholder,
+.auth-card input[type="email"]::placeholder{
+  color:#9ca3af !important;
+  font-size:0.9rem !important;
+}
+
+/* Remove default styling from Django form */
+.auth-card input{
+  appearance:none;
+  -webkit-appearance:none;
+  -moz-appearance:none;
+}
+
+/* Button improvements */
+.btn-primary.w-100{
+  font-weight:600;
+  letter-spacing:0.3px;
+  transition:all .3s ease;
+  border-radius:6px;
+}
+
+.btn-primary.w-100:active{
+  transform:scale(0.98);
+}
+/* ================= BLOG GALLERY PRO ================= */
+
+.blog-gallery-wrapper{
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.blog-gallery-grid{
+  display:grid;
+  grid-auto-flow:column;
+  grid-auto-columns:calc(33.333% - 12px);
+  gap:12px;
+  overflow-x:auto;
+  scroll-behavior:smooth;
+  padding-bottom:6px;
+}
+
+.blog-gallery-grid::-webkit-scrollbar{
+  display:none;
+}
+
+.gallery-image{
+  aspect-ratio:1/1;
+  object-fit:cover;
+  border-radius:14px;
+  cursor:pointer;
+  transition:.25s;
+}
+
+.gallery-image:hover{
+  transform:scale(1.05);
+  box-shadow:0 10px 24px rgba(0,0,0,.25);
+}
+
+/* NAV BUTTONS */
+.gallery-nav{
+  background:#fff;
+  border:none;
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  box-shadow:0 8px 20px rgba(0,0,0,.2);
+  font-size:22px;
+  cursor:pointer;
+  transition:.25s;
+}
+
+.gallery-nav:hover{
+  background:#2a9d8f;
+  color:#fff;
+}
+
+.gallery-nav.left{left:-10px}
+.gallery-nav.right{right:-10px}
+/* ================= COMMENTS ================= */
+
+.comments-section{
+  max-width:800px;
+}
+
+.comments-box{
+  max-height:280px;           /* ≈ 3 commentaires visibles */
+  overflow-y:auto;
+  padding-right:6px;
+}
+
+.comment-item{
+  padding:12px 0;
+  border-bottom:1px solid #e5e7eb;
+}
+
+.comment-item strong{
+  color:#264653;
+}
+
+.comment-date{
+  font-size:0.8rem;
+  color:#9ca3af;
+  margin-left:6px;
+}
+
+.comment-item p{
+  margin:6px 0 0;
+  font-size:0.95rem;
+  line-height:1.6;
+}
+/* ===== TOUR IMAGE FIX ===== */
+.tour-main-image{
+  max-height:400px !important;
+    width:700px !important;
+
+  object-fit:cover !important;
+  border-radius:18px !important;
+  display:block;
+}
+/* ===== BOOKING DATE INPUT ===== */
+.booking-date{
+  border:2px solid #d1d5db;
+  border-radius:8px;
+  padding:10px 12px;
+  font-weight:500;
+  transition:.25s;
+}
+
+.booking-date:focus{
+  outline:none;
+  border-color:#2a9d8f;
+  box-shadow:0 0 0 3px rgba(42,157,143,.15);
+  background:#f0fdfa;
+}
+
+/* Icône calendrier */
+.booking-date::-webkit-calendar-picker-indicator{
+  filter:invert(38%) sepia(19%) saturate(1000%) hue-rotate(125deg);
+  cursor:pointer;
+}
+/* ===============================
+   BOOKING DATE – PROFESSIONAL
+================================ */
+
+.booking-date{
+  border:1.5px solid #d1d5db;
+  border-radius:10px;
+  padding:12px 14px;
+  font-size:0.95rem;
+  font-weight:500;
+  background:#ffffff;
+  color:#264653;
+  transition:all .25s ease;
+}
+
+/* Hover */
+.booking-date:hover{
+  border-color:#2a9d8f;
+}
+
+/* Focus */
+.booking-date:focus{
+  outline:none;
+  border-color:#2a9d8f;
+  box-shadow:0 0 0 4px rgba(42,157,143,.15);
+  background:#f0fdfa;
+}
+
+/* Calendar icon (Webkit browsers) */
+.booking-date::-webkit-calendar-picker-indicator{
+  background-color:transparent;
+  cursor:pointer;
+  filter:
+    invert(36%)
+    sepia(19%)
+    saturate(900%)
+    hue-rotate(125deg);
+  opacity:0.85;
+}
+
+/* Remove ugly inner shadow */
+.booking-date::-webkit-inner-spin-button,
+.booking-date::-webkit-clear-button{
+  display:none;
+}
+.booked-badge{
+  position:absolute;
+  top:12px;
+  right:12px;
+  width:72px;
+  z-index:10;
+}
+
+/* Tour image with overlay effect */
+.tour-image-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.tour-booking-image {
+  position: relative;
+  z-index: 1;
+  filter: brightness(0.85) contrast(1.05);
+  transition: filter 0.3s ease;
+}
+.fa-location-dot {
+  font-size: 0.9rem;
+}
+
+.card:hover .fa-location-dot {
+  color: #198754; /* vert Bootstrap */
+}
+
+.tour-booking-image:hover {
+  filter: brightness(0.9) contrast(1.1);
+}
+
+/* Larger booked logo for booking page */
+.booked-logo-large {
+  width: 140px !important;
+  height: auto;
+  z-index: 20;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+  animation: bounce-in 0.6s ease-out;
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.8) rotate(-15deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+/* ===============================
+   BOOKED OVERLAY – CENTER & LARGE
+================================ */
+
+.booked-overlay{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.35);
+  z-index:5;
+
+  /* 🔑 TRÈS IMPORTANT */
+  pointer-events:none;
+}
+
+.booked-overlay img{
+  width:70%;
+  max-width:260px;
+  height:auto;
+  opacity:0.95;
+  filter:drop-shadow(0 10px 22px rgba(0,0,0,0.45));
+  animation:bookedPop .5s ease-out;
+
+  /* sécurité */
+  pointer-events:none;
+}
+
+
+/* Animation pro */
+@keyframes bookedPop{
+  0%{
+    transform:scale(0.85);
+    opacity:0;
+  }
+  100%{
+    transform:scale(1);
+    opacity:1;
+  }
+}
+/* ===============================
+   AVAILABLE TOURS – PRO SECTION
+================================ */
+
+.available-tours-section {
+  padding-top: 40px;
+  padding-bottom: 60px;
+}
+
+/* Title */
+.section-title {
+  font-size: 2.1rem;
+  color: #264653;
+  letter-spacing: 0.3px;
+}
+
+/* Elegant divider line */
+.section-divider {
+  width: 90px;
+  height: 4px;
+  margin: 14px auto 0;
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    #2a9d8f,
+    #e9c46a
+  );
+}
+
+/* Improve card balance */
+.available-tours-section .card {
+  background: #ffffff;
+}
+
+/* Reduce image dominance */
+.available-tours-section .card-img-top {
+  height: 210px;
+  object-fit: cover;
+}
+
+/* Card content spacing */
+.available-tours-section .card-body {
+  padding: 18px 20px 20px;
+}
+
+/* Card title */
+.available-tours-section h5 {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+/* Destination text */
+.available-tours-section .text-muted {
+  font-size: 0.92rem;
+}
+
+/* Button alignment */
+.available-tours-section .btn-sm {
+  padding: 6px 14px;
+  font-weight: 600;
+}
+/* ===============================
+   NAVBAR – ACTIVE & HOVER WHITE
+================================ */
+
+/* Couleur texte */
+.navbar-main .nav-link{
+  color:#ffffff !important;
+}
+
+/* Hover */
+.navbar-main .nav-link:hover{
+  color:#ffffff !important;
+}
+
+/* Active (page courante) */
+.navbar-main .nav-link.active,
+.navbar-main .nav-link:focus{
+  color:#ffffff !important;
+}
+
+/* Soulignement animé toujours blanc */
+.navbar-main .nav-link::after{
+  background:#ffffff;
+}
+/* ===============================
+   LITEPICKER – GREEN SELECTION
+================================ */
+
+/* Jour sélectionné */
+.litepicker .container__days .day-item.is-start-date,
+.litepicker .container__days .day-item.is-end-date {
+  background: #2a9d8f !important;
+  color: #fff !important;
+  border-radius: 8px;
+}
+
+/* Plage sélectionnée */
+.litepicker .container__days .day-item.is-in-range {
+  background: rgba(42, 157, 143, 0.25) !important;
+  color: #264653 !important;
+}
+
+/* Hover */
+.litepicker .container__days .day-item:hover {
+  background: rgba(42, 157, 143, 0.35) !important;
+  color: #264653 !important;
+}
+
+/* Tooltip (11 nights) */
+.litepicker .container__tooltip {
+  background: #2a9d8f !important;
+  color: #fff !important;
+  border-radius: 6px;
+}
+.available-tours-section {
+  scroll-margin-top: 100px; /* évite navbar fixe */
+}
+/* ================= CHATBOT ================= */
+.chat-widget {
+  position: fixed;
+  bottom: 100px;
+  right: 25px;
+  width: 320px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(0,0,0,.25);
+  display: none;
+  flex-direction: column;
+  z-index: 9999;
+}
+
+.chat-widget.chat-open {
+  display: flex;
+}
+
+/* ===== HEADER ===== */
+.chat-header {
+  background: linear-gradient(90deg,#264653,#2a9d8f);
+  color: #fff;
+  padding: 12px 16px;
+  font-weight: 600;
+  border-radius: 14px 14px 0 0;
+  text-align: center;
+}
+
+/* ===== MESSAGES ===== */
+.chat-messages {
+  padding: 12px;
+  height: 230px;
+  overflow-y: auto;
+  background: #f7f8fa;
+}
+
+.msg {
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  max-width: 80%;
+}
+
+.msg.bot {
+  background: #e9ecef;
+}
+
+.msg.user {
+  background: #2a9d8f;
+  color: #fff;
+  margin-left: auto;
+}
+
+/* ===== INPUT ===== */
+.chat-input {
+  padding: 10px;
+  border-top: 1px solid #ddd;
+  display: flex;
+  gap: 6px;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.chat-input button {
+  background: #2a9d8f;
+  color: #fff;
+  border: none;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+/* ===== FLOATING BUTTON ===== */
+.btn-chatbot {
+  background: #2a9d8f;
+  color: #fff;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.25);
+}
+/* ===============================
+   TOUR STATUS BADGE (HOME)
+================================ */
+
+.tour-badge{
+  position:absolute;
+  top:14px;
+  left:14px;
+  padding:6px 12px;
+  font-size:0.75rem;
+  font-weight:700;
+  letter-spacing:.4px;
+  border-radius:8px;
+  z-index:10;
+  text-transform:uppercase;
+  box-shadow:0 6px 16px rgba(0,0,0,.25);
+}
+
+.tour-badge.pending{
+  background:#facc15;   /* jaune */
+  color:#1f2937;
+}
+
+.tour-badge.rejected{
+  background:#dc2626;
+  color:#fff;
+}
+/* ===============================
+   DATE CONFLICT TOAST
+================================ */
+.date-toast{
+  position:fixed;
+  bottom:30px;
+  right:30px;
+  background:#e0f2fe;
+  color:#0f172a;
+  padding:14px 18px;
+  border-radius:10px;
+  font-size:0.9rem;
+  font-weight:500;
+  box-shadow:0 12px 28px rgba(0,0,0,.25);
+  opacity:0;
+  transform:translateY(10px);
+  transition:.3s ease;
+  z-index:9999;
+}
+
+.date-toast.show{
+  opacity:1;
+  transform:none;
+}
+/* ===== GREEN RADIO BUTTONS ===== */
+.form-check-input:checked {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+.form-check-input:focus {
+  box-shadow: 0 0 0 0.15rem rgba(40, 167, 69, 0.25);
+}
+
+.form-check-input {
+  cursor: pointer;
+}
+
+.form-check-label {
+  cursor: pointer;
+}
+/* ===== FIX LITEPICKER VISIBILITY ===== */
+.litepicker {
+  z-index: 9999 !important;
+}
+/* ===== PROMO BADGE ===== */
+.tour-badge.promo{
+  position:absolute;
+  top:14px;
+  left:14px;
+  background:#e63946;
+  color:#fff;
+  padding:6px 12px;
+  border-radius:999px;
+  font-weight:800;
+  font-size:12px;
+  letter-spacing:.3px;
+  box-shadow:0 8px 18px rgba(0,0,0,.15);
+  z-index:3;
+}
+
+/* ===== PRICE DISPLAY ===== */
+.price-box{
+  display:flex;
+  flex-direction:column;
+  line-height:1.1;
+}
+
+.old-price{
+  color:#9ca3af;
+  text-decoration:line-through;
+  font-weight:600;
+  font-size:13px;
+}
+
+.new-price{
+  color:#2a9d8f;
+  font-weight:800;
+  font-size:18px;
+}
+
+/* Booking big prices */
+.old-price-big{
+  color:#9ca3af;
+  text-decoration:line-through;
+  font-weight:700;
+  font-size:18px;
+}
+
+.new-price-big{
+  color:#2a9d8f;
+  font-weight:900;
+  font-size:32px;
+}
+/* ===============================
+   PROMO TOP BAR (TRAIN ANIMATION)
+================================ */
 :root{
-  --primary:#0d6efd; /* Bootstrap primary */
-  --accent:#0b5ed7;
+  --topbar-h: 36px;
 }
-body{font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
-.navbar-brand{font-weight:700}
-.card{border:0}
-.btn-primary{background:var(--primary);border:0}
-.btn-primary:hover{background:var(--accent)}
-.bg-primary{background:var(--primary) !important}
-.text-primary{color:var(--primary) !important}
-.footer{background:#05386b;color:#fff;padding:20px}
+
+.promo-topbar{
+  height: var(--topbar-h);
+  width: 100%;
+  overflow: hidden;
+  background: linear-gradient(90deg,#0f766e,#2a9d8f);
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  position: relative;
+  z-index: 2001;
+  border-bottom: 1px solid rgba(255,255,255,.15);
+}
+
+.promo-track{
+  display: flex;
+  gap: 60px;
+  white-space: nowrap;
+  will-change: transform;
+  animation: promoMarquee 18s linear infinite;
+  padding-left: 100%;
+}
+
+.promo-topbar:hover .promo-track{
+  animation-play-state: paused; /* pause when hover */
+}
+
+.promo-msg{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  opacity: 0.95;
+}
+
+@keyframes promoMarquee{
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+
+/* ✅ Navbar position fix */
+
+
+/* ✅ Home page navbar absolute must start after topbar */
+
+
+/* ✅ Hero padding must include topbar + navbar */
+body[data-page="home"] .hero-home{
+  padding-top: calc(80px + var(--topbar-h));
+}
+/* ✅ Strong strike-through (trash line) */
+.old-price,
+.old-price-big{
+  color:#9ca3af;              /* ✅ gris */
+  text-decoration:line-through;
+  font-weight:700;
+  font-size:18px;
+}
+
+/* ===============================
+   PROMO TRAIN (BEFORE NAVBAR)
+================================ */
+.promo-train{
+  height: var(--topbar-h);
+  margin: 0;
+  padding: 0;
+}
+
+.promo-track{
+  display:flex;
+  width:max-content;
+  animation:promo-move 18s linear infinite;
+}
+.promo-track span{
+  white-space:nowrap;
+  padding:0 80px;
+  font-size:0.95rem;
+  font-weight:600;
+  letter-spacing:.3px;
+}
+
+
+/* DISCOUNT en rouge */
+.promo-discount{
+  color:#e63946;
+  font-weight:900;
+  letter-spacing:1px;
+  margin-right:6px;
+}
+
+/* Animation style train */
+@keyframes promo-move{
+  from{ transform:translateX(0); }
+  to{ transform:translateX(-50%); }
+}
+/* ===== PRICE INLINE (HOME CARDS) ===== */
+.price-inline{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+/* Ancien prix GRIS */
+.old-price{
+  color:#9ca3af;
+  text-decoration:line-through;
+  font-weight:600;
+  font-size:13px;
+}
+
+/* Nouveau prix */
+.new-price{
+  color:#2a9d8f;
+  font-weight:800;
+  font-size:17px;
+}
+
+/* Label discount */
+.discount-label{
+  background:#dc2626;
+  color:#fff;
+  font-size:10px;
+  font-weight:800;
+  padding:2px 6px;
+  border-radius:6px;
+  margin-left:6px;
+  letter-spacing:.5px;
+}
+/* ===== FORCE SAME HEIGHT FOR TOUR CARDS ===== */
+.available-tours-section .col-12,
+.available-tours-section .col-md-6,
+.available-tours-section .col-lg-4 {
+  display: flex;
+}
+
+.available-tours-section .tour-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.available-tours-section .card-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-grow: 1;
+}
+/* ===== NAVBAR FULL WIDTH FIX ===== */
+.navbar-main{
+  position: relative;
+  background: linear-gradient(90deg,#264653,#2a9d8f);
+  z-index: 1000;
+}
+
+
+
+/* Évite tout overflow blanc */
+body, html {
+  overflow-x: hidden;
+}
+.navbar{
+  padding: 6px 0;     /* AVANT : 14px */
+}
+.navbar-brand img{
+  height: 36px;       /* AVANT : 44px */
+}
+.navbar-brand strong{
+  font-size: 1rem;
+}
+.navbar-nav .nav-link{
+  padding: 6px 10px;
+  font-size: 0.95rem;
+}
+
+body[data-page="home"] .navbar-brand img{
+  height: 44px;
+}
+body[data-page="home"] .hero-home{
+  padding-top: calc(100px + var(--topbar-h));
+}
+html, body{
+  margin: 0;
+  padding: 0;
+}
+/* ===============================
+   PROMO TOP BAR – BLACK VERSION
+================================ */
+.promo-train,
+.promo-topbar {
+  background: #000000 !important;   /* ✅ noir */
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+.promo-track span {
+  color: #ffffff;
+  opacity: 0.95;
+}
+/* ===============================
+   STICKY FOOTER – GLOBAL
+================================ */
+
+/* Le body prend toute la hauteur */
+html, body {
+  height: 100%;
+}
+
+/* Layout principal */
+.layout-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Le contenu prend l'espace restant */
+.site-content {
+  flex: 1 0 auto;
+}
+
+/* Footer toujours en bas */
+.site-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+height: 250px;
+
+}
+/* ===============================
+   HOME – DISABLE ABSOLUTE NAVBAR
+/* ===============================
+   HOME – NAVBAR INSIDE HERO (NON STICKY)
+================================ */
+body[data-page="home"] .navbar-main{
+  position: absolute;      /* ⬅️ PAS fixed, PAS sticky */
+  top: var(--topbar-h);    /* sous la promo bar */
+  left: 0;
+  width: 100%;
+  background: transparent;
+  z-index: 10;
+}

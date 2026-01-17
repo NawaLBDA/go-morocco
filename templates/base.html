@@ -1,87 +1,279 @@
-
+{% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Oma Travels Agency</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <style>
-      /* quick navbar color change to match new primary */
-      .navbar.bg-primary{background:linear-gradient(90deg,var(--primary),var(--primary-dark)) !important}
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>{% block title %}Oma Travels Agency{% endblock %}</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
-<body class="bg-light">
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-  <div class="container">
-    <a class="navbar-brand d-flex align-items-center" href="/">
-      <img src="{% static 'img/logo.png' %}" alt="logo" style="height:34px;margin-right:10px"> Oma Travels Agency
+
+<body class="site-body layout-root" data-page="{% block page %}default{% endblock %}">
+<!-- ================= PROMO TRAIN BAR ================= -->
+<div class="promo-train">
+ <div class="promo-track">
+  <span>
+    ✨ <strong class="promo-discount">EXCLUSIVE DISCOUNT</strong>
+    Save up to <strong>30%</strong> on handpicked Morocco tours 🇲🇦
+  </span>
+
+  <span>
+    ✨ Limited-time offer · Premium experiences · Best price guaranteed
+  </span>
+
+  <span>
+    ✨ Book today & travel with confidence · Trusted local experts
+  </span>
+</div>
+
+</div>
+
+<!-- ================= NAVBAR ================= -->
+<nav class="navbar navbar-expand-lg navbar-dark navbar-main">
+  <div class="container px-4">
+
+    <!-- BRAND -->
+    <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}">
+      <img src="{% static 'img/logo4.png' %}" alt="Oma Travels Logo" style="height:44px;margin-right:10px">
+      <strong>Oma Go Morocco</strong>
     </a>
+
+    <!-- TOGGLER -->
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
       <span class="navbar-toggler-icon"></span>
     </button>
+
+    <!-- MENU -->
     <div class="collapse navbar-collapse" id="nav">
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'blog_list' %}">Blog</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'about' %}">About</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'contact' %}">Contact</a></li>
-        {% if sections %}
-          {% for s in sections %}
-            <li class="nav-item d-flex align-items-center">
-              <a class="nav-link" href="#{{ s.slug }}">{{ s.title }}</a>
-              {% if user.is_staff %}
-                <a class="ms-1 text-light small" href="{% url 'admin:core_section_change' s.id %}" title="Edit section"><i class="fa-solid fa-pen-to-square"></i></a>
-              {% endif %}
-            </li>
-          {% endfor %}
-        {% endif %}
+
+      <!-- LEFT LINKS -->
+      <ul class="navbar-nav me-auto align-items-center">
+        <li class="nav-item">
+          <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{% url 'home' %}">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if 'blog' in request.path %}active{% endif %}" href="{% url 'blog_list' %}">Blog</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if 'about' in request.path %}active{% endif %}" href="{% url 'about' %}">About</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if 'contact' in request.path %}active{% endif %}" href="{% url 'contact' %}">Contact</a>
+        </li>
+              <li class="nav-item">
+
+        </li>
+        {% if user.is_authenticated and user.is_staff %}
+<li class="nav-item">
+  <a class="nav-link {% if 'dashboard' in request.path %}active{% endif %}"
+     href="{% url 'admin_reservations' %}">
+     All Reservations
+  </a>
+</li>
+{% endif %}
+
       </ul>
-      <ul class="navbar-nav">
+
+      <!-- RIGHT AUTH -->
+      <ul class="navbar-nav align-items-center">
+
         {% if user.is_authenticated %}
-          <li class="nav-item"><a class="nav-link" href="#">Hi, {{ user.username }}</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
+          <li class="nav-item">
+            <span class="nav-link">Hi, <strong>{{ user.username }}</strong></span>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'logout' %}">Logout</a>
+          </li>
+
+          {% if user.username == "omadmin" or user.is_staff %}
+            <li class="nav-item">
+              <a class="nav-link" href="/admin/">Admin</a>
+            </li>
+          {% endif %}
+
         {% else %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Login</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'register' %}">Register</a></li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'login' %}">Login</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'register' %}">Register</a>
+          </li>
         {% endif %}
-        {% if user.is_staff %}
-          <li class="nav-item"><a class="nav-link" href="/admin/">Admin</a></li>
-        {% endif %}
+
       </ul>
     </div>
   </div>
-  </nav>
+</nav>
+{% if messages %}
+<div class="container mt-3">
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
 
-<div class="container mt-4">
+
+<!-- ================= MAIN CONTENT ================= -->
+
+{% if messages %}
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  {% for message in messages %}
+  <div class="toast show align-items-center text-bg-success border-0">
+    <div class="d-flex">
+      <div class="toast-body">
+        {{ message }}
+      </div>
+      <button type="button" class="btn-close btn-close-white ms-auto"
+              data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- ================= FOOTER ================= -->
+<main class="site-content flex-fill">
   {% block content %}{% endblock %}
-</div>
+</main>
 
-{% include 'partials/footer.html' %}
+<footer class="site-footer mt-auto">
+  {% include 'partials/footer.html' %}
+</footer>
 
+<!-- ================= JS ================= -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-{% load static %}
-<script src="{% static 'js/booking.js' %}"></script>
 
-<!-- Floating contact buttons -->
+<!-- ================= FLOATING CONTACT ================= -->
 <div class="floating-contact">
-  <a class="btn-whatsapp" href="https://wa.me/212600000000" target="_blank" title="Contact us on WhatsApp"><i class="fa-brands fa-whatsapp fa-lg"></i></a>
-  <a id="chat-toggle" class="btn-chatbot" href="javascript:void(0);" title="Open chat"><i class="fa-solid fa-comments fa-lg"></i></a>
+  <a class="btn-whatsapp" href="https://wa.me/212600000000" target="_blank" title="WhatsApp">
+    <i class="fa-brands fa-whatsapp"></i>
+  </a>
+  <a id="chat-toggle" class="btn-chatbot" href="javascript:void(0);" title="Chat">
+    <i class="fa-solid fa-comments"></i>
+  </a>
 </div>
 
-<!-- Chat widget -->
+<!-- ================= CHAT WIDGET ================= -->
 <div id="chat-widget" class="chat-widget" aria-hidden="true">
-  <div class="chat-header">Oma Travels - Assistant</div>
+  <div class="chat-header">Oma Go – Assistant</div>
   <div id="chat-messages" class="chat-messages">
-    <div class="msg bot">Hello! Ask a question or type "price" to get rates.</div>
+    <div class="msg bot">
+      Hello 👋 How can I help you plan your trip?
+    </div>
   </div>
   <form id="chat-form" class="chat-input">
-    <input type="text" placeholder="Write a message...">
+    <input type="text" placeholder="Type your message..." required>
     <button type="submit">Send</button>
   </form>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  const chatToggle   = document.getElementById('chat-toggle');
+  const chatWidget   = document.getElementById('chat-widget');
+  const chatForm     = document.getElementById('chat-form');
+  const chatInput    = chatForm.querySelector('input');
+  const chatMessages = document.getElementById('chat-messages');
+
+  /* ========= LOAD CHAT HISTORY (SANS OUVRIR) ========= */
+  function loadChatHistory() {
+    const savedMessages = localStorage.getItem('oma_chat_history');
+    if (savedMessages) {
+      chatMessages.innerHTML = savedMessages;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    const isOpen = localStorage.getItem('oma_chat_open') === 'true';
+    chatWidget.setAttribute('aria-hidden', !isOpen);
+    chatWidget.classList.toggle('chat-open', isOpen);
+  }
+
+  /* ========= SAVE CHAT HISTORY ========= */
+  function saveChatHistory() {
+    localStorage.setItem('oma_chat_history', chatMessages.innerHTML);
+  }
+
+  /* ========= TOGGLE OPEN / CLOSE ========= */
+  chatToggle.addEventListener('click', function () {
+    const isHidden = chatWidget.getAttribute('aria-hidden') === 'true';
+    chatWidget.setAttribute('aria-hidden', !isHidden);
+    chatWidget.classList.toggle('chat-open', isHidden);
+
+    localStorage.setItem('oma_chat_open', isHidden);
+  });
+
+  /* ========= ADD MESSAGE ========= */
+  function addMessage(text, type) {
+    const msg = document.createElement('div');
+    msg.className = 'msg ' + type;
+    msg.textContent = text;
+    chatMessages.appendChild(msg);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    saveChatHistory();
+  }
+
+  /* ========= FORM SUBMIT ========= */
+  chatForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    addMessage(text, 'user');
+    chatInput.value = '';
+
+    setTimeout(() => {
+      const t = text.toLowerCase();
+      let reply = "How can I help you today?";
+
+      if (t.includes('price') || t.includes('cost')) {
+        reply = "Our tours start from 2000 $ per night per person.";
+      }
+      else if (t.includes('book') || t.includes('booking') || t.includes('reserve')) {
+        reply =
+          "To book a tour 👇\n" +
+          "1️⃣ Browse available tours\n" +
+          "2️⃣ Select your dates & persons\n" +
+          "3️⃣ Price is calculated automatically\n" +
+          "4️⃣ Confirm booking ✅";
+
+        setTimeout(() => {
+          window.location.href = "/#available-tours";
+        }, 2000);
+      }
+      else if (t.includes('hello') || t.includes('hi')) {
+        reply = "Hello 👋 Welcome to Oma Go Morocco!";
+      }
+      else if (t.includes('whatsapp')) {
+        reply = "Contact us on WhatsApp: +212 6 00 00 00 00.";
+      }
+
+      addMessage(reply, 'bot');
+    }, 600);
+  });
+
+  /* ========= INIT ========= */
+  loadChatHistory();
+
+});
+</script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>

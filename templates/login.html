@@ -1,13 +1,42 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% block page %}auth{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-6">
-    <h2>Login</h2>
-    <form method="post">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button class="btn btn-primary">Login</button>
-    </form>
+<section class="auth-hero">
+  <div class="auth-overlay"></div>
+
+  <div class="auth-container">
+    <div class="auth-card">
+
+      <h2 class="auth-title">Sign in</h2>
+      <p class="auth-subtitle">
+        Access your bookings and travel details
+      </p>
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label for="id_username">Username</label>
+          {{ form.username }}
+        </div>
+
+        <div class="mb-3">
+          <label for="id_password">Password</label>
+          {{ form.password }}
+        </div>
+
+        <button class="btn btn-primary w-100 py-2 mt-2">
+          Sign in
+        </button>
+      </form>
+
+      <p class="auth-footer mt-3">
+        Don’t have an account?
+        <a href="{% url 'register' %}">Create one</a>
+      </p>
+
+    </div>
   </div>
-</div>
+</section>
 {% endblock %}

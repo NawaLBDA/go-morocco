@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block page %}auth{% endblock %}
+
+{% block content %}
+<section class="auth-hero">
+  <div class="auth-overlay"></div>
+
+  <div class="auth-container">
+    <div class="auth-card">
+      <h2 class="auth-title">Confirm Logout</h2>
+      <p class="auth-subtitle">
+        Are you sure you want to log out?
+      </p>
+
+      <form method="post" style="text-align:center;">
+        {% csrf_token %}
+        
+        <button type="submit" class="btn btn-primary w-100 py-2" style="margin-bottom:12px;">
+          Yes, Log Out
+        </button>
+      </form>
+
+      <a href="{% url 'home' %}" class="btn btn-outline-secondary w-100 py-2" style="display:block; text-align:center; border:1px solid #d1d5db; color:#264653;">
+        Cancel
+      </a>
+
+      <p class="auth-footer mt-3">
+        <a href="{% url 'home' %}">Back to Home</a>
+      </p>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,67 +1,548 @@
-
 {% extends 'base.html' %}
-{% block content %}
-<div class="row">
-	<div class="col-lg-8">
-		<h2 class="mb-3">Booking {{ tour.title }}</h2>
-		<div class="card mb-3">
-			<div class="overflow-hidden">
-			{% if tour.image %}
-				<img src="{{ tour.image.url }}" class="tour-cover">
-			{% elif tour.destination.image %}
-				<img src="{{ tour.destination.image.url }}" class="tour-cover">
-			{% else %}
-				<img src="/static/img/placeholder.jpg" class="tour-cover">
-			{% endif %}
-			</div>
-			<div class="card-body">
-				<h5 class="card-title">About this tour</h5>
-				<p>{{ tour.description|default:tour.destination.description|linebreaks }}</p>
-			</div>
-		</div>
-	</div>
+{% load static %}
 
-	<div class="col-lg-4">
-		<div class="card p-3 sticky-top">
-			<h5>Book Now</h5>
-			<p class="mb-1">Price per person / night</p>
-			<p class="fs-5"><strong id="display-base">{{ tour.price_per_night|default:1000 }} MAD</strong></p>
-			<form method="post" action="{% url 'book_tour' tour.id %}">
-				{% csrf_token %}
-				<input type="hidden" id="base-price" value="{{ tour.price_per_night|default:1000 }}">
-				<div class="mb-2">
-					<label class="form-label">Nights</label>
-					<input id="nights" name="nights" type="number" min="1" value="1" class="form-control">
-				</div>
-				<div class="mb-2">
-					<label class="form-label">Persons</label>
-					<input id="persons" name="persons" type="number" min="1" value="1" class="form-control">
-				</div>
-				<p class="small text-muted">Group discount: 10% for 5 or more persons</p>
-				<p class="mt-2">Total: <strong id="live-price">0 MAD</strong></p>
-				<button class="btn btn-primary w-100" type="submit">Confirm booking</button>
-			</form>
-		</div>
-	</div>
+{% block content %}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litepicker/dist/css/litepicker.css">
+<script src="https://cdn.jsdelivr.net/npm/litepicker/dist/litepicker.js"></script>
+
+<section class="container my-5">
+  <div class="row g-5">
+
+    <!-- LEFT CONTENT -->
+    <div class="col-lg-8">
+      <h2 class="fw-bold">{{ tour.title }}</h2>
+      <p class="text-muted d-flex align-items-center gap-1 mb-1">
+        <i class="fa-solid fa-location-dot text-success"></i>
+        <span>{{ tour.destination.name }}</span>
+      </p>
+
+      <div class="tour-image-container position-relative">
+        <img src="{{ tour.image.url }}" class="img-fluid rounded mb-4 tour-booking-image">
+      </div>
+
+      <div class="tour-description mb-4">
+        <h4 class="fw-bold mb-3">About this tour</h4>
+        <p>{{ tour.description|linebreaks }}</p>
+
+        {% if tour.destination.description %}
+        <hr class="my-4">
+        <h5 class="fw-bold mb-2">About {{ tour.destination.name }}</h5>
+        <p>{{ tour.destination.description|linebreaks }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- RIGHT BOOKING CARD -->
+    <div class="col-lg-4">
+      <div class="card p-4 shadow-sm">
+        <h4 class="fw-bold mb-3">Booking</h4>
+
+
+
+{% if tour.is_promotion and tour.discount_percent > 0 and tour.promo_price %}
+  <div class="mb-3">
+    <div class="text-muted small">Promo -{{ tour.discount_percent }}%</div>
+<div class="d-flex align-items-end gap-2">
+  <span class="old-price-big">
+    {{ tour.price_per_night }} $
+  </span>
+
+  <span class="new-price-big">
+    {{ tour.promo_price }} $
+  </span>
+
+  <span class="badge bg-danger ms-2">DISCOUNT</span>
 </div>
 
+  </div>
+{% else %}
+  <p class="fs-3 fw-bold text-primary">
+    {{ tour.price_per_night }} $ / night
+  </p>
+{% endif %}
+
+{% if reservation %}
+
+  <div class="mt-3">
+
+    <!-- ✅ DETAILS -->
+    <div class="border rounded p-3 bg-light small mb-3">
+      <div class="d-flex justify-content-between">
+        <span><i class="fa-regular fa-calendar me-1"></i> Dates</span>
+        <strong>{{ reservation.start_date }} → {{ reservation.end_date }}</strong>
+      </div>
+
+      <div class="d-flex justify-content-between mt-2">
+        <span><i class="fa-solid fa-moon me-1"></i> Nights</span>
+        <strong>{{ reservation.nights }} nights</strong>
+      </div>
+
+      <div class="d-flex justify-content-between mt-2">
+        <span><i class="fa-solid fa-users me-1"></i> Persons</span>
+        <strong>{{ reservation.num_persons }}</strong>
+      </div>
+
+      <div class="d-flex justify-content-between mt-2">
+        <span><i class="fa-solid fa-money-bill-wave me-1"></i> Total</span>
+        <strong>{{ reservation.total_price }} $</strong>
+      </div>
+
+      <hr class="my-2">
+
+      <div class="d-flex justify-content-between">
+        <span><i class="fa-regular fa-credit-card me-1"></i> Method</span>
+        <strong class="text-uppercase">{{ reservation.payment_method }}</strong>
+      </div>
+
+      <div class="d-flex justify-content-between mt-2">
+        <span><i class="fa-solid fa-circle-info me-1"></i> Payment status</span>
+
+        {% if reservation.payment_status == 'paid' %}
+          <span class="badge bg-success">PAID</span>
+        {% else %}
+          <span class="badge bg-warning text-dark">UNPAID</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ✅ STATUS -->
+    {% if reservation.status == 'pending' %}
+      <div class="alert alert-warning small">
+        <i class="fa-solid fa-clock me-1"></i>
+        Your booking is under review. Please wait for admin validation.
+      </div>
+
+      <!-- ✅ Cancel ONLY if date not passed -->
+      {% if reservation.end_date >= today %}
+        <a href="{% url 'cancel_reservation' reservation.id %}" class="btn btn-outline-danger w-100">
+          Cancel booking
+        </a>
+      {% endif %}
+
+      <button class="btn btn-warning w-100 mt-2" disabled>
+        Pending validation
+      </button>
+
+    {% elif reservation.status == 'booked' %}
+      <div class="alert alert-success small">
+        <i class="fa-solid fa-circle-check me-1"></i>
+        Booking validated ✅
+      </div>
+
+      {% if reservation.payment_status != 'paid' %}
+        <div class="alert alert-info small">
+          <i class="fa-solid fa-triangle-exclamation me-1"></i>
+          You have not paid yet.
+        </div>
+
+        {% if reservation.payment_method == 'card' %}
+<button type="button"
+        class="btn btn-dark w-100"
+        id="payNowBtn"
+        data-reservation-id="{{ reservation.id }}"
+        data-total="{{ reservation.total_price }}">
+  Pay now
+</button>
+
+        {% endif %}
+      {% endif %}
+
+      <button class="btn btn-success w-100 mt-2" disabled>
+        Booked
+      </button>
+
+    {% elif reservation.status == 'rejected' %}
+      <div class="alert alert-danger small">
+        <i class="fa-solid fa-xmark me-1"></i>
+        Your booking was rejected. Please choose other dates.
+      </div>
+{% elif reservation.status == 'cancelled' %}
+  <div class="alert alert-secondary small">
+    <i class="fa-solid fa-ban me-1"></i>
+    This reservation was cancelled. You can book again.
+  </div>
+  {% include "partials/booking_form.html" %}
+
+    {% endif %}
+
+  </div>
+
+{% else %}
+
+  <!-- ✅ BOOKING FORM (no reservation yet) -->
+  <form method="post" id="booking-form" action="{% url 'book_tour' tour.id %}">
+    {% csrf_token %}
+
+{% if tour.is_promotion and tour.discount_percent > 0 and tour.promo_price %}
+  <input type="hidden" id="base-price" value="{{ tour.promo_price }}">
+{% else %}
+  <input type="hidden" id="base-price" value="{{ tour.price_per_night }}">
+{% endif %}
+
+    
+    <label class="fw-bold">Dates</label>
+
+    <input type="text" id="start_date" name="start_date"
+           class="form-control booking-date mb-2"
+           placeholder="Start date" autocomplete="off" required>
+
+    <input type="text" id="end_date" name="end_date"
+           class="form-control booking-date mb-3"
+           placeholder="End date" autocomplete="off" required>
+
+    <div id="dateWarning" class="alert alert-warning py-2 px-3 small d-none mt-2">
+      <i class="fa-solid fa-triangle-exclamation me-1"></i>
+      This date range is already booked. Please select another date.
+    </div>
+
+    <label class="fw-bold">Persons</label>
+    <input type="number" id="persons" name="persons" value="1" min="1"
+           class="form-control mb-3">
+
+    <label class="fw-bold mb-2 d-block">Booking for</label>
+    <div class="booking-for-options mb-3">
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="booking_for" id="booking_me" value="me" checked>
+        <label class="form-check-label" for="booking_me">Myself</label>
+      </div>
+
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="booking_for" id="booking_other" value="other">
+        <label class="form-check-label" for="booking_other">Someone else</label>
+      </div>
+    </div>
+
+    <div id="guestFields" style="display:none">
+      <input name="guest_full_name" class="form-control mb-2" placeholder="Full name">
+      <input name="guest_phone" class="form-control mb-2" placeholder="Phone number">
+    </div>
+
+    <p class="text-muted small mt-2">
+      🛈 Booking will be confirmed after admin validation.
+    </p>
+
+    <div class="alert alert-success small mb-3">
+      <i class="fa-solid fa-gift"></i> 10% discount for 5+ persons
+    </div>
+
+    <div class="d-flex justify-content-between fw-bold mb-3">
+      <span>Total</span>
+      <span id="live-price">0 $</span>
+    </div>
+
+    <label class="fw-bold mb-2">Payment method</label>
+    <div class="mb-3">
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="payment_method" value="cash" checked>
+        <label class="form-check-label"> Cash (pay later)</label>
+      </div>
+
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="payment_method" value="card">
+        <label class="form-check-label">💳 Card payment (secure)</label>
+      </div>
+    </div>
+
+    <button id="confirmCashBtn" class="btn btn-primary w-100">
+      Confirm booking
+    </button>
+
+  </form>
+
+{% endif %}
+
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ✅ RIGHT SIDEBAR (BOOTSTRAP OFFCANVAS) -->
+
+<!-- ✅ RIGHT SIDEBAR (BOOTSTRAP OFFCANVAS) -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="cardSidebar">
+  <div class="offcanvas-header">
+  <h5 class="offcanvas-title fw-bold">
+    <i class="fa-solid fa-lock text-success me-1"></i>
+    Secure card payment
+  </h5>
+
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+
+  <div class="offcanvas-body">
+
+    <!-- ✅ Total -->
+    <div class="alert alert-light border small mb-3">
+      <strong>Total to pay:</strong> <span id="stripe-total">0 $</span>
+    </div>
+
+    <!-- ✅ Email like Shein/Temu -->
+    <label class="fw-bold small mb-1">Email</label>
+    <input type="email" id="stripeEmail" class="form-control mb-3" placeholder="you@example.com">
+
+    <!-- ✅ STRIPE PAYMENT ELEMENT -->
+    <div id="payment-element" class="mb-2"></div>
+    <div id="card-errors" class="text-danger small mt-2"></div>
+
+    <button type="button" id="confirmCardBookingBtn" class="btn btn-dark w-100 mt-3">
+      Pay & Confirm booking
+    </button>
+
+ <hr class="my-3">
+
+<div class="small text-muted">
+  <i class="fa-solid fa-shield-halved text-success me-1"></i>
+  Your payment is processed securely by Stripe.
+</div>
+
+  </div>
+</div>
+
+<!-- ✅ Stripe JS (ONE TIME فقط) -->
+<script src="https://js.stripe.com/v3/"></script>
 <script>
-	(function(){
-		const base = parseFloat(document.getElementById('base-price').value || 1000);
-		const nights = document.getElementById('nights');
-		const persons = document.getElementById('persons');
-		const live = document.getElementById('live-price');
-		function update(){
-			const n = parseInt(nights.value||1);
-			const p = parseInt(persons.value||1);
-			let total = base * n * p;
-			if(p >= 5) total = total * 0.9; // 10% discount
-			live.textContent = total.toFixed(2) + ' MAD';
-		}
-		nights.addEventListener('input', update);
-		persons.addEventListener('input', update);
-		update();
-	})();
+document.addEventListener("DOMContentLoaded", function () {
+
+  const startInput   = document.getElementById("start_date");
+  const endInput     = document.getElementById("end_date");
+  const personsInput = document.getElementById("persons");
+  const basePriceEl  = document.getElementById("base-price");
+  const totalOutput  = document.getElementById("live-price");
+  const dateWarning  = document.getElementById("dateWarning");
+
+  // ✅ si pas de form => stop calendrier فقط
+  if (!startInput || !endInput || !personsInput || !basePriceEl) return;
+
+  const basePrice = parseFloat(basePriceEl.value || "0");
+  const disabledRanges = {{ disabled_ranges|default:"[]"|safe }};
+
+  function showDateWarning(show=true){
+    if (!dateWarning) return;
+    if (show) dateWarning.classList.remove("d-none");
+    else dateWarning.classList.add("d-none");
+  }
+
+  function rangesOverlap(aStart, aEnd, bStart, bEnd){
+    return aStart <= bEnd && aEnd >= bStart;
+  }
+
+  function isRangeConflict(startDate, endDate){
+    for (const r of disabledRanges) {
+      const rs = new Date(r.from);
+      const re = new Date(r.to);
+      if (rangesOverlap(startDate, endDate, rs, re)) return true;
+    }
+    return false;
+  }
+
+  function calculateTotal(){
+    const persons = Math.max(1, parseInt(personsInput.value || "1"));
+
+    if (!startInput.value || !endInput.value){
+      totalOutput.textContent = (basePrice * persons).toFixed(2) + " $";
+      return;
+    }
+
+    const start = new Date(startInput.value);
+    const end   = new Date(endInput.value);
+    const nights = Math.round((end - start) / (1000 * 60 * 60 * 24));
+
+    if (nights < 1){
+      totalOutput.textContent = (basePrice * persons).toFixed(2) + " $";
+      return;
+    }
+
+    let total = nights * persons * basePrice;
+    if (persons >= 5) total *= 0.9;
+
+    totalOutput.textContent = total.toFixed(2) + " $";
+  }
+
+  calculateTotal();
+  personsInput.addEventListener("input", calculateTotal);
+
+  const picker = new Litepicker({
+    element: startInput,
+    elementEnd: endInput,
+    singleMode: false,
+    allowRepick: true,
+    autoApply: true,
+    minDate: new Date(),
+    format: "YYYY-MM-DD",
+    numberOfMonths: 1,
+    numberOfColumns: 1,
+    showTooltip: true,
+    selectForward: true,
+    tooltipText: { one: "night", other: "nights" },
+    lockDays: disabledRanges.map(r => ({ from: r.from, to: r.to })),
+  });
+
+  picker.on("selected", (startDate, endDate) => {
+    if (!startDate || !endDate) return;
+
+    const s = startDate.dateInstance;
+    const e = endDate.dateInstance;
+
+    if (isRangeConflict(s, e)) {
+      startInput.value = "";
+      endInput.value = "";
+      picker.clearSelection();
+      calculateTotal();
+      showDateWarning(true);
+      return;
+    }
+
+    showDateWarning(false);
+    calculateTotal();
+  });
+
+});
 </script>
+<script src="https://js.stripe.com/v3/"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const payNowBtn = document.getElementById("payNowBtn");
+  const sidebarEl = document.getElementById("cardSidebar");
+
+  if (!payNowBtn || !sidebarEl) return;
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== "") {
+      const cookies = document.cookie.split(";");
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.startsWith(name + "=")) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie("csrftoken");
+
+  const reservationId = payNowBtn.dataset.reservationId;
+
+  const stripe = Stripe("{{ STRIPE_PUBLIC_KEY }}");
+
+  let sidebar = null;
+  if (window.bootstrap) {
+    sidebar = new bootstrap.Offcanvas(sidebarEl);
+  } else {
+    console.log("❌ Bootstrap JS not loaded => Offcanvas won't work");
+  }
+
+  const paymentContainer = document.getElementById("payment-element");
+  const cardErrorsEl = document.getElementById("card-errors");
+  const confirmCardBtn = document.getElementById("confirmCardBookingBtn");
+  const stripeEmailInput = document.getElementById("stripeEmail");
+
+  let elements = null;
+
+  function setCardError(msg){
+    if (cardErrorsEl) cardErrorsEl.textContent = msg || "";
+  }
+
+  async function createIntent(){
+    const res = await fetch(`/reservation/${reservationId}/create-intent/`, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrftoken }
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Payment error");
+    return data;
+  }
+
+async function openAndInitStripe(){
+
+  // ✅ SHOW sidebar
+  if (sidebar) sidebar.show();
+
+  // ✅ SET TOTAL in sidebar
+  const stripeTotalEl = document.getElementById("stripe-total");
+  const total = parseFloat(payNowBtn.dataset.total || "0");
+  if (stripeTotalEl) {
+    stripeTotalEl.textContent = total.toFixed(2) + " $";
+  }
+
+  setCardError("");
+  paymentContainer.innerHTML = "";
+
+  try {
+    const data = await createIntent();
+
+    const clientSecret = data.client_secret;
+
+    elements = stripe.elements({ clientSecret });
+
+    const paymentElement = elements.create("payment", { layout: "tabs" });
+    paymentElement.mount("#payment-element");
+
+  } catch(e){
+    setCardError(e.message);
+  }
+}
+
+  payNowBtn.addEventListener("click", openAndInitStripe);
+
+  confirmCardBtn.addEventListener("click", async function(){
+    if (!elements){
+      setCardError("Please click Pay now first.");
+      return;
+    }
+
+    const email = stripeEmailInput.value.trim();
+    if (!email){
+      setCardError("Please enter your email.");
+      return;
+    }
+
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: { receipt_email: email },
+      redirect: "if_required"
+    });
+
+    if (error){
+      setCardError(error.message);
+      return;
+    }
+
+    window.location.reload();
+  });
+
+});
+</script>
+
+<style>
+/* ✅ GREEN toast like your theme */
+.date-toast{
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #2a9d8f;   /* ✅ theme green */
+  color: white;
+  padding: 12px 16px;
+  border-radius: 12px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: 0.25s;
+  z-index: 9999;
+  box-shadow: 0 8px 20px rgba(0,0,0,.12);
+  font-weight: 600;
+}
+.date-toast.show{
+  opacity: 1;
+  transform: translateY(0px);
+}
+</style>
+
 
 {% endblock %}

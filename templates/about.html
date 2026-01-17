@@ -1,5 +1,51 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
-<h2>About Us</h2>
-<p>Welcome to TravelPro — professional travel agency template. Edit content in admin Sections.</p>
+
+<section class="container my-5">
+  <div class="row align-items-center gy-5">
+
+    <!-- TEXT CONTENT -->
+    <div class="col-lg-6 pe-lg-5">
+      <span class="text-uppercase text-primary fw-semibold small">
+        Who We Are
+      </span>
+
+      <h2 class="fw-bold mt-2 mb-4">
+        About Oma Travels Agency
+      </h2>
+
+      <p class="text-muted fs-6">
+        <strong>Oma Travels Agency</strong> is a Morocco-based travel agency
+        dedicated to the design and management of authentic, cultural,
+        and luxury travel experiences across the Kingdom.
+      </p>
+
+      <p class="text-muted fs-6">
+        We go beyond traditional tourism by creating carefully curated
+        journeys that combine comfort, local expertise, and meaningful
+        cultural immersion — allowing our travelers to truly experience
+        the soul of Morocco.
+      </p>
+
+      <ul class="list-unstyled mt-4 about-features">
+        <li>✔ Tailor-made travel planning and organization</li>
+        <li>✔ Professional local guides and trusted partners</li>
+        <li>✔ Handpicked hotels and premium accommodations</li>
+        <li>✔ 24/7 assistance before, during, and after your journey</li>
+      </ul>
+    </div>
+
+    <!-- IMAGE -->
+    <div class="col-lg-6 ps-lg-5">
+      <div class="about-image-wrapper">
+        <img src="{% static 'img/about.png' %}"
+             alt="About Oma Travels Agency"
+             class="img-fluid rounded shadow">
+      </div>
+    </div>
+
+  </div>
+</section>
+
 {% endblock %}

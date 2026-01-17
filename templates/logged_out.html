@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block page %}auth{% endblock %}
+
+{% block content %}
+<section class="auth-hero">
+  <div class="auth-overlay"></div>
+
+  <div class="auth-container">
+    <div class="auth-card">
+      <h2 class="auth-title">See you soon 👋</h2>
+      <p class="auth-subtitle">
+        You have been logged out successfully
+      </p>
+
+      <div style="text-align:center; margin-top:30px;">
+        <a href="{% url 'home' %}" class="btn btn-primary w-100 py-2">
+          Back to Home
+        </a>
+
+        <p class="auth-footer mt-3">
+          <a href="{% url 'login' %}">Sign in again</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

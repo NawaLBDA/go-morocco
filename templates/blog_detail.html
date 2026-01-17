@@ -1,11 +1,105 @@
 {% extends 'base.html' %}
 {% block content %}
-<article>
-  <h1>{{ post.title }}</h1>
-  <p class="text-muted">{{ post.created_at|date:'d M Y' }}</p>
-  {% if post.image %}
-    <img src="{{ post.image.url }}" class="img-fluid mb-3">
-  {% endif %}
-  <div>{{ post.content|linebreaks }}</div>
-</article>
+
+<section class="container my-5">
+
+  <h1 class="fw-bold mb-2">{{ post.title }}</h1>
+  <p class="text-muted mb-4">{{ post.created_at|date:'d M Y' }}</p>
+{% if post.image or post.gallery.all %}
+<div class="blog-gallery-wrapper mb-4">
+
+  <button class="gallery-nav left" onclick="scrollGallery(-1)">‹</button>
+
+  <div class="blog-gallery-grid" id="galleryGrid">
+
+    {# FIRST IMAGE = BlogPost.image #}
+    {% if post.image %}
+      <img src="{{ post.image.url }}"
+           class="gallery-image"
+           onclick="openImageModal(this)">
+    {% endif %}
+
+    {# OTHER IMAGES = BlogImage #}
+    {% for img in post.gallery.all %}
+      <img src="{{ img.image.url }}"
+           class="gallery-image"
+           onclick="openImageModal(this)">
+    {% endfor %}
+
+  </div>
+
+  <button class="gallery-nav right" onclick="scrollGallery(1)">›</button>
+
+</div>
+{% endif %}
+
+
+  <!-- CONTENU -->
+  <div class="blog-content mb-5">
+    {{ post.content|linebreaks }}
+  </div>
+
+  <!-- ================= COMMENTS ================= -->
+  <section class="comments-section">
+
+    <h4 class="mb-3">Comments</h4>
+
+    <div class="comments-box">
+      {% for comment in comments|slice:":15" %}
+        <div class="comment-item">
+          <strong>{{ comment.user.username }}</strong>
+          <span class="comment-date">
+            {{ comment.created_at|date:"d M Y H:i" }}
+          </span>
+          <p>{{ comment.content }}</p>
+        </div>
+      {% empty %}
+        <p class="text-muted">No comments yet.</p>
+      {% endfor %}
+    </div>
+
+    {% if user.is_authenticated %}
+    <form method="post" class="mt-3">
+      {% csrf_token %}
+      <textarea name="content"
+                class="form-control"
+                rows="3"
+                placeholder="Write your comment..."
+                required></textarea>
+      <button class="btn btn-primary mt-2">Send</button>
+    </form>
+    {% else %}
+      <p class="mt-3 text-muted">
+        Please <a href="{% url 'login' %}">login</a> to comment.
+      </p>
+    {% endif %}
+
+  </section>
+
+</section>
+
+<!-- MODAL IMAGE -->
+<div class="modal fade" id="imgModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content bg-transparent border-0">
+      <img id="modalImage" class="w-100 rounded">
+    </div>
+  </div>
+</div>
+
+<script>
+function openImageModal(el){
+  document.getElementById('modalImage').src = el.src;
+  new bootstrap.Modal(document.getElementById('imgModal')).show();
+}
+
+function scrollGallery(direction){
+  const grid = document.getElementById('galleryGrid');
+  grid.scrollBy({
+    left: direction * grid.clientWidth,
+    behavior: 'smooth'
+  });
+}
+</script>
+
 {% endblock %}
