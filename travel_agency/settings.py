@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-dev-key-change-later'
 DEBUG = True
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -51,23 +51,28 @@ TEMPLATES = [
         },
     },
 ]
-STRIPE_SECRET_KEY = 'sk_test_51SpxfZ4YMQsgoNZ714OWYuDTtH4gfUQOrBt9fQ4NaolGxiwydO6OxdGM2qzxwM0W4C1xCyMTPTcYr7nMleU7dfoc00fggPuC2j'
-STRIPE_PUBLIC_KEY = 'pk_test_51SpxfZ4YMQsgoNZ7pIlbVjDkCpGI49QCtLazSvXcx4fOZi3NcjR2MwdJGNjC7b3tlwJiz9UzfMendoL5toA2OYAv00t7GomWAM'
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
+STRIPE_PUBLIC_KEY = os.environ.get("STRIPE_PUBLIC_KEY")
+import dj_database_url
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+MIDDLEWARE.insert(
+    1, "whitenoise.middleware.WhiteNoiseMiddleware"
+)
+
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+CSRF_TRUSTED_ORIGINS = [
+    "https://oma-travels.onrender.com"
+]
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'travel_agency',   # ✅ base déjà créée
-        'USER': 'root',
-        'PASSWORD': 'P@ss123',
-        'HOST': 'localhost',
-        'PORT': '3306',
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-            'charset': 'utf8mb4',
-        },
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get("DATABASE_URL"),
+        conn_max_age=600,
+        ssl_require=True
+    )
 }
+
 
 
 STATIC_URL = '/static/'
