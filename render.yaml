@@ -1,7 +1,6 @@
 services:
   - type: web
-    name: oma-travels
+    name: go-morocco
     env: python
-    pythonVersion: 3.11.9
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn travel_agency.wsgi:application
