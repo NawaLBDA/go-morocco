@@ -1230,7 +1230,8 @@ img{max-width:100%}
 .tour-badge.promo{
   position:absolute;
   top:14px;
-  left:14px;
+  right:14px;   /* ✅ déplacé à droite */
+  left:auto;    /* ✅ sécurité */
   background:#e63946;
   color:#fff;
   padding:6px 12px;
@@ -1241,6 +1242,7 @@ img{max-width:100%}
   box-shadow:0 8px 18px rgba(0,0,0,.15);
   z-index:3;
 }
+
 
 /* ===== PRICE DISPLAY ===== */
 .price-box{
