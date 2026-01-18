@@ -48,11 +48,12 @@ class BlogPost(models.Model):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
     content = models.TextField()
-    image = models.ImageField(upload_to='img/blog/', blank=True, null=True)
+    image = CloudinaryField('image', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title
+
 
 
 class BlogImage(models.Model):
@@ -61,10 +62,11 @@ class BlogImage(models.Model):
         on_delete=models.CASCADE,
         related_name='gallery'
     )
-    image = models.ImageField(upload_to='img/blog/gallery/')
+    image = CloudinaryField('image')
 
     def __str__(self):
         return f"Image for {self.post.title}"
+
 
 
 class BlogComment(models.Model):
