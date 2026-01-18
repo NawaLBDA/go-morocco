@@ -55,9 +55,12 @@
         <!-- IMAGE + BADGES -->
         <div class="position-relative">
 
-          <img src="{{ tour.image.url }}"
-               class="card-img-top"
-               alt="{{ tour.title }}">
+       {% if tour.image %}
+  <img src="{{ tour.image.url }}" class="card-img-top" alt="{{ tour.title }}">
+{% else %}
+  <img src="{% static 'img/placeholder.jpg' %}" class="card-img-top">
+{% endif %}
+
 
           {% if tour.is_promotion and tour.discount_percent > 0 %}
             <span class="tour-badge promo">
