@@ -375,7 +375,7 @@ LOGGING = {
 # ==============================
 
 # ✅ Form validation
-FORM_RENDERER = 'django.forms.renderers.TemplatesSafeRenderer'
+FORM_RENDERER = 'django.forms.renderers.DjangoTemplates'
 
 # ✅ Minify HTML
 MIDDLEWARE = MIDDLEWARE + [
