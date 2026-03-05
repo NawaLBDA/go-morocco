@@ -183,25 +183,20 @@ img{max-width:100%}
     top: 100%;
     left: 0;
     right: 0;
-    background: rgba(0, 0, 0, 0.95);
+    background: rgba(255, 255, 255, 0.95);
     padding: 20px;
     border-radius: 0 0 8px 8px;
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
   }
 
-  /* Home page menu styling */
-  [data-page="home"] .navbar-collapse {
-    background: rgba(255, 255, 255, 0.95);
-  }
-
-  [data-page="home"] .navbar-nav .nav-link {
+  .navbar-nav .nav-link {
     color: #1a1a1a !important;
     font-weight: 600;
     padding: 12px 0;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   }
 
-  [data-page="home"] .navbar-nav .nav-link:last-child {
+  .navbar-nav .nav-link:last-child {
     border-bottom: none;
   }
 
