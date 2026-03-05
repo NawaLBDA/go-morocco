@@ -10,6 +10,7 @@ from django.conf import settings
 from .models import Tour, Reservation, BlogPost, Destination, ContactMessage, BlogComment, UserProfile
 
 
+
 def home(request):
     q = request.GET.get('q', '').strip()
     date_str = request.GET.get('date')

@@ -46,7 +46,6 @@ img{max-width:100%}
 .hero-home{
   position:relative;
   min-height:100vh;
-  background:url("../img/hero-maroc.jpg") center/cover no-repeat;
   display:flex;
   align-items:center;
   padding-top:80px; /* espace navbar */
@@ -137,6 +136,26 @@ img{max-width:100%}
     min-height: 90vh;
     text-align: center;
   }
+}
+/* ===== HERO SLIDER FIX ===== */
+
+.hero-slider{
+  position:absolute;
+  inset:0;
+  overflow:hidden;
+}
+
+.hero-slide{
+  position:absolute;
+  inset:0;
+  background-size:cover;
+  background-position:center;
+  opacity:0;
+  transition:opacity .8s ease-in-out;
+}
+
+.hero-slide.active{
+  opacity:1;
 }
 /* ===============================
    NAVBAR
@@ -1521,4 +1540,82 @@ body[data-page="home"] .navbar-main{
   width: 100%;
   background: transparent;
   z-index: 10;
+}
+/* ===== HERO SLIDER FIX ===== */
+.hero-slider {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.8s ease-in-out;
+}
+
+.hero-slide.active {
+  opacity: 1;
+}
+
+/* Flèches */
+.hero-arrows {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  padding: 0 30px;
+  z-index: 100;
+}
+
+.arrow {
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  color: #fff;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.arrow:hover {
+  background: rgba(255, 255, 255, 0.6);
+  transform: scale(1.1);
+}
+
+/* Dots */
+.hero-dots {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 100;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.dot.active {
+  background: #fff;
+  transform: scale(1.3);
 }

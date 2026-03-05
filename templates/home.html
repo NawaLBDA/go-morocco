@@ -7,9 +7,26 @@
 
 <!-- ================= HERO ================= -->
 <section class="hero-home text-white">
+
+  <div class="hero-slider">
+
+    <div class="hero-slide active"
+         style="background-image:url('{% static 'img/hero-maroc.jpg' %}')"></div>
+
+    <div class="hero-slide"
+         style="background-image:url('{% static 'img/hero2.png' %}')"></div>
+
+    <div class="hero-slide"
+         style="background-image:url('{% static 'img/hero3.png' %}')"></div>
+
+    <div class="hero-slide"
+         style="background-image:url('{% static 'img/hero4.png' %}')"></div>
+
+  </div>
+
   <div class="hero-overlay"></div>
 
-  <div class="container hero-content">
+  <div class="container hero-content text-center">
     <h1 class="display-4 fw-bold">
       Discover Morocco, Beyond the Ordinary
     </h1>
@@ -18,7 +35,7 @@
       Authentic Moroccan journeys, expertly planned
     </p>
 
-    <form method="get" class="row g-3 hero-search">
+    <form method="get" class="row g-3 hero-search justify-content-center">
       <div class="col-md-5">
         <input name="q" class="form-control form-control-lg"
                placeholder="Destination (Marrakech, Sahara, Atlas...)">
@@ -33,8 +50,20 @@
       </div>
     </form>
   </div>
-</section>
 
+  <div class="hero-arrows">
+    <span class="arrow left">&#10094;</span>
+    <span class="arrow right">&#10095;</span>
+  </div>
+
+  <div class="hero-dots">
+    <span class="dot active"></span>
+    <span class="dot"></span>
+    <span class="dot"></span>
+    <span class="dot"></span>
+  </div>
+
+</section>
 <!-- ================= AVAILABLE TOURS ================= -->
 <section id="available-tours" class="container my-5 available-tours-section">
 
@@ -150,5 +179,46 @@ document.addEventListener("DOMContentLoaded", function () {
 
 });
 </script>
+<script>
+document.addEventListener("DOMContentLoaded", function(){
 
+  const slides = document.querySelectorAll(".hero-slide");
+  const dots = document.querySelectorAll(".dot");
+  const next = document.querySelector(".arrow.right");
+  const prev = document.querySelector(".arrow.left");
+
+  let index = 0;
+
+  function showSlide(i){
+    slides.forEach(slide => slide.classList.remove("active"));
+    dots.forEach(dot => dot.classList.remove("active"));
+
+    slides[i].classList.add("active");
+    dots[i].classList.add("active");
+  }
+
+  function nextSlide(){
+    index = (index + 1) % slides.length;
+    showSlide(index);
+  }
+
+  function prevSlide(){
+    index = (index - 1 + slides.length) % slides.length;
+    showSlide(index);
+  }
+
+  next.addEventListener("click", nextSlide);
+  prev.addEventListener("click", prevSlide);
+
+  dots.forEach((dot,i)=>{
+    dot.addEventListener("click", ()=>{
+      index = i;
+      showSlide(index);
+    });
+  });
+
+
+
+});
+</script>
 {% endblock %}

@@ -20,6 +20,16 @@ media/
 staticfiles/
 
 # =========================
+# Environment Variables (SENSITIVE!)
+# =========================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+
+# =========================
 # IDE / OS
 # =========================
 .vscode/
@@ -31,3 +41,41 @@ Thumbs.db
 # Logs
 # =========================
 *.log
+logs/
+*.log.gz
+
+# =========================
+# OS / IDE Files
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# =========================
+# macOS
+# =========================
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# =========================
+# Windows
+# =========================
+Thumbs.db
+ehthumbs.db
+*.lnk
+
+# =========================
+# Node (if using)
+# =========================
+node_modules/
+npm-debug.log
+
+# =========================
+# Compiled CSS/JS
+# =========================
+*.min.js
+*.min.css

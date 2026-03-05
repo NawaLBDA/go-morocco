@@ -19,6 +19,8 @@
 
 <body class="site-body layout-root" data-page="{% block page %}default{% endblock %}">
 <!-- ================= PROMO TRAIN BAR ================= -->
+{% if has_promotion %}
+
 <div class="promo-train">
  <div class="promo-track">
   <span>
@@ -36,6 +38,8 @@
 </div>
 
 </div>
+{% endif %}
+
 
 <!-- ================= NAVBAR ================= -->
 <nav class="navbar navbar-expand-lg navbar-dark navbar-main">
