@@ -2,6 +2,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 import dj_database_url
+import logging
+import logging.handlers
 
 # ==============================
 # BASE
@@ -9,6 +11,10 @@ import dj_database_url
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# ✅ Create logs directory if it doesn't exist (for Render)
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
 
 SECRET_KEY = os.environ.get(
     "SECRET_KEY",
@@ -325,25 +331,37 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # ✅ Logging Security Errors
+# Use console only on Render (ephemeral filesystem)
+# Use file + console locally
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'file': {
             'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'errors.log',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'errors.log',
+            'maxBytes': 1024 * 1024,  # 1MB
+            'backupCount': 5,
+            'formatter': 'verbose',
         },
         'console': {
             'level': 'WARNING',
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'] if os.environ.get('ENVIRONMENT') == 'production' else ['file', 'console'],
             'level': 'INFO',
-            'propagate': True,
+            'propagate': False,
         },
     },
 }
