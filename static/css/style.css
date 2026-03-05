@@ -162,9 +162,55 @@ img{max-width:100%}
 ================================ */
 .navbar{
   padding:14px 0;
-  z-index:1050;
+  z-index:1051;
   position:relative;
 }
+
+.navbar-collapse {
+  z-index: 1060;
+  position: relative;
+}
+
+.navbar-toggler {
+  z-index: 1070;
+  position: relative;
+}
+
+/* Mobile menu styling */
+@media (max-width: 991px) {
+  .navbar-collapse {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.95);
+    padding: 20px;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Home page menu styling */
+  [data-page="home"] .navbar-collapse {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  }
+
+  [data-page="home"] .navbar-nav .nav-link {
+    color: #fff !important;
+    font-weight: 600;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  [data-page="home"] .navbar-nav .nav-link:last-child {
+    border-bottom: none;
+  }
+
+  /* Ensure menu shows above hero on home page */
+  [data-page="home"] .navbar-collapse.show {
+    z-index: 1100 !important;
+  }
+}
+
 .navbar-nav .nav-link{
   position:relative;
   font-weight:500;
@@ -1590,19 +1636,22 @@ body[data-page="home"] .navbar-main{
   justify-content: center;
   font-size: 24px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease-in-out;
   box-shadow: none;
   opacity: 0;
+  visibility: hidden;
 }
 
 .arrow:hover {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.7);
   transform: scale(1.1);
   opacity: 1;
+  visibility: visible;
 }
 
 .hero-arrows:hover .arrow {
   opacity: 1;
+  visibility: visible;
 }
 
 /* Dots */
