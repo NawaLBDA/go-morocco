@@ -1619,3 +1619,64 @@ body[data-page="home"] .navbar-main{
   background: #fff;
   transform: scale(1.3);
 }
+
+/* ===============================
+   RESPONSIVE DESIGN
+================================ */
+
+/* Tablet and smaller */
+@media (max-width: 992px) {
+  .hero-content h1 {
+    font-size: 2.5rem;
+  }
+  .hero-content p {
+    font-size: 1.1rem;
+  }
+  .hero-search .col-md-5,
+  .hero-search .col-md-3,
+  .hero-search .col-md-2 {
+    margin-bottom: 10px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .hero-content h1 {
+    font-size: 2rem;
+  }
+  .hero-content p {
+    font-size: 1rem;
+  }
+  .hero-search {
+    flex-direction: column;
+  }
+  .hero-search input,
+  .hero-search button {
+    width: 100%;
+  }
+  .navbar-nav {
+    text-align: center;
+  }
+  .tour-card {
+    margin-bottom: 20px;
+  }
+  .site-footer {
+    padding: 20px 0 10px;
+    text-align: center;
+  }
+  .floating-contact {
+    bottom: 20px;
+    right: 20px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 576px) {
+  .hero-content h1 {
+    font-size: 1.8rem;
+  }
+  .container {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+}
