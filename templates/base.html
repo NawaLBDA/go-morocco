@@ -14,6 +14,9 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://cdnjs.cloudflare.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  {% block extra_head %}{% endblock %}
 
   <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -21,8 +24,10 @@
   <!-- Font Awesome -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
-  <!-- Main CSS -->
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <!-- Main CSS (non-blocking load) -->
+  <link rel="preload" href="{% static 'css/style.min.css' %}" as="style" onload="this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="{% static 'css/style.min.css' %}"></noscript>
+  <!-- run scripts/minify_css.py before collectstatic to generate style.min.css -->
 </head>
 
 <body class="site-body layout-root" data-page="{% block page %}default{% endblock %}">
@@ -55,7 +60,7 @@
 
     <!-- BRAND -->
     <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}">
-      <img src="{% static 'img/logo4.png' %}" alt="Morocco Travel Logo" style="height:44px;margin-right:10px">
+      <img src="{% static 'img/logo4.png' %}" alt="Morocco Travel Logo" width="44" height="44" style="height:44px;margin-right:10px">
       <strong>Morocco Travel Group</strong>
     </a>
 
