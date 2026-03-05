@@ -126,8 +126,8 @@ def register(request):
         if form.is_valid():
             user = form.save(commit=False)
             user.email = request.POST.get('email')
-            user.first_name = request.POST.get('first_name')
-            user.last_name = request.POST.get('last_name')
+            user.first_name = request.POST.get('full_name')  # Use full name as first name
+            user.last_name = ''  # Leave last name empty
             user.save()
 
             UserProfile.objects.create(

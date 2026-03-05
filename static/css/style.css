@@ -300,7 +300,8 @@ img{max-width:100%}
   background-attachment: fixed;
   background-repeat: no-repeat;
   color:#e5e7eb;
-  padding:10px 0 10px;
+  padding: 40px 0 40px;  /* Augmenté le padding pour couvrir plus d'espace */
+  min-height: 200px;     /* Hauteur minimale pour éviter l'espace blanc */
 }
 .site-footer h5{color:#fff}
 .site-footer a{color:#cbd5e1}
@@ -1582,8 +1583,7 @@ html, body {
 .site-footer {
   flex-shrink: 0;
   margin-top: auto;
-height: 150px;
-
+  min-height: 200px;  /* Cohérent avec le padding ajouté */
 }
 /* ===============================
    HOME – DISABLE ABSOLUTE NAVBAR
@@ -1780,4 +1780,23 @@ body[data-page="home"] .navbar-main{
   color: #842029;
   font-size: 0.875rem;
   margin-top: 0.25rem;
+}
+
+/* ===============================
+   REGISTRATION FORM LAYOUT
+================================ */
+.auth-card .row {
+  margin-bottom: 1rem;
+}
+
+.auth-card .col-md-6 {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .auth-card .col-md-6 {
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
