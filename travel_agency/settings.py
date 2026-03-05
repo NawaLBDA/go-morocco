@@ -210,17 +210,30 @@ MESSAGE_TAGS = {
 # ✅ Database Connection Pooling
 DATABASES['default']['CONN_MAX_AGE'] = 600
 
-# ✅ Caching (Redis-like or Local Memory)
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-location',
-        'TIMEOUT': 3600,  # 1 hour
-        'OPTIONS': {
-            'MAX_ENTRIES': 1000
+# ✅ Caching (prefer Redis in production, fallback to local memory)
+if os.environ.get("REDIS_URL"):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': os.environ["REDIS_URL"],
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'PASSWORD': os.environ.get('REDIS_PASSWORD', ''),
+                'SHOW_DEBUG_INFO': DEBUG,
+            }
         }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-location',
+            'TIMEOUT': 3600,  # 1 hour
+            'OPTIONS': {
+                'MAX_ENTRIES': 1000
+            }
+        }
+    }
 
 # ✅ Session Management (Faster with Cache)
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
