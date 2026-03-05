@@ -191,14 +191,14 @@ img{max-width:100%}
 
   /* Home page menu styling */
   [data-page="home"] .navbar-collapse {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: rgba(255, 255, 255, 0.95);
   }
 
   [data-page="home"] .navbar-nav .nav-link {
-    color: #fff !important;
+    color: #1a1a1a !important;
     font-weight: 600;
     padding: 12px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   }
 
   [data-page="home"] .navbar-nav .nav-link:last-child {
