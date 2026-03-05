@@ -162,6 +162,8 @@ img{max-width:100%}
 ================================ */
 .navbar{
   padding:14px 0;
+  z-index:1050;
+  position:relative;
 }
 .navbar-nav .nav-link{
   position:relative;
@@ -241,7 +243,9 @@ img{max-width:100%}
 .site-footer{
   background:
     linear-gradient(rgba(103, 103, 103, 0.382), rgba(15,23,42,.85)),
-    url("/static/img/footer-bg.jpg") center/cover no-repeat;
+    url("/static/img/footer-bg.jpg") center/cover;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color:#e5e7eb;
   padding:40px 0 20px;
 }
@@ -1575,7 +1579,7 @@ body[data-page="home"] .navbar-main{
 }
 
 .arrow {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0);
   border: none;
   color: #fff;
   width: 50px;
@@ -1587,12 +1591,18 @@ body[data-page="home"] .navbar-main{
   font-size: 24px;
   cursor: pointer;
   transition: all 0.3s;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: none;
+  opacity: 0;
 }
 
 .arrow:hover {
   background: rgba(255, 255, 255, 0.6);
   transform: scale(1.1);
+  opacity: 1;
+}
+
+.hero-arrows:hover .arrow {
+  opacity: 1;
 }
 
 /* Dots */
