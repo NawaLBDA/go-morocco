@@ -8,7 +8,7 @@
 {% if post.image or post.gallery.all %}
 <div class="blog-gallery-wrapper mb-4">
 
-  <button class="gallery-nav left" onclick="scrollGallery(-1)">‹</button>
+<button class="gallery-nav left" onclick="scrollGallery(-1)" aria-label="Previous image">‹</button>
 
   <div class="blog-gallery-grid" id="galleryGrid">
 
@@ -16,6 +16,9 @@
     {% if post.image %}
       <img src="{{ post.image.url }}"
            class="gallery-image"
+           alt="{{ post.title }}"
+           loading="lazy"
+           width="{{ post.image.width }}" height="{{ post.image.height }}"
            onclick="openImageModal(this)">
     {% endif %}
 
@@ -23,12 +26,13 @@
     {% for img in post.gallery.all %}
       <img src="{{ img.image.url }}"
            class="gallery-image"
-           onclick="openImageModal(this)">
+           alt="{{ post.title }} gallery image"
+           loading="lazy"
+           width="{{ img.image.width }}" height="{{ img.image.height }}">
     {% endfor %}
-
   </div>
 
-  <button class="gallery-nav right" onclick="scrollGallery(1)">›</button>
+<button class="gallery-nav right" onclick="scrollGallery(1)" aria-label="Next image">›</button>
 
 </div>
 {% endif %}
