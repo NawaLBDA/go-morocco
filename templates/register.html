@@ -14,6 +14,23 @@
         Start planning your journey with Oma Travels
       </p>
 
+      {% if messages %}
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {% for message in messages %}
+          <div>{{ message }}</div>
+        {% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endif %}
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {% for error in form.non_field_errors %}
+          <div>{{ error }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
       <form method="post" novalidate>
         {% csrf_token %}
 
@@ -21,6 +38,13 @@
         <div class="mb-3">
           <label>Username</label>
           {{ form.username|add_class:"form-control" }}
+          {% if form.username.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.username.errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
         </div>
 
         <!-- EMAIL -->
@@ -63,12 +87,26 @@
         <div class="mb-3">
           <label>Password</label>
           {{ form.password1|add_class:"form-control" }}
+          {% if form.password1.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.password1.errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
         </div>
 
         <!-- CONFIRM PASSWORD -->
         <div class="mb-3">
           <label>Confirm password</label>
           {{ form.password2|add_class:"form-control" }}
+          {% if form.password2.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.password2.errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
         </div>
 
         <button class="btn btn-primary w-100 py-2 mt-2">

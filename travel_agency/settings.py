@@ -334,6 +334,16 @@ AUTH_PASSWORD_VALIDATORS = [
 # ✅ Logging Security Errors
 # Use console only on Render (ephemeral filesystem)
 # Use file + console locally
+
+# Custom filter to suppress Chrome DevTools 404 warnings
+class SuppressChromeDevToolsFilter(logging.Filter):
+    def filter(self, record):
+        # Suppress 404 warnings for Chrome DevTools JSON requests
+        if hasattr(record, 'status_code') and record.status_code == 404:
+            if 'appspecific/com.chrome.devtools.json' in getattr(record, 'path', ''):
+                return False
+        return True
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -341,6 +351,11 @@ LOGGING = {
         'verbose': {
             'format': '[{levelname}] {asctime} {name} {message}',
             'style': '{',
+        },
+    },
+    'filters': {
+        'suppress_chrome_devtools': {
+            '()': SuppressChromeDevToolsFilter,
         },
     },
     'handlers': {
@@ -356,6 +371,7 @@ LOGGING = {
             'level': 'WARNING',
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'filters': ['suppress_chrome_devtools'],
         },
     },
     'loggers': {

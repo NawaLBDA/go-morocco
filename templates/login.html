@@ -13,17 +13,40 @@
         Access your bookings and travel details
       </p>
 
+      {% if messages %}
+      <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        {% for message in messages %}
+          <div>{{ message }}</div>
+        {% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endif %}
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {% for error in form.non_field_errors %}
+          <div>{{ error }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
       <form method="post" novalidate>
         {% csrf_token %}
 
         <div class="mb-3">
           <label for="id_username">Username</label>
           {{ form.username }}
+          {% if form.username.errors %}
+            <div class="invalid-feedback d-block">{{ form.username.errors.0 }}</div>
+          {% endif %}
         </div>
 
         <div class="mb-3">
           <label for="id_password">Password</label>
           {{ form.password }}
+          {% if form.password.errors %}
+            <div class="invalid-feedback d-block">{{ form.password.errors.0 }}</div>
+          {% endif %}
         </div>
 
         <button class="btn btn-primary w-100 py-2 mt-2">
