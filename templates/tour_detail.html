@@ -1,6 +1,4 @@
 {% extends 'base.html' %}
-{% load static %}
-{% load performance %}
 {% block content %}
 
 <div class="row">
@@ -9,7 +7,7 @@
   <div class="col-lg-8">
     <div class="card mb-4">
       {% if tour.image %}
-        <img src="{{ tour.image.url }}" class="tour-main-image" loading="lazy">
+        <img src="{{ tour.image.url }}" class="tour-main-image">
       {% endif %}
       <div class="card-body">
         <h2 class="mb-1">{{ tour.title }}</h2>

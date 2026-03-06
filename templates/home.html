@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load performance %}
 {% block page %}home{% endblock %}
 
 {% block content %}
@@ -86,9 +85,9 @@
         <div class="position-relative">
 
        {% if tour.image %}
-  <img src="{{ tour.image.url }}" class="card-img-top" alt="{{ tour.title }}" loading="lazy">
+  <img src="{{ tour.image.url }}" class="card-img-top" alt="{{ tour.title }}">
 {% else %}
-  <img src="{% static 'img/placeholder.jpg' %}" class="card-img-top" loading="lazy">
+  <img src="{% static 'img/placeholder.jpg' %}" class="card-img-top">
 {% endif %}
 
 

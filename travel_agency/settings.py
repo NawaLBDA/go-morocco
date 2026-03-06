@@ -77,8 +77,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "travel_agency.middleware.PerformanceHeadersMiddleware",
-    "travel_agency.middleware.CDNOptimizationMiddleware",
 ]
 
 # ==============================
@@ -245,13 +243,6 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 WHITENOISE_COMPRESS_OFFLINE = True
 WHITENOISE_COMPRESS_ONLINE = True
 WHITENOISE_SKIP_COMPRESS_ON_BROTLI = True
-WHITENOISE_MIMETYPES = {
-    '.woff': 'font/woff',
-    '.woff2': 'font/woff2',
-}
-
-# ✅ Lazy load images configuration
-IMAGEKIT_DEFAULT_CACHEFILE_BACKEND = 'imagekit.cachefiles.backends.Simple'
 
 # ✅ Database Query Optimization
 DEBUG_PROPAGATE_EXCEPTIONS = True

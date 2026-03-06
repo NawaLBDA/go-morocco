@@ -1,6 +1,4 @@
 {% extends 'base.html' %}
-{% load static %}
-{% load performance %}
 {% block content %}
 
 <section class="container my-5">
@@ -18,7 +16,6 @@
     {% if post.image %}
       <img src="{{ post.image.url }}"
            class="gallery-image"
-           loading="lazy"
            onclick="openImageModal(this)">
     {% endif %}
 
@@ -26,7 +23,6 @@
     {% for img in post.gallery.all %}
       <img src="{{ img.image.url }}"
            class="gallery-image"
-           loading="lazy"
            onclick="openImageModal(this)">
     {% endfor %}
 
