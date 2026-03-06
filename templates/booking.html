@@ -241,8 +241,8 @@
       </div>
 
       <div class="form-check">
-        <input class="form-check-input" type="radio" name="payment_method" id="payment_card" value="card">
-        <label class="form-check-label" for="payment_card">💳 Card payment (secure)</label>
+        <input class="form-check-input" type="radio" name="payment_method" id="payment_transfer" value="transfer">
+        <label class="form-check-label" for="payment_transfer">🏦 Bank Transfer</label>
       </div>
     </div>
 
@@ -261,47 +261,7 @@
 </section>
 
 
-<!-- ✅ RIGHT SIDEBAR (BOOTSTRAP OFFCANVAS) -->
-
-<!-- ✅ RIGHT SIDEBAR (BOOTSTRAP OFFCANVAS) -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="cardSidebar">
-  <div class="offcanvas-header">
-  <h5 class="offcanvas-title fw-bold">
-    <i class="fa-solid fa-lock text-success me-1"></i>
-    Secure card payment
-  </h5>
-
-    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
-  </div>
-
-  <div class="offcanvas-body">
-
-    <!-- ✅ Total -->
-    <div class="alert alert-light border small mb-3">
-      <strong>Total to pay:</strong> <span id="stripe-total">0 $</span>
-    </div>
-
-    <!-- ✅ Email like Shein/Temu -->
-    <label class="fw-bold small mb-1">Email</label>
-    <input type="email" id="stripeEmail" class="form-control mb-3" placeholder="you@example.com">
-
-    <!-- ✅ STRIPE PAYMENT ELEMENT -->
-    <div id="payment-element" class="mb-2"></div>
-    <div id="card-errors" class="text-danger small mt-2"></div>
-
-    <button type="button" id="confirmCardBookingBtn" class="btn btn-dark w-100 mt-3">
-      Pay & Confirm booking
-    </button>
-
- <hr class="my-3">
-
-<div class="small text-muted">
-  <i class="fa-solid fa-shield-halved text-success me-1"></i>
-  Your payment is processed securely by Stripe.
-</div>
-
-  </div>
-</div>
+<!-- ✅ RIGHT SIDEBAR (BOOTSTRAP OFFCANVAS) REMOVED -->
 
 <!-- ✅ Stripe JS (ONE TIME فقط) -->
 <script src="https://js.stripe.com/v3/"></script>
@@ -403,148 +363,5 @@ document.addEventListener("DOMContentLoaded", function () {
 
 });
 </script>
-<script src="https://js.stripe.com/v3/"></script>
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-
-  const payNowBtn = document.getElementById("payNowBtn");
-  const sidebarEl = document.getElementById("cardSidebar");
-
-  if (!payNowBtn || !sidebarEl) return;
-
-  function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== "") {
-      const cookies = document.cookie.split(";");
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.startsWith(name + "=")) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
-      }
-    }
-    return cookieValue;
-  }
-  const csrftoken = getCookie("csrftoken");
-
-  const reservationId = payNowBtn.dataset.reservationId;
-
-  const stripe = Stripe("{{ STRIPE_PUBLIC_KEY }}");
-
-  let sidebar = null;
-  if (window.bootstrap) {
-    sidebar = new bootstrap.Offcanvas(sidebarEl);
-  } else {
-    console.log("❌ Bootstrap JS not loaded => Offcanvas won't work");
-  }
-
-  const paymentContainer = document.getElementById("payment-element");
-  const cardErrorsEl = document.getElementById("card-errors");
-  const confirmCardBtn = document.getElementById("confirmCardBookingBtn");
-  const stripeEmailInput = document.getElementById("stripeEmail");
-
-  let elements = null;
-
-  function setCardError(msg){
-    if (cardErrorsEl) cardErrorsEl.textContent = msg || "";
-  }
-
-  async function createIntent(){
-    const res = await fetch(`/reservation/${reservationId}/create-intent/`, {
-      method: "POST",
-      headers: { "X-CSRFToken": csrftoken }
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Payment error");
-    return data;
-  }
-
-async function openAndInitStripe(){
-
-  // ✅ SHOW sidebar
-  if (sidebar) sidebar.show();
-
-  // ✅ SET TOTAL in sidebar
-  const stripeTotalEl = document.getElementById("stripe-total");
-  const total = parseFloat(payNowBtn.dataset.total || "0");
-  if (stripeTotalEl) {
-    stripeTotalEl.textContent = total.toFixed(2) + " $";
-  }
-
-  setCardError("");
-  paymentContainer.innerHTML = "";
-
-  try {
-    const data = await createIntent();
-
-    const clientSecret = data.client_secret;
-
-    elements = stripe.elements({ clientSecret });
-
-    const paymentElement = elements.create("payment", { layout: "tabs" });
-    paymentElement.mount("#payment-element");
-
-  } catch(e){
-    setCardError(e.message);
-  }
-}
-
-  payNowBtn.addEventListener("click", openAndInitStripe);
-
-  confirmCardBtn.addEventListener("click", async function(){
-    if (!elements){
-      setCardError("Please click Pay now first.");
-      return;
-    }
-
-    const email = stripeEmailInput.value.trim();
-    if (!email){
-      setCardError("Please enter your email.");
-      return;
-    }
-
-    const { error } = await stripe.confirmPayment({
-      elements,
-      confirmParams: { receipt_email: email },
-      redirect: "if_required"
-    });
-
-    if (error){
-      setCardError(error.message);
-      return;
-    }
-
-    window.location.reload();
-  });
-
-});
-</script>
-
-<style>
-/* ✅ GREEN toast like your theme */
-.date-toast{
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: #2a9d8f;   /* ✅ theme green */
-  color: white;
-  padding: 12px 16px;
-  border-radius: 12px;
-  opacity: 0;
-  transform: translateY(20px);
-  transition: 0.25s;
-  z-index: 9999;
-  box-shadow: 0 8px 20px rgba(0,0,0,.12);
-  font-weight: 600;
-}
-.date-toast.show{
-  opacity: 1;
-  transform: translateY(0px);
-}
-</style>
-
 
 {% endblock %}

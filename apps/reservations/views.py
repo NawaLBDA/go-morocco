@@ -140,8 +140,8 @@ def create_payment_intent_for_reservation(request, reservation_id):
     if r.status != "booked":
         return JsonResponse({"error": "Booking not validated yet."}, status=400)
 
-    if r.payment_method != "card":
-        return JsonResponse({"error": "This reservation is not card payment."}, status=400)
+    if r.payment_method != "transfer":
+        return JsonResponse({"error": "This reservation is not transfer payment."}, status=400)
 
     if r.payment_status == "paid":
         return JsonResponse({"error": "Already paid."}, status=400)

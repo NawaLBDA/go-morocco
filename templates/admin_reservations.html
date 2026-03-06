@@ -28,7 +28,7 @@
         <td>{{ r.total_price }} $</td>
 
         <td>
-          <span class="badge {% if r.payment_method == 'card' %}bg-dark{% else %}bg-secondary{% endif %}">
+          <span class="badge {% if r.payment_method == 'transfer' %}bg-dark{% else %}bg-secondary{% endif %}">
             {{ r.payment_method|upper }}
           </span>
         </td>
@@ -62,7 +62,7 @@
     <a href="{% url 'reject_reservation' r.id %}" class="btn btn-danger btn-sm">Reject</a>
   {% endif %}
 
-  {% if r.payment_method == 'cash' and r.payment_status != 'paid' %}
+  {% if r.payment_method in ['cash', 'transfer'] and r.payment_status != 'paid' %}
     <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-primary btn-sm ms-1">
       Mark Paid
     </a>
