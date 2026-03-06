@@ -210,17 +210,30 @@ MESSAGE_TAGS = {
 # ✅ Database Connection Pooling
 DATABASES['default']['CONN_MAX_AGE'] = 600
 
-# ✅ Caching (Redis-like or Local Memory)
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-location',
-        'TIMEOUT': 3600,  # 1 hour
-        'OPTIONS': {
-            'MAX_ENTRIES': 1000
+# ✅ Caching (prefer Redis in production, fallback to local memory)
+if os.environ.get("REDIS_URL"):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': os.environ["REDIS_URL"],
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'PASSWORD': os.environ.get('REDIS_PASSWORD', ''),
+                'SHOW_DEBUG_INFO': DEBUG,
+            }
         }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-location',
+            'TIMEOUT': 3600,  # 1 hour
+            'OPTIONS': {
+                'MAX_ENTRIES': 1000
+            }
+        }
+    }
 
 # ✅ Session Management (Faster with Cache)
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
@@ -243,6 +256,17 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 WHITENOISE_COMPRESS_OFFLINE = True
 WHITENOISE_COMPRESS_ONLINE = True
 WHITENOISE_SKIP_COMPRESS_ON_BROTLI = True
+
+# ✅ HTTP Cache Headers
+WHITENOISE_MIMETYPES = {
+    '.webp': 'image/webp',
+    '.woff2': 'font/woff2',
+}
+
+# ✅ Long-term caching for immutable assets (1 year)
+WHITENOISE_MAX_AGE_SECONDS = {
+    r'.*\.[a-f0-9]{8,}\..*': 31536000,  # Files with hash in name
+}
 
 # ✅ Database Query Optimization
 DEBUG_PROPAGATE_EXCEPTIONS = True
@@ -334,6 +358,16 @@ AUTH_PASSWORD_VALIDATORS = [
 # ✅ Logging Security Errors
 # Use console only on Render (ephemeral filesystem)
 # Use file + console locally
+
+# Custom filter to suppress Chrome DevTools 404 warnings
+class SuppressChromeDevToolsFilter(logging.Filter):
+    def filter(self, record):
+        # Suppress 404 warnings for Chrome DevTools JSON requests
+        if hasattr(record, 'status_code') and record.status_code == 404:
+            if 'appspecific/com.chrome.devtools.json' in getattr(record, 'path', ''):
+                return False
+        return True
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -341,6 +375,11 @@ LOGGING = {
         'verbose': {
             'format': '[{levelname}] {asctime} {name} {message}',
             'style': '{',
+        },
+    },
+    'filters': {
+        'suppress_chrome_devtools': {
+            '()': SuppressChromeDevToolsFilter,
         },
     },
     'handlers': {
@@ -356,6 +395,7 @@ LOGGING = {
             'level': 'WARNING',
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'filters': ['suppress_chrome_devtools'],
         },
     },
     'loggers': {
