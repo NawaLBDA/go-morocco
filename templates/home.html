@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load performance %}
 {% block page %}home{% endblock %}
 
 {% block content %}
@@ -8,34 +9,19 @@
 <!-- ================= HERO ================= -->
 <section class="hero-home text-white">
 
-  {% block extra_head %}
-  <link rel="preload" as="image" href="{% static 'img/hero-maroc.jpg' %}">
-  <style>
-    /* critical inlined CSS for hero section to reduce render-blocking */
-    .hero-home{position:relative;min-height:100vh;display:flex;align-items:center;padding-top:80px;}
-    .hero-overlay{position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.45),rgba(38,70,83,.65));}
-    .hero-content{position:relative;z-index:2;max-width:1200px;}
-    .hero-home .nav-link,.hero-home .navbar-brand{color:#fff!important;}
-  </style>
-  {% endblock %}
-
   <div class="hero-slider">
 
-    <div class="hero-slide active">
-      <img src="{% static 'img/hero-maroc.jpg' %}" alt="Morocco landscape" loading="eager" width="1200" height="800">
-    </div>
+    <div class="hero-slide active"
+         style="background-image:url('{% static 'img/hero-maroc.jpg' %}')"></div>
 
-    <div class="hero-slide">
-      <img src="{% static 'img/hero2.png' %}" alt="Morocco tour" loading="lazy" width="1200" height="800">
-    </div>
+    <div class="hero-slide"
+         style="background-image:url('{% static 'img/hero2.png' %}')"></div>
 
-    <div class="hero-slide">
-      <img src="{% static 'img/hero3.jpg' %}" alt="Morocco desert" loading="lazy" width="1200" height="800">
-    </div>
+    <div class="hero-slide"
+         style="background-image:url('{% static 'img/hero3.jpg' %}')"></div>
 
-    <div class="hero-slide">
-      <img src="{% static 'img/hero4.png' %}" alt="Morocco city" loading="lazy" width="1200" height="800">
-    </div>
+    <div class="hero-slide"
+         style="background-image:url('{% static 'img/hero4.png' %}')"></div>
 
   </div>
 
@@ -52,14 +38,12 @@
 
     <form method="get" class="row g-3 hero-search justify-content-center">
       <div class="col-md-5">
-        <label for="q" class="visually-hidden">Destination</label>
-        <input id="q" name="q" class="form-control form-control-lg"
+        <input name="q" class="form-control form-control-lg"
                placeholder="Destination (Marrakech, Sahara, Atlas...)">
       </div>
 
       <div class="col-md-3">
-        <label for="date" class="visually-hidden">Date</label>
-        <input id="date" type="date" name="date" class="form-control form-control-lg">
+        <input type="date" name="date" class="form-control form-control-lg">
       </div>
 
       <div class="col-md-2">
@@ -102,11 +86,9 @@
         <div class="position-relative">
 
        {% if tour.image %}
-  <img src="{{ tour.image.url }}" class="card-img-top" alt="{{ tour.title }}"
-       loading="lazy" width="{{ tour.image.width }}" height="{{ tour.image.height }}">
+  <img src="{{ tour.image.url }}" class="card-img-top" alt="{{ tour.title }}" loading="lazy">
 {% else %}
-  <img src="{% static 'img/placeholder.jpg' %}" class="card-img-top"
-       alt="Tour placeholder" loading="lazy" width="400" height="300">
+  <img src="{% static 'img/placeholder.jpg' %}" class="card-img-top" loading="lazy">
 {% endif %}
 
 

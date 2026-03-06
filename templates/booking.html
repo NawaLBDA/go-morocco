@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load performance %}
 
 {% block content %}
 
@@ -18,7 +19,7 @@
       </p>
 
       <div class="tour-image-container position-relative">
-        <img src="{{ tour.image.url }}" class="img-fluid rounded mb-4 tour-booking-image">
+        <img src="{{ tour.image.url }}" class="img-fluid rounded mb-4 tour-booking-image" loading="lazy">
       </div>
 
       <div class="tour-description mb-4">
