@@ -36,6 +36,8 @@ else:
         "localhost",
         "127.0.0.1",
         "*.local",
+        "ireland.local",
+        "maroc.local",
     ]
 
 # ✅ CSRF Protection
@@ -43,6 +45,13 @@ CSRF_TRUSTED_ORIGINS = [
     "https://go-morocco.onrender.com",
     f"https://{os.environ.get('CUSTOM_DOMAIN', '')}",
 ]
+
+# Twilio / Robocall config
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
+TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
+ROBOCALL_PRIMARY_NUMBER = os.environ.get("ROBOCALL_PRIMARY_NUMBER", "+212644061453")
+ROBOCALL_SECONDARY_NUMBER = os.environ.get("ROBOCALL_SECONDARY_NUMBER", "+212643092852")
 
 # ==============================
 # APPLICATIONS
@@ -64,6 +73,8 @@ INSTALLED_APPS = [
     'cloudinary',
     'cloudinary_storage',
 ]
+
+SITE_ID = 1
 
 # ==============================
 # MIDDLEWARE

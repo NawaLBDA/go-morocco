@@ -46,6 +46,7 @@ img{max-width:100%}
 .hero-home{
   position:relative;
   min-height:100vh;
+  background:url("../img/hero-maroc.jpg") center/cover no-repeat;
   display:flex;
   align-items:center;
   padding-top:80px; /* espace navbar */
@@ -137,87 +138,12 @@ img{max-width:100%}
     text-align: center;
   }
 }
-/* ===== HERO SLIDER FIX ===== */
-
-.hero-slider{
-  position:absolute;
-  inset:0;
-  overflow:hidden;
-}
-
-.hero-slide{
-  position:absolute;
-  inset:0;
-  background-size:cover;
-  background-position:center;
-  opacity:0;
-  transition:opacity .8s ease-in-out;
-}
-
-.hero-slide.active{
-  opacity:1;
-}
 /* ===============================
    NAVBAR
 ================================ */
 .navbar{
   padding:14px 0;
-  z-index:1051;
-  position:relative;
 }
-
-.navbar-collapse {
-  z-index: 1060;
-  position: relative;
-}
-
-.navbar-toggler {
-  z-index: 1070;
-  position: relative;
-}
-
-/* Mobile menu styling */
-@media (max-width: 991px) {
-  /* Default for all pages */
-  .navbar-collapse {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: rgba(30, 30, 30, 0.7);
-    padding: 20px;
-    border-radius: 0 0 8px 8px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(5px);
-  }
-
-  .navbar-nav .nav-link {
-    color: #fff !important;
-    font-weight: 600;
-    padding: 12px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  /* Home page special styling */
-  [data-page="home"] .navbar-collapse {
-    background: rgba(255, 255, 255, 0.5);
-  }
-
-  [data-page="home"] .navbar-nav .nav-link {
-    color: #1a1a1a !important;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  }
-
-  .navbar-nav .nav-link:last-child {
-    border-bottom: none;
-  }
-
-  /* Ensure menu shows above hero on home page */
-  [data-page="home"] .navbar-collapse.show {
-    z-index: 1100 !important;
-  }
-}
-
 .navbar-nav .nav-link{
   position:relative;
   font-weight:500;
@@ -296,11 +222,9 @@ img{max-width:100%}
 .site-footer{
   background:
     linear-gradient(rgba(103, 103, 103, 0.382), rgba(15,23,42,.85)),
-    url("/static/img/footer-bg.jpg") center/cover;
-  background-attachment: fixed;
-  background-repeat: no-repeat;
+    url("/static/img/footer-bg.jpg") center/cover no-repeat;
   color:#e5e7eb;
-  padding:10px 0 10px;
+  padding:80px 0 40px;
 }
 .site-footer h5{color:#fff}
 .site-footer a{color:#cbd5e1}
@@ -1582,7 +1506,7 @@ html, body {
 .site-footer {
   flex-shrink: 0;
   margin-top: auto;
-height: 150px;
+height: 250px;
 
 }
 /* ===============================
@@ -1598,186 +1522,27 @@ body[data-page="home"] .navbar-main{
   background: transparent;
   z-index: 10;
 }
-/* ===== HERO SLIDER FIX ===== */
-.hero-slider {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
 
-.hero-slide {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  opacity: 0;
-  transition: opacity 0.8s ease-in-out;
-}
-
-.hero-slide.active {
-  opacity: 1;
-}
-
-/* Flèches */
-.hero-arrows {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  transform: translateY(-50%);
-  display: flex;
-  justify-content: space-between;
-  padding: 0 30px;
-  z-index: 100;
-}
-
-.arrow {
-  background: rgba(255, 255, 255, 0);
-  border: none;
-  color: #fff;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  cursor: pointer;
-  transition: all 0.3s ease-in-out;
-  box-shadow: none;
-  opacity: 0;
-  visibility: hidden;
-}
-
-.arrow:hover {
-  background: rgba(255, 255, 255, 0.7);
-  transform: scale(1.1);
-  opacity: 1;
-  visibility: visible;
-}
-
-.hero-arrows:hover .arrow {
-  opacity: 1;
-  visibility: visible;
-}
-
-/* Dots */
-.hero-dots {
-  position: absolute;
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 10px;
-  z-index: 100;
-}
-
-.dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.dot.active {
-  background: #fff;
-  transform: scale(1.3);
-}
-
-/* ===============================
-   RESPONSIVE DESIGN
+/* =============================== 
+   IRELAND THEME (FLOWER COLORS)
 ================================ */
-
-/* Tablet and smaller */
-@media (max-width: 992px) {
-  .hero-content h1 {
-    font-size: 2.5rem;
-  }
-  .hero-content p {
-    font-size: 1.1rem;
-  }
-  .hero-search .col-md-5,
-  .hero-search .col-md-3,
-  .hero-search .col-md-2 {
-    margin-bottom: 10px;
-  }
+.theme-ireland {
+  --primary: #4CAF50; /* Flower green */
+  --primary-dark: #388E3C;
+  --accent: #E91E63; /* Flower pink */
+  --dark: #2E7D32;
 }
 
-/* Mobile */
-@media (max-width: 768px) {
-  .hero-content h1 {
-    font-size: 2rem;
-  }
-  .hero-content p {
-    font-size: 1rem;
-  }
-  .hero-search {
-    flex-direction: column;
-  }
-  .hero-search input,
-  .hero-search button {
-    width: 100%;
-  }
-  .navbar-nav {
-    text-align: center;
-  }
-  .tour-card {
-    margin-bottom: 20px;
-  }
-  .site-footer {
-    padding: 20px 0 10px;
-    text-align: center;
-  }
-  .floating-contact {
-    bottom: 20px;
-    right: 20px;
-  }
+.theme-ireland .hero-overlay {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.7), rgba(233, 30, 99, 0.7));
 }
 
-/* Small mobile */
-@media (max-width: 576px) {
-  .hero-content h1 {
-    font-size: 1.8rem;
-  }
-  .container {
-    padding-left: 15px;
-    padding-right: 15px;
-  }
+.theme-ireland .btn-primary {
+  background-color: var(--primary);
+  border-color: var(--primary);
 }
 
-/* ===============================
-   ALERTS AND ERROR FEEDBACK
-================================ */
-.alert {
-  margin-bottom: 1rem;
-  padding: 0.75rem 1.25rem;
-  border-radius: 0.375rem;
-  border: 1px solid transparent;
-}
-
-.alert-success {
-  background-color: #d1e7dd;
-  border-color: #badbcc;
-  color: #0f5132;
-}
-
-.alert-danger {
-  background-color: #f8d7da;
-  border-color: #f5c2c7;
-  color: #842029;
-}
-
-.alert-warning {
-  background-color: #fff3cd;
-  border-color: #ffecb5;
-  color: #664d03;
-}
-
-.invalid-feedback {
-  display: block;
-  color: #842029;
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
+.theme-ireland .btn-primary:hover {
+  background-color: var(--primary-dark);
+  border-color: var(--primary-dark);
 }

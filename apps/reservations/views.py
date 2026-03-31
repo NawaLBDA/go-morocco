@@ -78,11 +78,13 @@ def book_tour(request, tour_id):
         return redirect("tour_detail", tour_id=tour.id)
 
     # ✅ conflit seulement avec BOOKED (pas pending)
+    # Ne bloquer que si vraiment un chevauchement existe
+    # start_date < other.end_date AND end_date > other.start_date
     conflict = Reservation.objects.filter(
         tour=tour,
         status="booked",
-        start_date__lte=end_date + timedelta(days=2),
-        end_date__gte=start_date
+        start_date__lt=end_date,
+        end_date__gt=start_date
     ).exclude(user=request.user).exists()
 
     if conflict:
@@ -104,6 +106,17 @@ def book_tour(request, tour_id):
     if persons >= 5:
         total *= 0.9
 
+    # ✅ If user has pending/booked reservation, cancel it first (modification)
+    existing = Reservation.objects.filter(
+        user=request.user,
+        tour=tour
+    ).exclude(status__in=["cancelled", "rejected"]).first()
+
+    if existing:
+        existing.status = "cancelled"
+        existing.save()
+        messages.info(request, "ℹ️ Your previous booking has been updated with new dates.")
+
     Reservation.objects.create(
         user=request.user,
         tour=tour,
@@ -119,7 +132,7 @@ def book_tour(request, tour_id):
         # ✅ ALWAYS pending
         status="pending",
 
-        payment_method=payment_method,      # cash | card
+        payment_method=payment_method,      # cash | transfer
         payment_status="unpaid",            # unpaid until paid
         stripe_payment_intent=""            # empty for now
     )
@@ -233,8 +246,8 @@ def mark_paid_reservation(request, id):
 
     r = get_object_or_404(Reservation, id=id)
 
-    # ✅ only cash manual
-    if r.payment_method == "cash" and r.payment_status != "paid":
+    # ✅ allow manual marking for cash and transfer methods
+    if (r.payment_method in ["cash", "transfer"]) and r.payment_status != "paid":
         r.payment_status = "paid"
         r.save()
         messages.success(request, "✅ Payment marked as PAID.")

@@ -9,44 +9,44 @@
 <section class="hero-home text-white">
 
   <div class="hero-slider">
-
-    <div class="hero-slide active"
-         style="background-image:url('{% static 'img/hero-maroc.jpg' %}')"></div>
-
-    <div class="hero-slide"
-         style="background-image:url('{% static 'img/hero2.jpg' %}')"></div>
-
-    <div class="hero-slide"
-         style="background-image:url('{% static 'img/hero3.jpg' %}')"></div>
-
-    <div class="hero-slide"
-         style="background-image:url('{% static 'img/hero4.jpg' %}')"></div>
-
+    {% if hero_image %}
+      <div class="hero-slide active" style="background-image:url('{{ hero_image }}')"></div>
+    {% elif country == 'ireland' %}
+      <div class="hero-slide active" style="background-image:url('{% static 'img/hero2-ir.jpg' %}')"></div>
+      <div class="hero-slide" style="background-image:url('{% static 'img/hero1-ir.png' %}')"></div>
+      <div class="hero-slide" style="background-image:url('{% static 'img/hero3-ir.png' %}')"></div>
+      <div class="hero-slide" style="background-image:url('{% static 'img/hero4-ir.jpg' %}')"></div>
+    {% else %}
+      <div class="hero-slide active" style="background-image:url('{% static 'img/hero-ma.jpg' %}')"></div>
+      <div class="hero-slide" style="background-image:url('{% static 'img/hero2.jpg' %}')"></div>
+      <div class="hero-slide" style="background-image:url('{% static 'img/hero3.jpg' %}')"></div>
+      <div class="hero-slide" style="background-image:url('{% static 'img/hero4.jpg' %}')"></div>
+    {% endif %}
   </div>
 
   <div class="hero-overlay"></div>
 
   <div class="container hero-content text-center">
     <h1 class="display-4 fw-bold">
-      Discover Morocco, Beyond the Ordinary
+      {{ hero_title }}
     </h1>
 
     <p class="lead mb-4">
-      Authentic Moroccan journeys, expertly planned
+      {{ hero_subtitle|default:"Authentic journeys, expertly planned" }}
     </p>
 
     <form method="get" class="row g-3 hero-search justify-content-center">
       <div class="col-md-5">
         <input name="q" class="form-control form-control-lg"
-               placeholder="Destination (Marrakech, Sahara, Atlas...)" aria-label="Search destination">
+               placeholder="Destination (Marrakech, Sahara, Atlas...)">
       </div>
 
       <div class="col-md-3">
-        <input type="date" name="date" class="form-control form-control-lg" aria-label="Travel date">
+        <input type="date" name="date" class="form-control form-control-lg">
       </div>
 
       <div class="col-md-2">
-        <button type="submit" class="btn btn-primary btn-lg w-100">Search</button>
+        <button class="btn btn-primary btn-lg w-100">Search</button>
       </div>
     </form>
   </div>
@@ -103,7 +103,7 @@
 
             {% elif tour.user_reservation.status == 'booked' %}
               <div class="booked-overlay">
-                <img src="{% static 'img/booked.webp' %}" alt="Booked">
+                <img src="{% static 'img/booked.png' %}" alt="Booked">
               </div>
 
             {% elif tour.user_reservation.status == 'rejected' %}
@@ -117,7 +117,7 @@
         <div class="card-body d-flex flex-column justify-content-between">
 
           <div>
-            <h3 class="fw-bold">{{ tour.title }}</h3>
+            <h5 class="fw-bold">{{ tour.title }}</h5>
 
             <p class="text-muted mb-2">
               <i class="fa-solid fa-location-dot text-success"></i>

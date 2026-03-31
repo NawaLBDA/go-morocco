@@ -38,6 +38,8 @@ class Section(models.Model):
     order = models.IntegerField(default=0)
     show_in_nav = models.BooleanField(default=True)
 
+    country = models.CharField(max_length=50, default='morocco')
+
     def __str__(self):
         return self.title
 
@@ -51,6 +53,8 @@ class BlogPost(models.Model):
     content = models.TextField()
     image = CloudinaryField('image', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    country = models.CharField(max_length=50, default='morocco')
 
     def __str__(self):
         return self.title
@@ -136,6 +140,8 @@ class Tour(models.Model):
     is_promotion = models.BooleanField(default=False)
     discount_percent = models.IntegerField(default=0)
 
+    country = models.CharField(max_length=50, default='morocco')
+
     def __str__(self):
         return self.title
 
@@ -192,6 +198,18 @@ class Reservation(models.Model):
     @property
     def nights(self):
         return max(0, (self.end_date - self.start_date).days)
+# =========================
+# Country Content
+# =========================
+class CountryContent(models.Model):
+    country = models.CharField(max_length=50, unique=True)
+    hero_title = models.CharField(max_length=200, default="Discover Morocco")
+    hero_subtitle = models.TextField(blank=True)
+    hero_image = models.ImageField(upload_to='img/heroes/', blank=True, null=True)
+
+    def __str__(self):
+        return f"Content for {self.country}"
+
 # =========================
 # Profile user
 # =========================

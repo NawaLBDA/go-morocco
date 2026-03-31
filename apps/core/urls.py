@@ -20,4 +20,10 @@ urlpatterns = [
     ), name='login'),
 
     path('logout/', views.custom_logout, name='logout'),
+
+    # Twilio Robocall API
+    path('api/robo-call/<int:reservation_id>/', views.start_robo_call, name='start_robo_call'),
+    path('twiml/call-first/<int:reservation_id>/', views.twiml_call_first, name='twiml_call_first'),
+    path('twiml/call-fallback/<int:reservation_id>/', views.twiml_call_fallback, name='twiml_call_fallback'),
+    path('twiml/call-complete/<int:reservation_id>/', views.twiml_call_complete, name='twiml_call_complete'),
 ]

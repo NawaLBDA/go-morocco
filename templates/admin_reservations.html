@@ -62,16 +62,19 @@
     <a href="{% url 'reject_reservation' r.id %}" class="btn btn-danger btn-sm">Reject</a>
   {% endif %}
 
-  {% if r.payment_method in ['cash', 'transfer'] and r.payment_status != 'paid' %}
-    <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-primary btn-sm ms-1">
-      Mark Paid
+  {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
+    {% if r.payment_status != 'paid' %}
+      <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-primary btn-sm ms-1">
+        Mark Paid
+      </a>
+    {% endif %}
+  {% endif %}
+  
+  {% if r.status == 'booked' and r.payment_status != 'paid' %}
+    <a href="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-warning btn-sm ms-1">
+      Cancel
     </a>
   {% endif %}
-  {% if r.status == 'booked' and r.payment_status != 'paid' %}
-  <a href="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-warning btn-sm ms-1">
-    Cancel
-  </a>
-{% endif %}
 
 </td>
 
