@@ -9,46 +9,85 @@
 <section class="hero-home text-white">
 
   <div class="hero-slider">
-    {% if hero_image %}
-      <div class="hero-slide active" style="background-image:url('{{ hero_image }}')"></div>
-    {% elif country == 'ireland' %}
-      <div class="hero-slide active" style="background-image:url('{% static 'img/hero2-ir.jpg' %}')"></div>
-      <div class="hero-slide" style="background-image:url('{% static 'img/hero1-ir.png' %}')"></div>
-      <div class="hero-slide" style="background-image:url('{% static 'img/hero3-ir.png' %}')"></div>
-      <div class="hero-slide" style="background-image:url('{% static 'img/hero4-ir.jpg' %}')"></div>
-    {% else %}
-      <div class="hero-slide active" style="background-image:url('{% static 'img/hero-ma.jpg' %}')"></div>
-      <div class="hero-slide" style="background-image:url('{% static 'img/hero2.jpg' %}')"></div>
-      <div class="hero-slide" style="background-image:url('{% static 'img/hero3.jpg' %}')"></div>
-      <div class="hero-slide" style="background-image:url('{% static 'img/hero4.jpg' %}')"></div>
-    {% endif %}
+      {% if country == 'ireland' %}
+        <div class="hero-slide active" style="background-image:url('{% static 'img/hero2-ir.jpg' %}?v=20260402_2')"></div>
+        <div class="hero-slide" style="background-image:url('{% static 'img/hero1-ir.png' %}?v=20260402_2')"></div>
+        <div class="hero-slide" style="background-image:url('{% static 'img/hero3-ir.png' %}?v=20260402_2')"></div>
+        <div class="hero-slide" style="background-image:url('{% static 'img/hero4-ir.jpg' %}?v=20260402_2')"></div>
+      {% elif country == 'morocco' %}
+        <div class="hero-slide active" style="background-image:url('{% static 'img/hero-ma.jpg' %}?v=20260402_2')"></div>
+        <div class="hero-slide" style="background-image:url('{% static 'img/hero2.jpg' %}?v=20260402_2')"></div>
+        <div class="hero-slide" style="background-image:url('{% static 'img/hero3.jpg' %}?v=20260402_2')"></div>
+        <div class="hero-slide" style="background-image:url('{% static 'img/hero4.jpg' %}?v=20260402_2')"></div>
+      {% endif %}
   </div>
 
   <div class="hero-overlay"></div>
 
   <div class="container hero-content text-center">
-    <h1 class="display-4 fw-bold">
-      {{ hero_title }}
-    </h1>
+    {% if country == 'morocco' %}
+      <h1 class="display-4 fw-bold hero-headline reveal">
+        Discover Morocco Beyond the Ordinary — Curated 5–11 Day Experiences with Basma
+      </h1>
 
-    <p class="lead mb-4">
-      {{ hero_subtitle|default:"Authentic journeys, expertly planned" }}
-    </p>
+      <p class="lead mb-3 hero-tagline reveal">
+        Not a tour. Not a checklist.<br>
+        A carefully guided journey into the real Morocco.
+      </p>
 
-    <form method="get" class="row g-3 hero-search justify-content-center">
+      <div class="hero-ctas reveal">
+        <a class="btn btn-primary btn-lg me-2" href="#available-tours">
+          Explore tours
+        </a>
+        <a class="btn btn-outline-light btn-lg" href="https://wa.me/212643092852" target="_blank" rel="noopener">
+          <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp Basma
+        </a>
+      </div>
+    {% else %}
+      <h1 class="display-4 fw-bold hero-headline reveal">{{ hero_title }}</h1>
+      <p class="lead mb-4 hero-tagline reveal">{{ hero_subtitle|default:"Authentic journeys, expertly planned" }}</p>
+    {% endif %}
+
+    <form method="get" class="row g-3 hero-search justify-content-center reveal" aria-label="Search tours">
       <div class="col-md-5">
         <input name="q" class="form-control form-control-lg"
+               value="{{ search_q|default:'' }}"
                placeholder="Destination (Marrakech, Sahara, Atlas...)">
       </div>
 
       <div class="col-md-3">
-        <input type="date" name="date" class="form-control form-control-lg">
+        <input type="date" name="start_date" class="form-control form-control-lg"
+               value="{{ search_start_date|default:'' }}"
+               aria-label="Start date">
+      </div>
+
+      <div class="col-md-3">
+        <input type="date" name="end_date" class="form-control form-control-lg"
+               value="{{ search_end_date|default:'' }}"
+               aria-label="End date (optional)">
       </div>
 
       <div class="col-md-2">
         <button class="btn btn-primary btn-lg w-100">Search</button>
       </div>
     </form>
+
+    {% if country == 'morocco' %}
+      <div class="hero-features mt-4 reveal">
+        <div class="hero-feature">
+          <i class="fa-solid fa-route"></i>
+          <span>5–11 days, thoughtfully paced</span>
+        </div>
+        <div class="hero-feature">
+          <i class="fa-solid fa-car"></i>
+          <span>Trusted local drivers</span>
+        </div>
+        <div class="hero-feature">
+          <i class="fa-solid fa-handshake"></i>
+          <span>Personal, seamless planning</span>
+        </div>
+      </div>
+    {% endif %}
   </div>
 
   <div class="hero-arrows">
@@ -64,6 +103,179 @@
   </div>
 
 </section>
+
+<!-- ================= ABOUT US (IN HOME) ================= -->
+<section id="about-us" class="container my-5 scroll-target">
+  <div class="row align-items-center gy-4">
+    <div class="col-lg-6 pe-lg-5">
+      <span class="text-uppercase text-primary fw-semibold small reveal">ABOUT US</span>
+      <h2 class="fw-bold mt-2 reveal">Basma — Your Gateway to the Real Morocco</h2>
+
+      <p class="text-muted fs-5 mt-3 reveal">
+        <strong>Basma</strong> is more than a name. It represents trust, warmth, and authenticity.
+      </p>
+
+      <p class="text-muted fs-6 reveal">
+        We are a locally grounded tourism service built on relationships, not transactions.
+        Our strength lies in our deep connection to Moroccan culture and our network of trusted drivers
+        and local partners who know the land, the people, and the hidden experiences that make Morocco unforgettable.
+      </p>
+
+      <p class="text-muted fs-6 mb-0 reveal">
+        We believe that true travel is not about luxury alone — it is about connection, understanding, and experience.
+        With Basma, you are not treated as a tourist. You are welcomed as a guest.
+      </p>
+
+      <div class="mt-4 d-flex flex-wrap gap-2 reveal">
+        <a class="btn btn-primary" href="{% url 'reservations' %}">Start a reservation</a>
+        <a class="btn btn-outline-secondary" href="https://wa.me/212643092852" target="_blank" rel="noopener">
+          <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp Basma
+        </a>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm overflow-hidden reveal">
+        <img
+          src="{% static 'img/about.png' %}"
+          alt="About Basma"
+          style="width:100%;height:420px;object-fit:cover;">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= WHY CHOOSE US ================= -->
+<section id="why-choose-us" class="container my-5 scroll-target">
+  <div class="section-header text-center mb-5">
+    <h2 class="fw-bold section-title reveal">Why Choose Us</h2>
+    <div class="section-divider"></div>
+    <p class="text-muted mt-3 reveal" style="max-width:820px;margin:0 auto;">
+      Built on trust, comfort, and authentic local experiences — with support from start to finish.
+    </p>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card h-100 border-0 shadow-sm reveal">
+        <div class="card-body">
+          <div class="mb-3" style="font-size:1.8rem;color:var(--primary)">
+            <i class="fa-solid fa-heart"></i>
+          </div>
+          <div class="fw-bold">Authentic, local-first experiences</div>
+          <div class="text-muted">Designed around real places and real people — not tourist clichés.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card h-100 border-0 shadow-sm reveal">
+        <div class="card-body">
+          <div class="mb-3" style="font-size:1.8rem;color:var(--primary)">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </div>
+          <div class="fw-bold">Flexible and affordable packages</div>
+          <div class="text-muted">Options that fit your schedule, budget, and expectations.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card h-100 border-0 shadow-sm reveal">
+        <div class="card-body">
+          <div class="mb-3" style="font-size:1.8rem;color:var(--primary)">
+            <i class="fa-solid fa-hotel"></i>
+          </div>
+          <div class="fw-bold">Better accommodation rates</div>
+          <div class="text-muted">Local negotiation to unlock real value for your stay.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card h-100 border-0 shadow-sm reveal">
+        <div class="card-body">
+          <div class="mb-3" style="font-size:1.8rem;color:var(--primary)">
+            <i class="fa-solid fa-car"></i>
+          </div>
+          <div class="fw-bold">Trusted, professional drivers</div>
+          <div class="text-muted">Safe, punctual, and connected to the places you want to feel.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card h-100 border-0 shadow-sm reveal">
+        <div class="card-body">
+          <div class="mb-3" style="font-size:1.8rem;color:var(--primary)">
+            <i class="fa-solid fa-user-check"></i>
+          </div>
+          <div class="fw-bold">Personalized attention</div>
+          <div class="text-muted">Support throughout your journey — before, during, after.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card h-100 border-0 shadow-sm reveal">
+        <div class="card-body">
+          <div class="mb-3" style="font-size:1.8rem;color:var(--primary)">
+            <i class="fa-solid fa-compass"></i>
+          </div>
+          <div class="fw-bold">More than sightseeing</div>
+          <div class="text-muted">Made for travelers who want meaning, not just photos.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section id="how-it-works" class="container my-5 scroll-target">
+  <div class="section-header text-center mb-5">
+    <h2 class="fw-bold section-title reveal">How it works</h2>
+    <div class="section-divider"></div>
+  </div>
+
+  <div class="row g-4 align-items-stretch">
+    <div class="col-12 col-md-4">
+      <div class="card h-100 border-0 shadow-sm reveal">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-3 mb-2">
+            <div class="badge rounded-pill text-bg-dark">1</div>
+            <h5 class="fw-bold mb-0">You book your flight</h5>
+          </div>
+          <p class="text-muted mb-0">Pick your dates and arrival city — Marrakesh, Casablanca, Rabat…</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-4">
+      <div class="card h-100 border-0 shadow-sm reveal">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-3 mb-2">
+            <div class="badge rounded-pill text-bg-dark">2</div>
+            <h5 class="fw-bold mb-0">Basma curates your journey</h5>
+          </div>
+          <p class="text-muted mb-0">Routes, stays, cultural moments, hidden gems — tailored to your pace.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-4">
+      <div class="card h-100 border-0 shadow-sm reveal">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-3 mb-2">
+            <div class="badge rounded-pill text-bg-dark">3</div>
+            <h5 class="fw-bold mb-0">Enjoy Morocco — seamlessly</h5>
+          </div>
+          <p class="text-muted mb-0">With trusted local drivers, your experience feels personal and effortless.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ================= AVAILABLE TOURS ================= -->
 <section id="available-tours" class="container my-5 available-tours-section">
 
@@ -103,7 +315,7 @@
 
             {% elif tour.user_reservation.status == 'booked' %}
               <div class="booked-overlay">
-                <img src="{% static 'img/booked.png' %}" alt="Booked">
+                <img src="{% static 'img/booked.webp' %}" alt="Booked">
               </div>
 
             {% elif tour.user_reservation.status == 'rejected' %}
@@ -165,7 +377,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const params = new URLSearchParams(window.location.search);
 
   // Si une recherche est faite
-  if (params.has("q") || params.has("date")) {
+  if (params.has("q") || params.has("date") || params.has("start_date") || params.has("end_date")) {
 
     const target = document.getElementById("available-tours");
 
@@ -217,8 +429,60 @@ document.addEventListener("DOMContentLoaded", function(){
     });
   });
 
+  // Auto-play (pauses on hover)
+  let auto = null;
+  function startAuto(){
+    if (slides.length < 2) return;
+    auto = setInterval(nextSlide, 6000);
+  }
+  function stopAuto(){
+    if (auto) clearInterval(auto);
+    auto = null;
+  }
+
+  const hero = document.querySelector('.hero-home');
+  if (hero) {
+    hero.addEventListener('mouseenter', stopAuto);
+    hero.addEventListener('mouseleave', startAuto);
+  }
+  startAuto();
+
 
 
 });
 </script>
+
+<script>
+  // Date UX: default start date to today and keep end date >= start date.
+  document.addEventListener('DOMContentLoaded', function () {
+    const today = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const iso = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+
+    const start = document.querySelector('input[name="start_date"]');
+    const end = document.querySelector('input[name="end_date"]');
+
+    if (start) {
+      start.min = iso;
+      if (!start.value) start.value = iso;
+    }
+    if (end) {
+      end.min = start && start.value ? start.value : iso;
+      if (start && end && end.value && start.value && end.value < start.value) {
+        end.value = start.value;
+      }
+    }
+
+    if (start && end) {
+      start.addEventListener('change', () => {
+        if (start.value) end.min = start.value;
+        if (end.value && start.value && end.value < start.value) {
+          end.value = start.value;
+        }
+      });
+    }
+  });
+</script>
+
+<script src="{% static 'js/home_sections.js' %}"></script>
 {% endblock %}

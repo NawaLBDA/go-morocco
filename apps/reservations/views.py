@@ -23,6 +23,16 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 def tour_detail(request, tour_id):
     tour = get_object_or_404(Tour, id=tour_id)
 
+    # Compute promo price for template display.
+    if tour.is_promotion and (tour.discount_percent or 0) > 0:
+        try:
+            discount = (Decimal(100) - Decimal(tour.discount_percent)) / Decimal(100)
+            tour.promo_price = (Decimal(tour.price_per_night) * discount).quantize(Decimal('0.01'))
+        except Exception:
+            tour.promo_price = None
+    else:
+        tour.promo_price = None
+
     # ✅ Reservation du user courant sur ce tour (active)
     reservation = Reservation.objects.filter(
         user=request.user,
@@ -36,10 +46,22 @@ def tour_detail(request, tour_id):
     ).exclude(user=request.user)
 
     disabled_ranges = []
+    booked_months = set()
     for r in booked_by_others:
+        booked_months.add((r.start_date.year, r.start_date.month))
+
+    # Disable entire months that have bookings
+    for year, month in booked_months:
+        # Get first and last day of the month
+        from datetime import datetime
+        first_day = date(year, month, 1)
+        if month == 12:
+            last_day = date(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            last_day = date(year, month + 1, 1) - timedelta(days=1)
         disabled_ranges.append({
-            "from": r.start_date.strftime("%Y-%m-%d"),
-            "to": r.end_date.strftime("%Y-%m-%d"),
+            "from": first_day.strftime("%Y-%m-%d"),
+            "to": last_day.strftime("%Y-%m-%d"),
         })
 
     return render(request, "booking.html", {
@@ -47,6 +69,8 @@ def tour_detail(request, tour_id):
         "reservation": reservation,
         "disabled_ranges": disabled_ranges,
         "STRIPE_PUBLIC_KEY": settings.STRIPE_PUBLIC_KEY,
+        "activities_list": [activity.strip() for activity in tour.activities.split(',')] if tour.activities else [],
+        "today": date.today(),
     })
 
 
@@ -78,17 +102,16 @@ def book_tour(request, tour_id):
         return redirect("tour_detail", tour_id=tour.id)
 
     # ✅ conflit seulement avec BOOKED (pas pending)
-    # Ne bloquer que si vraiment un chevauchement existe
-    # start_date < other.end_date AND end_date > other.start_date
+    # Bloquer si une réservation existe dans le même mois
     conflict = Reservation.objects.filter(
         tour=tour,
         status="booked",
-        start_date__lt=end_date,
-        end_date__gt=start_date
+        start_date__year=start_date.year,
+        start_date__month=start_date.month
     ).exclude(user=request.user).exists()
 
     if conflict:
-        messages.error(request, "❌ This date range is already booked. Please choose another date.")
+        messages.error(request, "❌ This month is already fully booked. Please choose another month.")
         return redirect("tour_detail", tour_id=tour.id)
 
     # total
@@ -103,8 +126,6 @@ def book_tour(request, tour_id):
     # ✅ 10% discount for 5+ persons
     if persons >= 5:
         total = (total * Decimal("0.90")).quantize(Decimal("0.01"))
-    if persons >= 5:
-        total *= 0.9
 
     # ✅ If user has pending/booked reservation, cancel it first (modification)
     existing = Reservation.objects.filter(
@@ -153,8 +174,8 @@ def create_payment_intent_for_reservation(request, reservation_id):
     if r.status != "booked":
         return JsonResponse({"error": "Booking not validated yet."}, status=400)
 
-    if r.payment_method != "transfer":
-        return JsonResponse({"error": "This reservation is not transfer payment."}, status=400)
+    if r.payment_method != "card":
+        return JsonResponse({"error": "This reservation is not card payment."}, status=400)
 
     if r.payment_status == "paid":
         return JsonResponse({"error": "Already paid."}, status=400)

@@ -1,21 +1,50 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
 
 <section class="container my-5">
-  <div class="row justify-content-center">
-    <div class="col-lg-8">
-      <div class="card p-4">
-        <h2 class="mb-3">Contact Us</h2>
-        <p class="text-muted mb-4">
-          Have a question about a tour, booking or promotion?  
-          Send us a message and our team will reply shortly.
-        </p>
+  <div class="row g-4 align-items-stretch">
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100 overflow-hidden">
+        <img
+          src="{% static 'img/contact.jpg' %}"
+          alt="Contact Basma support"
+          style="width:100%;height:220px;object-fit:cover;">
+        <div class="card-body">
+          <span class="text-uppercase text-primary fw-semibold small">CONTACT US</span>
+          <h2 class="fw-bold mt-2">Support & feedback</h2>
+          <p class="text-muted mt-3 mb-4">
+            Need help with a booking, have questions, or want to share feedback? Reach out anytime — we respond promptly
+            and guide you to the best option for your trip.
+          </p>
 
-        {% if success %}
-          <div class="alert alert-success">
-            Thank you — your message has been sent.
+          <div class="d-flex flex-column gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-envelope text-primary"></i>
+              <span class="text-muted">Email:</span>
+              <span class="fw-semibold">info@basma.com</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-brands fa-whatsapp text-success"></i>
+              <span class="text-muted">WhatsApp:</span>
+              <a class="fw-semibold" href="https://wa.me/212643092852" target="_blank" rel="noopener">+212 643 092 852</a>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-location-dot text-danger"></i>
+              <span class="text-muted">Location:</span>
+              <span class="fw-semibold">Morocco (operations based locally)</span>
+            </div>
           </div>
-        {% endif %}
+
+          <div class="alert alert-light border mt-4 mb-0 small">Tip: For fastest response, message us on WhatsApp.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card p-4 border-0 shadow-sm h-100">
+        <h3 class="fw-bold mb-2">Send a message</h3>
+        <p class="text-muted mb-4">Tell us your dates, cities, and travel style — we’ll take it from there.</p>
 
         <form method="post">
           {% csrf_token %}
@@ -34,12 +63,13 @@
 
           <div class="mb-3">
             <label class="form-label">Subject</label>
-            <input name="subject" class="form-control">
+            <input name="subject" class="form-control" placeholder="Customized itinerary / Question / Booking">
           </div>
 
           <div class="mb-3">
             <label class="form-label">Message</label>
-            <textarea name="message" class="form-control" rows="5" required></textarea>
+            <textarea name="message" class="form-control" rows="6" required
+                      placeholder="Example: 7 days, Marrakech + Sahara, 2 people, mid-range budget..."></textarea>
           </div>
 
           <button class="btn btn-primary px-4">

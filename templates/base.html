@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>{% block title %}Morocco Travel Group{% endblock %}</title>
+  <title>{% block title %}{% if country == 'ireland' %}Ireland Discover with Bayo{% else %}Basma | Morocco Experiences{% endif %}{% endblock %}</title>
 
   <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -46,13 +46,13 @@
   <div class="container px-4">
 
     <!-- BRAND -->
-    <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}">
+    <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}" aria-label="Basma">
       {% if country == 'ireland' %}
         <img src="{% static 'img/logo-ir.png' %}" alt="Ireland Travel Logo" style="height:32px;margin-right:8px">
         <strong>Ireland Discover with Bayo</strong>
       {% else %}
         <img src="{% static 'img/logo4.webp' %}" alt="Morocco Travel Logo" style="height:32px;margin-right:8px">
-        <strong>Morocco Travel Group</strong>
+        <strong>Basma</strong>
       {% endif %}
     </a>
 
@@ -69,11 +69,23 @@
         <li class="nav-item">
           <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{% url 'home' %}">Home</a>
         </li>
+
         <li class="nav-item">
-          <a class="nav-link {% if 'blog' in request.path %}active{% endif %}" href="{% url 'blog_list' %}">Blog</a>
+          <a class="nav-link" href="{% url 'home' %}#about-us">About Us</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if 'about' in request.path %}active{% endif %}" href="{% url 'about' %}">About</a>
+          <a class="nav-link" href="{% url 'home' %}#why-choose-us">Why Choose Us</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'home' %}#how-it-works">How It Works</a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link {% if 'blog' in request.path %}active{% endif %}" href="{% url 'blog_list' %}">Our Experiences</a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link {% if 'reservations' in request.path %}active{% endif %}" href="{% url 'reservations' %}">Reservations</a>
         </li>
         <li class="nav-item">
           <a class="nav-link {% if 'contact' in request.path %}active{% endif %}" href="{% url 'contact' %}">Contact</a>
@@ -85,7 +97,7 @@
 <li class="nav-item">
   <a class="nav-link {% if 'dashboard' in request.path %}active{% endif %}"
      href="{% url 'admin_reservations' %}">
-     All Reservations
+     Admin Reservations
   </a>
 </li>
 {% endif %}
@@ -167,9 +179,6 @@
 
 <!-- ================= FLOATING CONTACT ================= -->
 <div class="floating-contact">
-  <a class="btn-whatsapp" href="https://wa.me/212600000000" target="_blank" title="WhatsApp">
-    <i class="fa-brands fa-whatsapp"></i>
-  </a>
   <a id="chat-toggle" class="btn-chatbot" href="javascript:void(0);" title="Chat">
     <i class="fa-solid fa-comments"></i>
   </a>
@@ -177,10 +186,10 @@
 
 <!-- ================= CHAT WIDGET ================= -->
 <div id="chat-widget" class="chat-widget" aria-hidden="true">
-  <div class="chat-header">Oma Go – Assistant</div>
+  <div class="chat-header">Your virtual assistant</div>
   <div id="chat-messages" class="chat-messages">
     <div class="msg bot">
-      Hello 👋 How can I help you plan your trip?
+      Hello 👋 Your virtual assistant is ready. You can ask in English for tours, booking, travel tips.
     </div>
   </div>
   <form id="chat-form" class="chat-input">
@@ -205,6 +214,26 @@ document.addEventListener('DOMContentLoaded', function () {
       chatMessages.innerHTML = savedMessages;
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
+
+    // try user-specific server history
+    fetch('/api/ai-chat-history/')
+      .then(r => r.json())
+      .then(data => {
+        if (data.history && data.history.length > 0) {
+          chatMessages.innerHTML = '';
+          data.history.forEach(item => {
+            const msg = document.createElement('div');
+            msg.className = 'msg ' + item.role;
+            msg.textContent = item.message;
+            chatMessages.appendChild(msg);
+          });
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          saveChatHistory();
+        }
+      })
+      .catch(() => {
+        // Ignore if API not available (anonymous users maybe)
+      });
 
     const isOpen = localStorage.getItem('oma_chat_open') === 'true';
     chatWidget.setAttribute('aria-hidden', !isOpen);
@@ -235,6 +264,47 @@ document.addEventListener('DOMContentLoaded', function () {
     saveChatHistory();
   }
 
+  function addMessageStreamed(text, type) {
+    if (type !== 'bot') {
+      return addMessage(text, type);
+    }
+
+    const words = text.split(' ');
+    let chunk = '';
+    let delay = 0;
+
+    words.forEach((word, idx) => {
+      chunk += (idx === 0 ? '' : ' ') + word;
+      if (idx % 8 === 0) {
+        setTimeout(() => {
+          const existing = document.querySelector('.msg.bot:last-child');
+          if (existing && existing.getAttribute('data-stream') === 'true') {
+            existing.textContent = chunk;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          } else {
+            const msg = document.createElement('div');
+            msg.className = 'msg bot';
+            msg.setAttribute('data-stream', 'true');
+            msg.textContent = chunk;
+            chatMessages.appendChild(msg);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          }
+          saveChatHistory();
+        }, delay);
+        delay += 80;
+      }
+    });
+
+    setTimeout(() => {
+      const existing = document.querySelector('.msg.bot:last-child');
+      if (existing && existing.getAttribute('data-stream') === 'true') {
+        existing.textContent = text;
+        existing.removeAttribute('data-stream');
+        saveChatHistory();
+      }
+    }, delay + 80);
+  }
+
   /* ========= FORM SUBMIT ========= */
   chatForm.addEventListener('submit', function (e) {
     e.preventDefault();
@@ -245,34 +315,70 @@ document.addEventListener('DOMContentLoaded', function () {
     addMessage(text, 'user');
     chatInput.value = '';
 
-    setTimeout(() => {
-      const t = text.toLowerCase();
-      let reply = "How can I help you today?";
+    // call AI backend first, fallback to local rules when endpoint fails or no key
+    fetch('/api/ai-chat/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message: text })
+    })
+      .then(response => response.json())
+      .then(data => {
+        const botReply = data.reply || data.error || 'Sorry, I did not understand. Please rephrase.';
+        addMessageStreamed(botReply, 'bot');
 
-      if (t.includes('price') || t.includes('cost')) {
-        reply = "Our tours start from 2000 $ per night per person.";
-      }
-      else if (t.includes('book') || t.includes('booking') || t.includes('reserve')) {
-        reply =
-          "To book a tour 👇\n" +
-          "1️⃣ Browse available tours\n" +
-          "2️⃣ Select your dates & persons\n" +
-          "3️⃣ Price is calculated automatically\n" +
-          "4️⃣ Confirm booking ✅";
+        // If API instructs to navigate + prefill, provide query parameters and redirect
+        if (data.navigate && data.prefill) {
+          const query = new URLSearchParams({
+            start_date: data.prefill.start_date,
+            end_date: data.prefill.end_date,
+            persons: data.prefill.persons,
+          }).toString();
+          setTimeout(() => { window.location.href = data.navigate + '?' + query; }, 600);
+          return;
+        }
 
-        setTimeout(() => {
-          window.location.href = "/#available-tours";
-        }, 2000);
-      }
-      else if (t.includes('hello') || t.includes('hi')) {
-        reply = "Hello 👋 Welcome to Morocco Travel Group!";
-      }
-      else if (t.includes('whatsapp')) {
-        reply = "Contact us on WhatsApp: +212 6 00 00 00 00.";
-      }
+        // If API instructs to navigate only
+        if (data.navigate) {
+          setTimeout(() => { window.location.href = data.navigate; }, 600);
+          return;
+        }
 
-      addMessage(reply, 'bot');
-    }, 600);
+        // If API instructs to prefill booking form on current page
+        if (data.prefill) {
+          const startInput = document.getElementById('start_date');
+          const endInput = document.getElementById('end_date');
+          const personsInput = document.getElementById('persons');
+
+          if (startInput && endInput && personsInput) {
+            startInput.value = data.prefill.start_date;
+            endInput.value = data.prefill.end_date;
+            personsInput.value = data.prefill.persons;
+            addMessage('✅ Booking form prefilled based on your request (not submitted). Please click Book Now manually.', 'bot');
+          } else {
+            addMessage('✅ Pre-fill request ready; go to a tour booking page for form population.', 'bot');
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback rule-based
+        const t = text.toLowerCase();
+        let reply = 'How can I help you today?';
+
+        if (t.includes('price') || t.includes('cost')) {
+          reply = 'Our tours start from 2000 $ per night per person.';
+        } else if (t.includes('book') || t.includes('booking') || t.includes('reserve')) {
+          reply = 'To book a tour 👇\n1️⃣ Browse available tours\n2️⃣ Select your dates & persons\n3️⃣ Price is calculated automatically\n4️⃣ Confirm booking ✅';
+          setTimeout(() => { window.location.href = '/#available-tours'; }, 2000);
+        } else if (t.includes('hello') || t.includes('hi')) {
+          reply = 'Hello 👋 Welcome to Basma!';
+        } else if (t.includes('whatsapp')) {
+          reply = 'Contact us on WhatsApp: +212 643 092 852';
+        }
+
+        addMessage(reply, 'bot');
+      });
   });
 
   /* ========= INIT ========= */
@@ -283,6 +389,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  {% for message in messages %}
+    <div class="toast align-items-center text-white bg-{{ message.tags|default:'primary' }} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          {{ message }}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<script>
+  // Show toasts on page load
+  document.addEventListener('DOMContentLoaded', function () {
+    var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+    var toastList = toastElList.map(function (toastEl) {
+      return new bootstrap.Toast(toastEl, { autohide: true, delay: 5000 });
+    });
+    toastList.forEach(function (toast) {
+      toast.show();
+    });
+  });
+</script>
 
 </body>
 </html>

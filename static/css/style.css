@@ -21,6 +21,14 @@ body{
   font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
 }
 
+html{
+  scroll-behavior:smooth;
+}
+
+.scroll-target{
+  scroll-margin-top:96px;
+}
+
 a{text-decoration:none}
 img{max-width:100%}
 
@@ -46,10 +54,89 @@ img{max-width:100%}
 .hero-home{
   position:relative;
   min-height:100vh;
-  background:url("../img/hero-maroc.jpg") center/cover no-repeat;
+  background:url("../img/hero-ma.jpg") center/cover no-repeat;
   display:flex;
   align-items:center;
   padding-top:80px; /* espace navbar */
+}
+
+/* Hero slider (4 images) */
+.hero-slider{
+  position:absolute;
+  inset:0;
+  overflow:hidden;
+}
+
+.hero-slide{
+  position:absolute;
+  inset:0;
+  background-position:center;
+  background-size:cover;
+  opacity:0;
+  transform:scale(1.02);
+  transition:opacity .9s ease, transform 1.2s ease;
+}
+
+.hero-slide.active{
+  opacity:1;
+  transform:scale(1);
+}
+
+.hero-arrows{
+  position:absolute;
+  inset:auto 0 50%;
+  transform:translateY(50%);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:0 18px;
+  z-index:3;
+  pointer-events:none;
+}
+
+.hero-arrows .arrow{
+  pointer-events:auto;
+  width:46px;
+  height:46px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.22);
+  color:#fff;
+  font-size:22px;
+  cursor:pointer;
+  user-select:none;
+  transition:transform .2s ease, background .2s ease;
+}
+
+.hero-arrows .arrow:hover{
+  background:rgba(0,0,0,.5);
+  transform:scale(1.04);
+}
+
+.hero-dots{
+  position:absolute;
+  left:50%;
+  bottom:20px;
+  transform:translateX(-50%);
+  display:flex;
+  gap:10px;
+  z-index:3;
+}
+
+.hero-dots .dot{
+  width:10px;
+  height:10px;
+  border-radius:999px;
+  background:rgba(255,255,255,.35);
+  border:1px solid rgba(255,255,255,.25);
+  cursor:pointer;
+}
+
+.hero-dots .dot.active{
+  background:#fff;
 }
 
 .hero-overlay{
@@ -65,6 +152,92 @@ img{max-width:100%}
   position:relative;
   z-index:2;
   max-width:1200px;
+}
+
+/* Hero typography + CTA */
+.hero-kicker{
+  display:inline-block;
+  padding:6px 12px;
+  border:1px solid rgba(255,255,255,.25);
+  border-radius:999px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  font-size:.75rem;
+  background:rgba(255,255,255,.06);
+  backdrop-filter:blur(8px);
+  margin-bottom:14px;
+}
+
+.hero-headline{
+  text-wrap:balance;
+  text-shadow:0 8px 30px rgba(0,0,0,.35);
+}
+
+.hero-tagline{
+  max-width:860px;
+  margin-left:auto;
+  margin-right:auto;
+  color:rgba(255,255,255,.92);
+}
+
+.hero-ctas{
+  margin:18px 0 14px;
+}
+
+.btn-outline-light{
+  border-width:2px;
+}
+
+.hero-features{
+  display:flex;
+  gap:12px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+
+.hero-feature{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 14px;
+  border-radius:999px;
+  background:rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.18);
+  backdrop-filter:blur(10px);
+  color:#fff;
+  font-weight:600;
+}
+
+.hero-feature i{
+  width:34px;
+  height:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  background:rgba(233,196,106,.22);
+  color:#fff;
+}
+
+/* Reveal animation (used by home + sections) */
+.reveal{
+  opacity:0;
+  transform:translateY(10px);
+  transition:opacity .6s ease, transform .6s ease;
+}
+
+.reveal.is-visible{
+  opacity:1;
+  transform:translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce){
+  .reveal,
+  .reveal.is-visible{
+    transition:none;
+    transform:none;
+    opacity:1;
+  }
 }
 
 /* Text white */
@@ -136,6 +309,11 @@ img{max-width:100%}
   .hero-home {
     min-height: 90vh;
     text-align: center;
+  }
+
+  .hero-ctas .btn{
+    width:100%;
+    margin:6px 0 !important;
   }
 }
 /* ===============================
@@ -257,6 +435,7 @@ img{max-width:100%}
   font-size:1.3rem;
   box-shadow:0 12px 28px rgba(0,0,0,.25);
   transition:.3s;
+  opacity:.92;
 }
 
 .floating-contact a:hover{
@@ -880,6 +1059,99 @@ img{max-width:100%}
 
 .tour-booking-image:hover {
   filter: brightness(0.9) contrast(1.1);
+}
+
+/* ===============================
+   BOOKING PAGE (Modern UI)
+================================ */
+.booking-sidebar{
+  position: sticky;
+  top: 92px;
+}
+
+.booking-icon{
+  width:44px;
+  height:44px;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(42,157,143,.12);
+  color:var(--primary);
+  font-size:18px;
+}
+
+.booking-trust{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+
+.booking-trust .trust-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border-radius:999px;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+  color:#0f172a;
+  font-weight:600;
+  font-size:.85rem;
+}
+
+.booking-trust .trust-item i{
+  color:var(--primary);
+}
+
+.payment-options{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.payment-option{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  padding:12px 12px;
+  border-radius:14px;
+  border:1px solid #e5e7eb;
+  background:#fff;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.payment-option:hover{
+  border-color:rgba(42,157,143,.55);
+  box-shadow:0 10px 24px rgba(15,23,42,.06);
+}
+
+.payment-option input{
+  margin-top:4px;
+}
+
+.payment-option-body{
+  display:flex;
+  flex-direction:column;
+  line-height:1.25;
+}
+
+.payment-option-title{
+  font-weight:800;
+  color:#0f172a;
+}
+
+.payment-option-sub{
+  font-size:.85rem;
+  color:#64748b;
+}
+
+@media (max-width: 991.98px){
+  .booking-sidebar{
+    position: static;
+    top:auto;
+  }
 }
 
 /* Larger booked logo for booking page */

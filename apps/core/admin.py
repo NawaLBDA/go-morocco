@@ -5,7 +5,8 @@ from .models import (
     Section,
     BlogPost, BlogImage,
     Promotion,
-    ContactMessage
+    ContactMessage,
+    Information, ChatMessage
 )
 
 
@@ -18,6 +19,20 @@ class DestinationImageInline(admin.TabularInline):
 class DestinationAdmin(admin.ModelAdmin):
     list_display = ('name',)
     inlines = [DestinationImageInline]
+
+
+@admin.register(Information)
+class InformationAdmin(admin.ModelAdmin):
+    list_display = ('title', 'country', 'created_at')
+    search_fields = ('title', 'content')
+    list_filter = ('country',)
+
+
+@admin.register(ChatMessage)
+class ChatMessageAdmin(admin.ModelAdmin):
+    list_display = ('user', 'role', 'created_at')
+    list_filter = ('role', 'user')
+    search_fields = ('message',)
 
 
 @admin.register(Tour)

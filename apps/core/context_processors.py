@@ -1,26 +1,34 @@
 from .models import Section, Tour
+from django.db.utils import OperationalError, ProgrammingError
 
 def get_country_from_site(request):
-    # First, check if user is logged in and has a country in profile
+    # Prefer host-based detection so maroc.local / ireland.local always win.
+    host = request.get_host().split(':')[0].lower()
+    if 'ireland' in host:
+        return 'ireland'
+    if 'maroc' in host or 'morocco' in host:
+        return 'morocco'
+
+    # Fallback: user profile (only when host does not indicate a country)
     if request.user.is_authenticated:
         try:
             profile = request.user.profile
-            if profile.country.lower() in ['morocco', 'ireland']:
-                return profile.country.lower()
-        except:
+            profile_country = (profile.country or '').lower().strip()
+            if profile_country in ['morocco', 'ireland']:
+                return profile_country
+        except Exception:
             pass
 
-    # Fallback to host-based detection
-    host = request.get_host().split(':')[0].lower()
-    if 'maroc' in host:
-        return 'morocco'
-    elif 'ireland' in host:
-        return 'ireland'
     return 'morocco'
 
 def sections_processor(request):
     country = get_country_from_site(request)
-    sections = Section.objects.filter(show_in_nav=True, country=country).order_by('order')
-    # ✅ Check if there are any promotions to display the promo bar
-    has_promotion = Tour.objects.filter(is_promotion=True, discount_percent__gt=0, country=country).exists()
+    try:
+        sections = Section.objects.filter(show_in_nav=True, country=country).order_by('order')
+        # ✅ Check if there are any promotions to display the promo bar
+        has_promotion = Tour.objects.filter(is_promotion=True, discount_percent__gt=0, country=country).exists()
+    except (OperationalError, ProgrammingError):
+        sections = []
+        has_promotion = False
+
     return {'sections': sections, 'has_promotion': has_promotion, 'country': country}

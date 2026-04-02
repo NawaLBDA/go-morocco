@@ -6,19 +6,78 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litepicker/dist/css/litepicker.css">
 <script src="https://cdn.jsdelivr.net/npm/litepicker/dist/litepicker.js"></script>
 
-<section class="container my-5">
+<section class="container my-4 my-lg-5">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small mb-0">
+      <li class="breadcrumb-item"><a href="{% url 'home' %}">Home</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'reservations' %}">Reservations</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ tour.title }}</li>
+    </ol>
+  </nav>
+
   <div class="row g-5">
 
     <!-- LEFT CONTENT -->
     <div class="col-lg-8">
-      <h2 class="fw-bold">{{ tour.title }}</h2>
-      <p class="text-muted d-flex align-items-center gap-1 mb-1">
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-2">
+        <div>
+          <h1 class="fw-bold mb-1">{{ tour.title }}</h1>
+          <p class="text-muted d-flex align-items-center gap-1 mb-0">
         <i class="fa-solid fa-location-dot text-success"></i>
         <span>{{ tour.destination.name }}</span>
-      </p>
+          </p>
+        </div>
 
-      <div class="tour-image-container position-relative">
-        <img src="{{ tour.image.url }}" class="img-fluid rounded mb-4 tour-booking-image">
+        <div class="d-flex align-items-center gap-2">
+          {% if tour.is_promotion and tour.discount_percent > 0 %}
+            <span class="badge text-bg-danger">Promo -{{ tour.discount_percent }}%</span>
+          {% endif %}
+          <span class="badge text-bg-dark">Basma</span>
+        </div>
+      </div>
+
+      <div class="tour-image-container position-relative booking-hero-media">
+        {% if tour.image %}
+        <img src="{{ tour.image.url }}" class="img-fluid rounded mb-4 tour-booking-image" alt="{{ tour.title }}">
+        {% endif %}
+      </div>
+
+      <div class="row g-3 mb-4">
+        {% if tour.transport %}
+          <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="booking-icon mb-2"><i class="fa-solid fa-car"></i></div>
+                <div class="fw-bold">Transport</div>
+                <div class="text-muted small">{{ tour.transport }}</div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if tour.hotel %}
+          <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="booking-icon mb-2"><i class="fa-solid fa-hotel"></i></div>
+                <div class="fw-bold">Stay</div>
+                <div class="text-muted small">{{ tour.hotel }}</div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if tour.activities %}
+          <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="booking-icon mb-2"><i class="fa-solid fa-star"></i></div>
+                <div class="fw-bold">Highlights</div>
+                <div class="text-muted small">{{ tour.activities|truncatechars:90 }}</div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
       </div>
 
       <div class="tour-description mb-4">
@@ -35,8 +94,20 @@
 
     <!-- RIGHT BOOKING CARD -->
     <div class="col-lg-4">
-      <div class="card p-4 shadow-sm">
-        <h4 class="fw-bold mb-3">Booking</h4>
+      <div class="card p-4 shadow-sm border-0 booking-sidebar">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h4 class="fw-bold mb-0">Booking</h4>
+          <span class="badge rounded-pill text-bg-light border">
+            <i class="fa-solid fa-shield-halved text-success me-1"></i>
+            Secure
+          </span>
+        </div>
+
+        <div class="booking-trust mb-3">
+          <div class="trust-item"><i class="fa-solid fa-headset"></i><span>Local support</span></div>
+          <div class="trust-item"><i class="fa-solid fa-route"></i><span>Curated itinerary</span></div>
+          <div class="trust-item"><i class="fa-brands fa-whatsapp"></i><span>Fast WhatsApp reply</span></div>
+        </div>
 
 
 
@@ -152,12 +223,7 @@
         Booked
       </button>
 
-      {% if country == 'morocco' %}
-      <button type="button" class="btn btn-info w-100 mt-2" id="callBtn" data-reservation-id="{{ reservation.id }}">
-        <i class="fa-solid fa-phone me-1"></i>
-        Call for verification
-      </button>
-      {% endif %}
+
 
     {% elif reservation.status == 'rejected' %}
       <div class="alert alert-danger small">
@@ -203,6 +269,11 @@
       This date range is already booked. Please select another date.
     </div>
 
+    <div class="d-flex justify-content-between align-items-center small text-muted mb-3">
+      <span><i class="fa-solid fa-moon me-1"></i> Nights</span>
+      <strong id="live-nights">—</strong>
+    </div>
+
     <label class="fw-bold">Persons</label>
     <input type="number" id="persons" name="persons" value="1" min="1"
            class="form-control mb-3">
@@ -239,21 +310,32 @@
     </div>
 
     <label class="fw-bold mb-2">Payment method</label>
-    <div class="mb-3">
-      <div class="form-check">
+    <div class="mb-3 payment-options">
+      <label class="payment-option">
         <input class="form-check-input" type="radio" name="payment_method" value="cash" checked>
-        <label class="form-check-label">💸 Cash </label>
-      </div>
+        <span class="payment-option-body">
+          <span class="payment-option-title"><span class="me-2">💸</span> Cash</span>
+          <span class="payment-option-sub">Pay on arrival after validation</span>
+        </span>
+      </label>
 
-      <div class="form-check">
+      <label class="payment-option">
         <input class="form-check-input" type="radio" name="payment_method" value="card">
-        <label class="form-check-label">💳 Card payment (secure)</label>
-      </div>
+        <span class="payment-option-body">
+          <span class="payment-option-title"><span class="me-2">💳</span> Card payment</span>
+          <span class="payment-option-sub">Secure payment via Stripe (after validation)</span>
+        </span>
+      </label>
     </div>
 
     <button id="confirmCashBtn" class="btn btn-primary w-100">
       Confirm booking
     </button>
+
+    <a class="btn btn-outline-success w-100 mt-2" href="https://wa.me/212643092852" target="_blank" rel="noopener">
+      <i class="fa-brands fa-whatsapp me-1"></i>
+      Ask Basma on WhatsApp
+    </a>
 
   </form>
 
@@ -308,7 +390,7 @@
   </div>
 </div>
 
-<!-- ✅ Stripe JS (ONE TIME فقط) -->
+<!-- ✅ Stripe JS -->
 <script src="https://js.stripe.com/v3/"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -318,6 +400,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const personsInput = document.getElementById("persons");
   const basePriceEl  = document.getElementById("base-price");
   const totalOutput  = document.getElementById("live-price");
+  const nightsOutput = document.getElementById("live-nights");
   const dateWarning  = document.getElementById("dateWarning");
 
   // ✅ si pas de form => stop calendrier فقط
@@ -350,6 +433,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (!startInput.value || !endInput.value){
       totalOutput.textContent = (basePrice * persons).toFixed(2) + " $";
+      if (nightsOutput) nightsOutput.textContent = "—";
       return;
     }
 
@@ -359,8 +443,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (nights < 1){
       totalOutput.textContent = (basePrice * persons).toFixed(2) + " $";
+      if (nightsOutput) nightsOutput.textContent = "—";
       return;
     }
+
+    if (nightsOutput) nightsOutput.textContent = nights + (nights === 1 ? " night" : " nights");
 
     let total = nights * persons * basePrice;
     if (persons >= 5) total *= 0.9;
@@ -370,6 +457,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   calculateTotal();
   personsInput.addEventListener("input", calculateTotal);
+  startInput.addEventListener("change", calculateTotal);
+  endInput.addEventListener("change", calculateTotal);
 
   const picker = new Litepicker({
     element: startInput,
@@ -408,7 +497,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 });
 </script>
-<script src="https://js.stripe.com/v3/"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -527,42 +615,6 @@ async function openAndInitStripe(){
 
 });
 
-// ✅ ROBOCALL HANDLER
-document.addEventListener('DOMContentLoaded', function() {
-  const callBtn = document.getElementById('callBtn');
-  if (callBtn) {
-    callBtn.addEventListener('click', async function() {
-      const reservationId = this.getAttribute('data-reservation-id');
-      const btn = this;
-      
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Initiating call...';
-
-      try {
-        const response = await fetch(`/api/robo-call/${reservationId}/`, {
-          method: 'POST',
-          headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          alert('✅ Call initiated!\n' + data.message + '\n\nYou should receive a call shortly.\nPlease keep your phone handy.');
-        } else {
-          alert('❌ Error: ' + (data.error || 'Unknown error'));
-        }
-      } catch (error) {
-        alert('❌ Error initiating call: ' + error.message);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-phone me-1"></i>Call for verification';
-      }
-    });
-  }
-});
 </script>
 
 <style>
@@ -588,5 +640,33 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 
+<script>
+  // ----------------------
+  // Prefill booking from URL arguments
+  // ----------------------
+  document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    const startField = document.getElementById('start_date');
+    const endField = document.getElementById('end_date');
+    const personsField = document.getElementById('persons');
+
+    const startValue = params.get('start_date');
+    const endValue = params.get('end_date');
+    const personsValue = params.get('persons');
+
+    if (startField && startValue) {
+      startField.value = startValue;
+      startField.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (endField && endValue) {
+      endField.value = endValue;
+      endField.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (personsField && personsValue) {
+      personsField.value = personsValue;
+      personsField.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
+</script>
 
 {% endblock %}

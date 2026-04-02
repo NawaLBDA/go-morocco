@@ -74,7 +74,11 @@
             <!-- COUNTRY -->
             <div class="mb-3">
               <label>Country</label>
-              <input type="text" name="country" class="form-control" required>
+              <select name="country" class="form-control" required>
+                <option value="">Select country</option>
+                <option value="morocco" {% if country == 'morocco' %}selected{% endif %}>Morocco</option>
+                <option value="ireland" {% if country == 'ireland' %}selected{% endif %}>Ireland</option>
+              </select>
             </div>
 
             <!-- POSTAL CODE -->

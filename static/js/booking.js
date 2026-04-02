@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function(){
           reply = "Hello! Welcome to Oma Travels Agency ✨";
         }
         else if(t.includes('whatsapp')){
-          reply = "You can contact us on WhatsApp at +212600000000.";
+            reply = "You can contact us on WhatsApp at +212643092852.";
         }
         else if(t.includes('contact')){
           reply = "You can reach us via the Contact page or WhatsApp.";

@@ -27,7 +27,7 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 if os.environ.get("ENVIRONMENT") == "production":
     ALLOWED_HOSTS = [
         "go-morocco.onrender.com",
-        "*.onrender.com",
+        ".onrender.com",
         os.environ.get("CUSTOM_DOMAIN", ""),
     ]
 else:
@@ -35,10 +35,24 @@ else:
         "go-morocco.onrender.com",
         "localhost",
         "127.0.0.1",
-        "*.local",
         "ireland.local",
         "maroc.local",
+        "morocco.local",
+        "testserver",  # Django test client
     ]
+
+# If DEBUG is on, always allow common local hosts even if ENVIRONMENT was mis-set.
+if DEBUG:
+    for host in [
+        "localhost",
+        "127.0.0.1",
+        "ireland.local",
+        "maroc.local",
+        "morocco.local",
+        "testserver",
+    ]:
+        if host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host)
 
 # ✅ CSRF Protection
 CSRF_TRUSTED_ORIGINS = [
@@ -52,6 +66,12 @@ TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
 TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 ROBOCALL_PRIMARY_NUMBER = os.environ.get("ROBOCALL_PRIMARY_NUMBER", "+212644061453")
 ROBOCALL_SECONDARY_NUMBER = os.environ.get("ROBOCALL_SECONDARY_NUMBER", "+212643092852")
+
+# OpenAI Chat Assistant (laissez vide si pas de clé)
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+
+# HuggingFace Mistral (laissez vide si pas de clé)
+HF_API_TOKEN = os.environ.get("HF_API_TOKEN", "")
 
 # ==============================
 # APPLICATIONS
@@ -75,6 +95,14 @@ INSTALLED_APPS = [
 ]
 
 SITE_ID = 1
+
+# ==============================
+# SESSION / AUTH
+# ==============================
+# Keep user logged in (not expire on browser close), refresh every request.
+SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_SAVE_EVERY_REQUEST = True
 
 # ==============================
 # MIDDLEWARE

@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Basma | Reservations{% endblock %}
+
+{% block content %}
+<section class="container my-5">
+  <div class="row align-items-center g-4">
+    <div class="col-lg-7">
+      <span class="text-uppercase text-primary fw-semibold small">RESERVATIONS</span>
+      <h1 class="fw-bold mt-2">Start Your Journey</h1>
+      <p class="text-muted fs-5 mt-3" style="max-width: 48rem;">
+        Ready to discover Morocco beyond the ordinary?
+      </p>
+
+      <div class="card border-0 shadow-sm mt-4">
+        <div class="card-body">
+          <div class="d-flex gap-3 align-items-start mb-3">
+            <div class="badge rounded-pill text-bg-dark">Step 1</div>
+            <div>
+              <div class="fw-bold">Select your preferred itinerary</div>
+              <div class="text-muted">Choose a tour below (or search by destination).</div>
+            </div>
+          </div>
+          <div class="d-flex gap-3 align-items-start mb-3">
+            <div class="badge rounded-pill text-bg-dark">Step 2</div>
+            <div>
+              <div class="fw-bold">Submit your reservation request</div>
+              <div class="text-muted">Pick your dates & persons on the tour page.</div>
+            </div>
+          </div>
+          <div class="d-flex gap-3 align-items-start">
+            <div class="badge rounded-pill text-bg-dark">Step 3</div>
+            <div>
+              <div class="fw-bold">Receive confirmation & travel details</div>
+              <div class="text-muted">We’ll send preparation details once validated.</div>
+            </div>
+          </div>
+
+          <div class="alert alert-info small mt-4 mb-0">
+            We recommend booking early to secure availability, especially during peak seasons.
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 d-flex flex-wrap gap-2">
+        <a class="btn btn-primary" href="https://wa.me/212643092852" target="_blank" rel="noopener">
+          <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp Basma
+        </a>
+        <a class="btn btn-outline-secondary" href="{% url 'contact' %}">
+          Contact us
+        </a>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm overflow-hidden">
+        <img
+          src="https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=1400&q=80"
+          alt="Morocco landscape"
+          style="width:100%;height:360px;object-fit:cover;">
+        <div class="card-body">
+          <div class="fw-bold">You book your flight.</div>
+          <div class="text-muted">We take care of everything else.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="container my-5">
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+    <div>
+      <h2 class="fw-bold mb-1">Available Tours</h2>
+      <div class="text-muted">List view for fast comparison.</div>
+    </div>
+
+    <form method="get" class="row g-2" style="min-width: min(100%, 760px);">
+      <div class="col-12 col-md-4">
+         <input name="q" class="form-control" value="{{ search_q|default:'' }}"
+               placeholder="Destination or tour name">
+      </div>
+      <div class="col-6 col-md-3">
+        <input type="date" name="start_date" class="form-control"
+           value="{{ search_start_date|default:'' }}" aria-label="Start date">
+      </div>
+      <div class="col-6 col-md-3">
+        <input type="date" name="end_date" class="form-control"
+           value="{{ search_end_date|default:'' }}" aria-label="End date">
+      </div>
+      <div class="col-12 col-md-2">
+        <button class="btn btn-primary w-100">Search</button>
+      </div>
+    </form>
+  </div>
+
+  {% if tours %}
+    <div class="list-group shadow-sm">
+      {% for tour in tours %}
+        <div class="list-group-item p-3">
+          <div class="row align-items-center g-3">
+            <div class="col-12 col-md-3">
+              {% if tour.image %}
+                <img src="{{ tour.image.url }}" alt="{{ tour.title }}" class="rounded"
+                     style="width:100%;height:140px;object-fit:cover;">
+              {% else %}
+                <img src="{% static 'img/placeholder.jpg' %}" alt="{{ tour.title }}" class="rounded"
+                     style="width:100%;height:140px;object-fit:cover;">
+              {% endif %}
+            </div>
+
+            <div class="col-12 col-md-6">
+              <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <div class="fw-bold fs-5">{{ tour.title }}</div>
+                  <div class="text-muted">
+                    <i class="fa-solid fa-location-dot text-success"></i>
+                    {{ tour.destination.name }}
+                  </div>
+                </div>
+              </div>
+
+              {% if tour.is_promotion and tour.discount_percent > 0 and tour.promo_price %}
+                <div class="mt-2">
+                  <span class="text-muted text-decoration-line-through me-2">{{ tour.price_per_night }} $</span>
+                  <span class="fw-bold" style="color:#dc2626;">{{ tour.promo_price }} $</span>
+                  <span class="badge text-bg-warning ms-2">-{{ tour.discount_percent }}%</span>
+                </div>
+              {% else %}
+                <div class="mt-2 fw-bold">{{ tour.price_per_night }} $</div>
+              {% endif %}
+
+              {% if tour.activities %}
+                <div class="text-muted small mt-2">
+                  <i class="fa-solid fa-star"></i>
+                  {{ tour.activities|truncatechars:120 }}
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="col-12 col-md-3 text-md-end">
+              <a class="btn btn-primary" href="{% url 'tour_detail' tour.id %}">
+                View & Book
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-warning">
+      No tours match your search for the selected dates.
+      Try another destination or adjust the date range.
+    </div>
+  {% endif %}
+</section>
+
+<script>
+  // Improve UX: set min dates and default start date = today when empty.
+  document.addEventListener('DOMContentLoaded', function () {
+    const today = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const iso = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+
+    const start = document.querySelector('input[name="start_date"]');
+    const end = document.querySelector('input[name="end_date"]');
+
+    if (start) {
+      start.min = iso;
+      if (!start.value) start.value = iso;
+    }
+    if (end) {
+      end.min = iso;
+    }
+
+    if (start && end) {
+      start.addEventListener('change', () => {
+        if (start.value) end.min = start.value;
+        if (end.value && start.value && end.value < start.value) {
+          end.value = start.value;
+        }
+      });
+    }
+  });
+</script>
+{% endblock %}

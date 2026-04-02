@@ -146,6 +146,35 @@ class Tour(models.Model):
         return self.title
 
 
+class Information(models.Model):
+    title = models.CharField(max_length=255)
+    content = models.TextField(blank=True)
+    file = models.FileField(upload_to='information_files/', blank=True, null=True)
+    country = models.CharField(max_length=50, default='morocco')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+
+class ChatMessage(models.Model):
+    ROLE_CHOICES = (
+        ('user', 'User'),
+        ('bot', 'Bot'),
+    )
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
+    session_key = models.CharField(max_length=255, blank=True, null=True)
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'{self.role}: {self.message[:30]}'
+
+
 # =========================
 # Reservation (BOOKING)
 # =========================

@@ -4,6 +4,7 @@ from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path('', views.home, name='home'),
+    path('reservations/', views.reservations, name='reservations'),
     path('tour/<int:tour_id>/', views.tour_detail, name='tour_detail'),
 
     path('blog/', views.blog_list, name='blog_list'),
@@ -26,4 +27,6 @@ urlpatterns = [
     path('twiml/call-first/<int:reservation_id>/', views.twiml_call_first, name='twiml_call_first'),
     path('twiml/call-fallback/<int:reservation_id>/', views.twiml_call_fallback, name='twiml_call_fallback'),
     path('twiml/call-complete/<int:reservation_id>/', views.twiml_call_complete, name='twiml_call_complete'),
+    path('api/ai-chat/', views.ai_chat, name='ai_chat'),
+    path('api/ai-chat-history/', views.ai_chat_history, name='ai_chat_history'),
 ]
