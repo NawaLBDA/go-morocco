@@ -404,6 +404,13 @@ img{max-width:100%}
   color:#e5e7eb;
   padding:80px 0 40px;
 }
+
+/* Morocco footer uses hero-ma background */
+.theme-morocco .site-footer{
+  background:
+    linear-gradient(rgba(0,0,0,.35), rgba(15,23,42,.88)),
+    url("/static/img/hero-ma.jpg?v=20260402_2") center/cover no-repeat;
+}
 .site-footer h5{color:#fff}
 .site-footer a{color:#cbd5e1}
 .site-footer a:hover{color:#fff}
