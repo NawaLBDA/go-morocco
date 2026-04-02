@@ -84,7 +84,7 @@
     <form method="get" class="row g-2" style="min-width: min(100%, 760px);">
       <div class="col-12 col-md-4">
          <input name="q" class="form-control" value="{{ search_q|default:'' }}"
-               placeholder="Destination or tour name">
+           placeholder="Destination or tour name" aria-label="Destination or tour name">
       </div>
       <div class="col-6 col-md-3">
         <input type="date" name="start_date" class="form-control"
@@ -107,11 +107,13 @@
           <div class="row align-items-center g-3">
             <div class="col-12 col-md-3">
               {% if tour.image %}
-                <img src="{{ tour.image.url }}" alt="{{ tour.title }}" class="rounded reservations-thumb"
-                     style="width:100%;height:150px;object-fit:cover;">
+                 <img src="{{ tour.image.url }}" alt="{{ tour.title }}" class="rounded reservations-thumb"
+                   width="420" height="150" loading="lazy" decoding="async"
+                   style="width:100%;height:150px;object-fit:cover;">
               {% else %}
-                <img src="{% static 'img/placeholder.jpg' %}" alt="{{ tour.title }}" class="rounded reservations-thumb"
-                     style="width:100%;height:150px;object-fit:cover;">
+                 <img src="{% static 'img/placeholder.jpg' %}" alt="{{ tour.title }}" class="rounded reservations-thumb"
+                   width="420" height="150" loading="lazy" decoding="async"
+                   style="width:100%;height:150px;object-fit:cover;">
               {% endif %}
             </div>
 

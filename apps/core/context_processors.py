@@ -47,6 +47,25 @@ def sections_processor(request):
 
     whatsapp_link = f"https://wa.me/{whatsapp_wa_digits}"
 
+    # SEO defaults
+    try:
+        canonical_url = request.build_absolute_uri().split('?', 1)[0]
+    except Exception:
+        canonical_url = ''
+
+    if country == 'ireland':
+        meta_description = (
+            f"Explore Ireland with {brand_name}: local taxi-driver tours, flexible pickup, and friendly guidance."
+        )
+        og_image_url = request.build_absolute_uri('/static/img/hero2-ir.jpg') if canonical_url else ''
+        site_lang = 'en'
+    else:
+        meta_description = (
+            f"Discover authentic Morocco experiences with {brand_name}: curated tours, trusted drivers, and seamless planning."
+        )
+        og_image_url = request.build_absolute_uri('/static/img/hero-ma.jpg') if canonical_url else ''
+        site_lang = 'en'
+
     try:
         sections = Section.objects.filter(show_in_nav=True, country=country).order_by('order')
         # ✅ Check if there are any promotions to display the promo bar
@@ -63,4 +82,8 @@ def sections_processor(request):
         'support_email': support_email,
         'whatsapp_number': whatsapp_number,
         'whatsapp_link': whatsapp_link,
+        'canonical_url': canonical_url,
+        'meta_description': meta_description,
+        'og_image_url': og_image_url,
+        'site_lang': site_lang,
     }

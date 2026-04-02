@@ -2,6 +2,14 @@
 {% load static %}
 {% block page %}home{% endblock %}
 
+{% block extra_head %}
+  {% if country == 'ireland' %}
+    <link rel="preload" as="image" href="{% static 'img/hero2-ir.jpg' %}?v=20260402_2">
+  {% else %}
+    <link rel="preload" as="image" href="{% static 'img/hero-ma.jpg' %}?v=20260402_2">
+  {% endif %}
+{% endblock %}
+
 {% block content %}
 
 
@@ -11,14 +19,14 @@
   <div class="hero-slider">
       {% if country == 'ireland' %}
         <div class="hero-slide active" style="background-image:url('{% static 'img/hero2-ir.jpg' %}?v=20260402_2')"></div>
-        <div class="hero-slide" style="background-image:url('{% static 'img/hero1-ir.png' %}?v=20260402_2')"></div>
-        <div class="hero-slide" style="background-image:url('{% static 'img/hero3-ir.png' %}?v=20260402_2')"></div>
-        <div class="hero-slide" style="background-image:url('{% static 'img/hero4-ir.jpg' %}?v=20260402_2')"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero1-ir.png' %}?v=20260402_2"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero3-ir.png' %}?v=20260402_2"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero4-ir.jpg' %}?v=20260402_2"></div>
       {% elif country == 'morocco' %}
         <div class="hero-slide active" style="background-image:url('{% static 'img/hero-ma.jpg' %}?v=20260402_2')"></div>
-        <div class="hero-slide" style="background-image:url('{% static 'img/hero2.jpg' %}?v=20260402_2')"></div>
-        <div class="hero-slide" style="background-image:url('{% static 'img/hero3.jpg' %}?v=20260402_2')"></div>
-        <div class="hero-slide" style="background-image:url('{% static 'img/hero4.jpg' %}?v=20260402_2')"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero2.jpg' %}?v=20260402_2"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero3.jpg' %}?v=20260402_2"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero4.jpg' %}?v=20260402_2"></div>
       {% endif %}
   </div>
 
@@ -67,6 +75,7 @@
       <div class="col-md-5">
         <input name="q" class="form-control form-control-lg"
                value="{{ search_q|default:'' }}"
+               aria-label="Destination"
                placeholder="{% if country == 'ireland' %}Destination (Dublin, Galway, Cliffs...){% else %}Destination (Marrakech, Sahara, Atlas...){% endif %}">
       </div>
 
@@ -105,16 +114,16 @@
     {% endif %}
   </div>
 
-  <div class="hero-arrows">
-    <span class="arrow left">&#10094;</span>
-    <span class="arrow right">&#10095;</span>
+  <div class="hero-arrows" aria-label="Hero image controls">
+    <button type="button" class="arrow left" aria-label="Previous slide">&#10094;</button>
+    <button type="button" class="arrow right" aria-label="Next slide">&#10095;</button>
   </div>
 
   <div class="hero-dots">
-    <span class="dot active"></span>
-    <span class="dot"></span>
-    <span class="dot"></span>
-    <span class="dot"></span>
+    <button type="button" class="dot active" aria-label="Slide 1"></button>
+    <button type="button" class="dot" aria-label="Slide 2"></button>
+    <button type="button" class="dot" aria-label="Slide 3"></button>
+    <button type="button" class="dot" aria-label="Slide 4"></button>
   </div>
 
 </section>
@@ -171,6 +180,7 @@
         <img
           src="{% if country == 'ireland' %}{% static 'img/about-ir.png' %}?v=20260402_1{% else %}{% static 'img/about.jpg' %}?v=20260402_1{% endif %}"
           alt="About {{ brand_name }}"
+          width="1200" height="420" loading="lazy" decoding="async"
           style="width:100%;height:420px;object-fit:cover;">
       </div>
     </div>
@@ -343,11 +353,13 @@
         <!-- IMAGE + BADGES -->
         <div class="position-relative">
 
-       {% if tour.image %}
-  <img src="{{ tour.image.url }}" class="card-img-top" alt="{{ tour.title }}">
-{% else %}
-  <img src="{% static 'img/placeholder.jpg' %}" class="card-img-top">
-{% endif %}
+          {% if tour.image %}
+            <img src="{{ tour.image.url }}" class="card-img-top" alt="{{ tour.title }}"
+                 loading="lazy" decoding="async" width="800" height="520">
+          {% else %}
+            <img src="{% static 'img/placeholder.jpg' %}" class="card-img-top" alt="{{ tour.title }}"
+                 loading="lazy" decoding="async" width="800" height="520">
+          {% endif %}
 
 
           {% if tour.is_promotion and tour.discount_percent > 0 %}
@@ -362,7 +374,7 @@
 
             {% elif tour.user_reservation.status == 'booked' %}
               <div class="booked-overlay">
-                <img src="{% static 'img/booked.webp' %}" alt="Booked">
+                <img src="{% static 'img/booked.webp' %}" alt="Booked" loading="lazy" decoding="async" width="240" height="240">
               </div>
 
             {% elif tour.user_reservation.status == 'rejected' %}
@@ -473,9 +485,19 @@ document.addEventListener("DOMContentLoaded", function(){
 
   let index = 0;
 
+  function ensureBg(i) {
+    const slide = slides[i];
+    if (!slide) return;
+    if (slide.style.backgroundImage) return;
+    const bg = slide.getAttribute('data-bg');
+    if (bg) slide.style.backgroundImage = `url('${bg}')`;
+  }
+
   function showSlide(i){
     slides.forEach(slide => slide.classList.remove("active"));
     dots.forEach(dot => dot.classList.remove("active"));
+
+    ensureBg(i);
 
     slides[i].classList.add("active");
     dots[i].classList.add("active");

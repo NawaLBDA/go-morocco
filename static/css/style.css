@@ -32,6 +32,26 @@ html{
 a{text-decoration:none}
 img{max-width:100%}
 
+/* Skip link (a11y) */
+.skip-link{
+  position:absolute;
+  left:-999px;
+  top:10px;
+  z-index:9999;
+  background:#fff;
+  color:#000;
+  padding:10px 14px;
+  border-radius:10px;
+  box-shadow:0 10px 24px rgba(0,0,0,.18);
+}
+.skip-link:focus{ left:10px; }
+
+/* Visible focus for keyboard users */
+:focus-visible{
+  outline:3px solid rgba(233,196,106,.95);
+  outline-offset:2px;
+}
+
 /* ===============================
    HERO
 ================================ */
@@ -54,7 +74,8 @@ img{max-width:100%}
 .hero-home{
   position:relative;
   min-height:100vh;
-  background:url("../img/hero-ma.jpg") center/cover no-repeat;
+  min-height:100svh;
+  background:transparent;
   display:flex;
   align-items:center;
   padding-top:80px; /* espace navbar */
@@ -62,7 +83,7 @@ img{max-width:100%}
 
 /* Ireland hero fallback background (ensures first slide look even if slider fails) */
 .theme-ireland .hero-home{
-  background:url("../img/hero2-ir.jpg") center/cover no-repeat;
+  background:transparent;
 }
 
 /* Hero slider (4 images) */
@@ -114,6 +135,8 @@ img{max-width:100%}
   cursor:pointer;
   user-select:none;
   transition:transform .2s ease, background .2s ease;
+  padding:0;
+  line-height:1;
 }
 
 .hero-arrows .arrow:hover{
@@ -138,6 +161,8 @@ img{max-width:100%}
   background:rgba(255,255,255,.35);
   border:1px solid rgba(255,255,255,.25);
   cursor:pointer;
+  padding:0;
+  display:inline-block;
 }
 
 .hero-dots .dot.active{
@@ -1986,18 +2011,17 @@ body[data-page="home"] .navbar-main{
   --dark:#1f2937;
 }
 
-/* Light transparency over hero images for Ireland (softer than Morocco) */
+/* Ireland hero overlay: keep contrast similar to Morocco (not too bright) */
 .theme-ireland .hero-overlay{
   display:block;
-  /* A light “wash” + gentle contrast so images feel slightly transparent */
   background:
     linear-gradient(
-      rgba(255,255,255,.14),
-      rgba(181,126,220,.10)
+      rgba(0,0,0,.40),
+      rgba(31,41,55,.64)
     ),
     linear-gradient(
-      rgba(0,0,0,.10),
-      rgba(31,41,55,.18)
+      rgba(181,126,220,.08),
+      rgba(181,126,220,0)
     );
 }
 
