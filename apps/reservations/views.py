@@ -1,6 +1,6 @@
 from decimal import Decimal
 import json
-import csv
+from io import BytesIO
 import stripe
 from datetime import datetime, timedelta, date
 from django.conf import settings
@@ -13,6 +13,14 @@ from django.views.decorators.http import require_POST, require_http_methods
 from datetime import date
 
 from apps.core.models import Reservation, Tour
+
+try:
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.table import Table, TableStyleInfo
+except Exception:
+    openpyxl = None
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -244,15 +252,8 @@ def _get_profile_fields(user):
         return None
 
 
-def _reservations_to_csv_response(reservations_qs, filename: str) -> HttpResponse:
-    response = HttpResponse(content_type='text/csv; charset=utf-8')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-
-    # Excel-friendly UTF-8 BOM
-    response.write('\ufeff')
-
-    writer = csv.writer(response)
-    writer.writerow([
+def _reservation_report_headers():
+    return [
         'reservation_id',
         'created_at',
         'status',
@@ -284,57 +285,119 @@ def _reservations_to_csv_response(reservations_qs, filename: str) -> HttpRespons
         'profile_phone',
         'profile_country',
         'profile_postal_code',
-    ])
+    ]
+
+
+def _reservation_report_row(r):
+    u = r.user
+    t = r.tour
+    destination_name = ''
+    try:
+        destination_name = getattr(getattr(t, 'destination', None), 'name', '') or ''
+    except Exception:
+        destination_name = ''
+
+    profile_fields = _get_profile_fields(u) or {
+        'profile_phone': '',
+        'profile_country': '',
+        'profile_postal_code': '',
+    }
+
+    return [
+        r.id,
+        r.created_at.isoformat() if getattr(r, 'created_at', None) else '',
+        r.status,
+        r.admin_note,
+        r.payment_method,
+        r.payment_status,
+        r.stripe_payment_intent or '',
+        getattr(t, 'id', ''),
+        getattr(t, 'title', ''),
+        getattr(t, 'country', ''),
+        destination_name,
+        r.start_date.isoformat() if r.start_date else '',
+        r.end_date.isoformat() if r.end_date else '',
+        getattr(r, 'nights', ''),
+        r.num_persons,
+        str(r.total_price),
+        'yes' if r.booking_for_other else 'no',
+        r.guest_full_name,
+        r.guest_phone,
+        u.id,
+        u.username,
+        u.email,
+        u.first_name,
+        u.last_name,
+        'yes' if u.is_staff else 'no',
+        'yes' if u.is_active else 'no',
+        u.date_joined.isoformat() if u.date_joined else '',
+        u.last_login.isoformat() if u.last_login else '',
+        profile_fields['profile_phone'],
+        profile_fields['profile_country'],
+        profile_fields['profile_postal_code'],
+    ]
+
+
+def _reservations_to_xlsx_response(reservations_qs, filename: str) -> HttpResponse:
+    if openpyxl is None:
+        # Fallback: plain text if openpyxl isn't available (shouldn't happen in prod)
+        response = HttpResponse('Excel export requires openpyxl.', content_type='text/plain; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{filename}.txt"'
+        return response
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Reservations'
+
+    headers = _reservation_report_headers()
+    ws.append(headers)
 
     for r in reservations_qs:
-        u = r.user
-        t = r.tour
-        destination_name = ''
-        try:
-            destination_name = getattr(getattr(t, 'destination', None), 'name', '') or ''
-        except Exception:
-            destination_name = ''
+        ws.append(_reservation_report_row(r))
 
-        profile_fields = _get_profile_fields(u) or {
-            'profile_phone': '',
-            'profile_country': '',
-            'profile_postal_code': '',
-        }
+    # Styling
+    header_fill = PatternFill('solid', fgColor='1F2937')
+    header_font = Font(color='FFFFFF', bold=True)
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(vertical='center', horizontal='center', wrap_text=True)
 
-        writer.writerow([
-            r.id,
-            r.created_at.isoformat() if getattr(r, 'created_at', None) else '',
-            r.status,
-            r.admin_note,
-            r.payment_method,
-            r.payment_status,
-            r.stripe_payment_intent or '',
-            getattr(t, 'id', ''),
-            getattr(t, 'title', ''),
-            getattr(t, 'country', ''),
-            destination_name,
-            r.start_date.isoformat() if r.start_date else '',
-            r.end_date.isoformat() if r.end_date else '',
-            getattr(r, 'nights', ''),
-            r.num_persons,
-            str(r.total_price),
-            'yes' if r.booking_for_other else 'no',
-            r.guest_full_name,
-            r.guest_phone,
-            u.id,
-            u.username,
-            u.email,
-            u.first_name,
-            u.last_name,
-            'yes' if u.is_staff else 'no',
-            'yes' if u.is_active else 'no',
-            u.date_joined.isoformat() if u.date_joined else '',
-            u.last_login.isoformat() if u.last_login else '',
-            profile_fields['profile_phone'],
-            profile_fields['profile_country'],
-            profile_fields['profile_postal_code'],
-        ])
+    ws.freeze_panes = 'A2'
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
 
+    # Add Excel table style (clear borders + banded rows)
+    table = Table(displayName='ReservationsTable', ref=ws.auto_filter.ref)
+    style = TableStyleInfo(
+        name='TableStyleMedium9',
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=True,
+        showColumnStripes=False,
+    )
+    table.tableStyleInfo = style
+    ws.add_table(table)
+
+    # Best-effort column widths
+    for col_idx, header in enumerate(headers, start=1):
+        max_len = len(str(header))
+        for row_idx in range(2, min(ws.max_row, 250) + 1):
+            v = ws.cell(row=row_idx, column=col_idx).value
+            if v is None:
+                continue
+            max_len = max(max_len, len(str(v)))
+        ws.column_dimensions[get_column_letter(col_idx)].width = min(max(10, max_len + 2), 45)
+
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+
+    response = HttpResponse(
+        stream.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
 @login_required
@@ -366,13 +429,16 @@ def admin_reservations(request):
 
         if action == 'download_report':
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f'reservations_report_{ts}.csv'
-            return _reservations_to_csv_response(selected_qs, filename)
+            filename = f'reservations_report_{ts}.xlsx'
+            return _reservations_to_xlsx_response(selected_qs, filename)
 
         messages.info(request, 'Choose an action to apply.')
         return redirect('admin_reservations')
 
-    return render(request, "admin_reservations.html", {"reservations": reservations_qs})
+    return render(request, "admin_reservations.html", {
+        "reservations": reservations_qs,
+        "reservations_count": reservations_qs.count(),
+    })
 
 
 @login_required
@@ -397,8 +463,8 @@ def download_reservation_report(request, id):
     r = get_object_or_404(qs, id=id)
 
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f'reservation_{r.id}_report_{ts}.csv'
-    return _reservations_to_csv_response(qs, filename)
+    filename = f'reservation_{r.id}_report_{ts}.xlsx'
+    return _reservations_to_xlsx_response(qs, filename)
 
 
 @login_required

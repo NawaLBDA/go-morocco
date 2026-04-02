@@ -3,40 +3,50 @@
 {% block content %}
 <div class="container my-5">
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-    <h2 class="mb-0">Reservations management</h2>
+    <div>
+      <h2 class="mb-0">Reservations</h2>
+      <div class="text-muted small">{{ reservations_count|default:reservations|length }} items</div>
+    </div>
   </div>
 
   <form method="post" class="card border-0 shadow-sm">
     {% csrf_token %}
-    <div class="card-body">
-      <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-          <select class="form-select form-select-sm" name="action" style="max-width:240px" required>
-            <option value="" selected disabled>Action…</option>
-            <option value="download_report">Download report (CSV)</option>
-            <option value="delete_selected">Delete selected</option>
-          </select>
-          <button class="btn btn-sm btn-dark" type="submit">Apply</button>
+    <div class="card-body py-3">
+      <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+        <div class="text-muted small">Select rows, then export or delete.</div>
+        <div class="btn-group" role="group" aria-label="Bulk actions">
+          <button type="submit" name="action" value="download_report"
+                  class="btn btn-sm btn-outline-secondary"
+                  title="Download Excel report"
+                  aria-label="Download Excel report">
+            <i class="fa-solid fa-file-excel"></i>
+          </button>
+          <button type="submit" name="action" value="delete_selected"
+                  class="btn btn-sm btn-outline-danger"
+                  title="Delete selected"
+                  aria-label="Delete selected"
+                  onclick="return confirm('Delete selected reservations permanently?');">
+            <i class="fa-solid fa-trash"></i>
+          </button>
         </div>
-        <div class="text-muted small">{{ reservations|length }} reservation(s)</div>
       </div>
 
       <div class="table-responsive">
-        <table class="table table-striped align-middle mb-0">
+        <table class="table table-hover align-middle mb-0">
           <thead>
-            <tr>
+            <tr class="table-light">
               <th style="width:34px">
                 <input class="form-check-input" type="checkbox" id="select-all"
                        onclick="document.querySelectorAll('input[name=reservation_ids]').forEach(cb => cb.checked = this.checked);">
               </th>
+              <th style="width:90px">#</th>
               <th>User</th>
               <th>Tour</th>
               <th>Dates</th>
               <th>Total</th>
               <th>Payment</th>
-              <th>Payment Status</th>
               <th>Status</th>
-              <th style="min-width:340px">Actions</th>
+              <th style="width:160px">Actions</th>
             </tr>
           </thead>
 
@@ -45,39 +55,31 @@
             <tr>
               <td>
                 <input class="form-check-input" type="checkbox" name="reservation_ids" value="{{ r.id }}">
+              <td class="fw-semibold">{{ r.id }}</td>
               </td>
               <td>
                 <div class="fw-semibold">{{ r.user.username }}</div>
               </td>
               <td>
-                <div class="fw-semibold">{{ r.tour.title }}</div>
                 <div class="text-muted small">#{{ r.id }}</div>
               </td>
               <td>{{ r.start_date }} → {{ r.end_date }}</td>
               <td>{{ r.total_price }} $</td>
 
-              <td>
-                <span class="badge {% if r.payment_method == 'transfer' %}bg-dark{% else %}bg-secondary{% endif %}">
-                  {{ r.payment_method|upper }}
-                </span>
-              </td>
-
-              <td>
-                <span class="badge
-                  {% if r.payment_status == 'paid' %}bg-success
-                  {% elif r.payment_status == 'unpaid' %}bg-warning text-dark
-                  {% else %}bg-danger{% endif %}
-                ">
-                  {{ r.payment_status|upper }}
-                </span>
+                <span class="badge text-bg-secondary">{{ r.payment_method|upper }}</span>
+                <span class="badge ms-1
+                  {% if r.payment_status == 'paid' %}text-bg-success
+                  {% elif r.payment_status == 'unpaid' %}text-bg-warning
+                  {% else %}text-bg-danger{% endif %}
+                ">{{ r.payment_status|upper }}</span>
               </td>
 
               <td>
                 <span class="badge 
-                  {% if r.status == 'pending' %}bg-warning text-dark
-                  {% elif r.status == 'booked' %}bg-success
-                  {% elif r.status == 'rejected' %}bg-danger
-                  {% elif r.status == 'cancelled' %}bg-secondary
+                  {% if r.status == 'pending' %}text-bg-warning
+                  {% elif r.status == 'booked' %}text-bg-success
+                  {% elif r.status == 'rejected' %}text-bg-danger
+                  {% elif r.status == 'cancelled' %}text-bg-secondary
                   {% endif %}
                 ">
                   {{ r.status|upper }}
@@ -85,36 +87,42 @@
               </td>
 
               <td>
-                <div class="d-flex flex-wrap gap-2">
-                  {% if r.status == 'pending' %}
-                    <a href="{% url 'validate_reservation' r.id %}" class="btn btn-success btn-sm">Validate</a>
-                    <a href="{% url 'reject_reservation' r.id %}" class="btn btn-danger btn-sm">Reject</a>
-                  {% endif %}
+                <div class="d-flex justify-content-end gap-2">
+                  <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="dropdown"
+                            aria-expanded="false" title="Actions" aria-label="Actions">
+                      <i class="fa-solid fa-ellipsis-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      {% if r.status == 'pending' %}
+                        <li><a class="dropdown-item" href="{% url 'validate_reservation' r.id %}">Validate</a></li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'reject_reservation' r.id %}">Reject</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                      {% endif %}
 
-                  {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
-                    {% if r.payment_status != 'paid' %}
-                      <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-primary btn-sm">Mark Paid</a>
-                    {% endif %}
-                  {% endif %}
+                      {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
+                        {% if r.payment_status != 'paid' %}
+                          <li><a class="dropdown-item" href="{% url 'mark_paid_reservation' r.id %}">Mark paid</a></li>
+                        {% endif %}
+                      {% endif %}
 
-                  {% if r.status == 'booked' and r.payment_status != 'paid' %}
-                    <a href="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-warning btn-sm">Cancel</a>
-                  {% endif %}
+                      {% if r.status == 'booked' and r.payment_status != 'paid' %}
+                        <li><a class="dropdown-item" href="{% url 'admin_cancel_reservation' r.id %}">Cancel</a></li>
+                      {% endif %}
+                    </ul>
+                  </div>
 
                   <a href="{% url 'download_reservation_report' r.id %}"
                      class="btn btn-outline-secondary btn-sm"
-                     title="Download report"
-                     aria-label="Download report">
+                     title="Download report (Excel)"
+                     aria-label="Download report (Excel)">
                     <i class="fa-solid fa-download"></i>
                   </a>
 
                   <form method="post" action="{% url 'delete_reservation' r.id %}" class="d-inline"
                         onsubmit="return confirm('Delete this reservation permanently?');">
                     {% csrf_token %}
-                    <button type="submit"
-                            class="btn btn-outline-danger btn-sm"
-                            title="Delete"
-                            aria-label="Delete">
+                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete" aria-label="Delete">
                       <i class="fa-solid fa-trash"></i>
                     </button>
                   </form>
