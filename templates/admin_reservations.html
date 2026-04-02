@@ -55,17 +55,18 @@
             <tr>
               <td>
                 <input class="form-check-input" type="checkbox" name="reservation_ids" value="{{ r.id }}">
-              <td class="fw-semibold">{{ r.id }}</td>
               </td>
+              <td class="fw-semibold">{{ r.id }}</td>
               <td>
                 <div class="fw-semibold">{{ r.user.username }}</div>
               </td>
               <td>
-                <div class="text-muted small">#{{ r.id }}</div>
+                <div class="fw-semibold">{{ r.tour.title }}</div>
               </td>
               <td>{{ r.start_date }} → {{ r.end_date }}</td>
-              <td>{{ r.total_price }} $</td>
+              <td class="fw-semibold">{{ r.total_price }} $</td>
 
+              <td>
                 <span class="badge text-bg-secondary">{{ r.payment_method|upper }}</span>
                 <span class="badge ms-1
                   {% if r.payment_status == 'paid' %}text-bg-success
@@ -88,34 +89,45 @@
 
               <td>
                 <div class="d-flex justify-content-end gap-2">
-                  <div class="dropdown">
-                    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="dropdown"
-                            aria-expanded="false" title="Actions" aria-label="Actions">
-                      <i class="fa-solid fa-ellipsis-vertical"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                      {% if r.status == 'pending' %}
-                        <li><a class="dropdown-item" href="{% url 'validate_reservation' r.id %}">Validate</a></li>
-                        <li><a class="dropdown-item text-danger" href="{% url 'reject_reservation' r.id %}">Reject</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                      {% endif %}
+                  {% if r.status == 'pending' %}
+                    <a href="{% url 'validate_reservation' r.id %}"
+                       class="btn btn-outline-success btn-sm"
+                       title="Validate"
+                       aria-label="Validate">
+                      <i class="fa-solid fa-check"></i>
+                    </a>
+                    <a href="{% url 'reject_reservation' r.id %}"
+                       class="btn btn-outline-danger btn-sm"
+                       title="Reject"
+                       aria-label="Reject">
+                      <i class="fa-solid fa-xmark"></i>
+                    </a>
+                  {% endif %}
 
-                      {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
-                        {% if r.payment_status != 'paid' %}
-                          <li><a class="dropdown-item" href="{% url 'mark_paid_reservation' r.id %}">Mark paid</a></li>
-                        {% endif %}
-                      {% endif %}
+                  {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
+                    {% if r.payment_status != 'paid' %}
+                      <a href="{% url 'mark_paid_reservation' r.id %}"
+                         class="btn btn-outline-primary btn-sm"
+                         title="Mark paid"
+                         aria-label="Mark paid">
+                        <i class="fa-solid fa-money-bill-wave"></i>
+                      </a>
+                    {% endif %}
+                  {% endif %}
 
-                      {% if r.status == 'booked' and r.payment_status != 'paid' %}
-                        <li><a class="dropdown-item" href="{% url 'admin_cancel_reservation' r.id %}">Cancel</a></li>
-                      {% endif %}
-                    </ul>
-                  </div>
+                  {% if r.status == 'booked' and r.payment_status != 'paid' %}
+                    <a href="{% url 'admin_cancel_reservation' r.id %}"
+                       class="btn btn-outline-warning btn-sm"
+                       title="Cancel"
+                       aria-label="Cancel">
+                      <i class="fa-solid fa-ban"></i>
+                    </a>
+                  {% endif %}
 
                   <a href="{% url 'download_reservation_report' r.id %}"
                      class="btn btn-outline-secondary btn-sm"
-                     title="Download report (Excel)"
-                     aria-label="Download report (Excel)">
+                     title="Download report (CSV)"
+                     aria-label="Download report (CSV)">
                     <i class="fa-solid fa-download"></i>
                   </a>
 

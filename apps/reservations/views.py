@@ -1,6 +1,6 @@
 from decimal import Decimal
 import json
-from io import BytesIO
+import csv
 import stripe
 from datetime import datetime, timedelta, date
 from django.conf import settings
@@ -13,14 +13,6 @@ from django.views.decorators.http import require_POST, require_http_methods
 from datetime import date
 
 from apps.core.models import Reservation, Tour
-
-try:
-    import openpyxl
-    from openpyxl.styles import Font, Alignment, PatternFill
-    from openpyxl.utils import get_column_letter
-    from openpyxl.worksheet.table import Table, TableStyleInfo
-except Exception:
-    openpyxl = None
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -338,66 +330,23 @@ def _reservation_report_row(r):
     ]
 
 
-def _reservations_to_xlsx_response(reservations_qs, filename: str) -> HttpResponse:
-    if openpyxl is None:
-        # Fallback: plain text if openpyxl isn't available (shouldn't happen in prod)
-        response = HttpResponse('Excel export requires openpyxl.', content_type='text/plain; charset=utf-8')
-        response['Content-Disposition'] = f'attachment; filename="{filename}.txt"'
-        return response
+def _reservations_to_csv_response(reservations_qs, filename: str) -> HttpResponse:
+    """Excel-friendly CSV with clear columns for traceability.
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = 'Reservations'
+    Uses ';' delimiter which is the most compatible with French Excel locales.
+    """
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
-    headers = _reservation_report_headers()
-    ws.append(headers)
+    # Excel-friendly UTF-8 BOM
+    response.write('\ufeff')
+
+    writer = csv.writer(response, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(_reservation_report_headers())
 
     for r in reservations_qs:
-        ws.append(_reservation_report_row(r))
+        writer.writerow(_reservation_report_row(r))
 
-    # Styling
-    header_fill = PatternFill('solid', fgColor='1F2937')
-    header_font = Font(color='FFFFFF', bold=True)
-    for col_idx in range(1, len(headers) + 1):
-        cell = ws.cell(row=1, column=col_idx)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(vertical='center', horizontal='center', wrap_text=True)
-
-    ws.freeze_panes = 'A2'
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
-
-    # Add Excel table style (clear borders + banded rows)
-    table = Table(displayName='ReservationsTable', ref=ws.auto_filter.ref)
-    style = TableStyleInfo(
-        name='TableStyleMedium9',
-        showFirstColumn=False,
-        showLastColumn=False,
-        showRowStripes=True,
-        showColumnStripes=False,
-    )
-    table.tableStyleInfo = style
-    ws.add_table(table)
-
-    # Best-effort column widths
-    for col_idx, header in enumerate(headers, start=1):
-        max_len = len(str(header))
-        for row_idx in range(2, min(ws.max_row, 250) + 1):
-            v = ws.cell(row=row_idx, column=col_idx).value
-            if v is None:
-                continue
-            max_len = max(max_len, len(str(v)))
-        ws.column_dimensions[get_column_letter(col_idx)].width = min(max(10, max_len + 2), 45)
-
-    stream = BytesIO()
-    wb.save(stream)
-    stream.seek(0)
-
-    response = HttpResponse(
-        stream.getvalue(),
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
 @login_required
@@ -429,8 +378,8 @@ def admin_reservations(request):
 
         if action == 'download_report':
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f'reservations_report_{ts}.xlsx'
-            return _reservations_to_xlsx_response(selected_qs, filename)
+            filename = f'reservations_report_{ts}.csv'
+            return _reservations_to_csv_response(selected_qs, filename)
 
         messages.info(request, 'Choose an action to apply.')
         return redirect('admin_reservations')
@@ -464,7 +413,8 @@ def download_reservation_report(request, id):
 
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f'reservation_{r.id}_report_{ts}.xlsx'
-    return _reservations_to_xlsx_response(qs, filename)
+    filename = f'reservation_{r.id}_report_{ts}.csv'
+    return _reservations_to_csv_response(qs, filename)
 
 
 @login_required
