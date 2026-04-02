@@ -13,20 +13,14 @@
     {% csrf_token %}
     <div class="card-body py-3">
       <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-        <div class="text-muted small">Select rows, then export or delete.</div>
+        <div class="text-muted small">Select rows, then export.</div>
         <div class="btn-group" role="group" aria-label="Bulk actions">
           <button type="submit" name="action" value="download_report"
                   class="btn btn-sm btn-outline-secondary"
-                  title="Download Excel report"
-                  aria-label="Download Excel report">
-            <i class="fa-solid fa-file-excel"></i>
-          </button>
-          <button type="submit" name="action" value="delete_selected"
-                  class="btn btn-sm btn-outline-danger"
-                  title="Delete selected"
-                  aria-label="Delete selected"
-                  onclick="return confirm('Delete selected reservations permanently?');">
-            <i class="fa-solid fa-trash"></i>
+                  title="Download report (CSV)"
+                  aria-label="Download report (CSV)">
+            <i class="fa-solid fa-download me-1"></i>
+            Export CSV
           </button>
         </div>
       </div>
@@ -56,15 +50,15 @@
               <td>
                 <input class="form-check-input" type="checkbox" name="reservation_ids" value="{{ r.id }}">
               </td>
-              <td class="fw-semibold">{{ r.id }}</td>
+              <td>{{ r.id }}</td>
               <td>
-                <div class="fw-semibold">{{ r.user.username }}</div>
+                <div>{{ r.user.username }}</div>
               </td>
               <td>
-                <div class="fw-semibold">{{ r.tour.title }}</div>
+                <div>{{ r.tour.title }}</div>
               </td>
               <td>{{ r.start_date }} → {{ r.end_date }}</td>
-              <td class="fw-semibold">{{ r.total_price }} $</td>
+              <td>{{ r.total_price }} $</td>
 
               <td>
                 <span class="badge text-bg-secondary">{{ r.payment_method|upper }}</span>
@@ -90,37 +84,25 @@
               <td>
                 <div class="d-flex justify-content-end gap-2">
                   {% if r.status == 'pending' %}
-                    <a href="{% url 'validate_reservation' r.id %}"
-                       class="btn btn-outline-success btn-sm"
-                       title="Validate"
-                       aria-label="Validate">
-                      <i class="fa-solid fa-check"></i>
+                    <a href="{% url 'validate_reservation' r.id %}" class="btn btn-success btn-sm" title="Validate">
+                      Validate
                     </a>
-                    <a href="{% url 'reject_reservation' r.id %}"
-                       class="btn btn-outline-danger btn-sm"
-                       title="Reject"
-                       aria-label="Reject">
-                      <i class="fa-solid fa-xmark"></i>
+                    <a href="{% url 'reject_reservation' r.id %}" class="btn btn-outline-danger btn-sm" title="Reject">
+                      Reject
                     </a>
                   {% endif %}
 
                   {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
                     {% if r.payment_status != 'paid' %}
-                      <a href="{% url 'mark_paid_reservation' r.id %}"
-                         class="btn btn-outline-primary btn-sm"
-                         title="Mark paid"
-                         aria-label="Mark paid">
-                        <i class="fa-solid fa-money-bill-wave"></i>
+                      <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-primary btn-sm" title="Mark paid">
+                        Mark paid
                       </a>
                     {% endif %}
                   {% endif %}
 
                   {% if r.status == 'booked' and r.payment_status != 'paid' %}
-                    <a href="{% url 'admin_cancel_reservation' r.id %}"
-                       class="btn btn-outline-warning btn-sm"
-                       title="Cancel"
-                       aria-label="Cancel">
-                      <i class="fa-solid fa-ban"></i>
+                    <a href="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-warning btn-sm" title="Cancel">
+                      Cancel
                     </a>
                   {% endif %}
 
