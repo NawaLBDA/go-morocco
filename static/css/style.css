@@ -203,6 +203,25 @@ img{max-width:100%}
   text-shadow:0 8px 30px rgba(0,0,0,.35);
 }
 
+/* Morocco hero headline sizing: emphasize first phrase */
+.hero-headline .hero-headline-main,
+.hero-headline .hero-headline-sub{
+  display:block;
+}
+
+.theme-morocco .hero-headline .hero-headline-main{
+  font-size:clamp(2.2rem, 3.6vw, 3.3rem);
+  line-height:1.06;
+}
+
+.theme-morocco .hero-headline .hero-headline-sub{
+  margin-top:.35rem;
+  font-size:clamp(1.15rem, 1.6vw, 1.6rem);
+  line-height:1.2;
+  font-weight:600;
+  opacity:.96;
+}
+
 .hero-tagline{
   max-width:860px;
   margin-left:auto;
