@@ -1,14 +1,15 @@
 from decimal import Decimal
 import json
+import csv
 import stripe
 from datetime import datetime, timedelta, date
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from datetime import date
 
 from apps.core.models import Reservation, Tour
@@ -227,13 +228,177 @@ def cancel_reservation(request, id):
 # ============================================================
 # ADMIN
 # ============================================================
+
+
+def _get_profile_fields(user):
+    try:
+        profile = getattr(user, 'profile', None)
+        if not profile:
+            return None
+        return {
+            'profile_phone': getattr(profile, 'phone', ''),
+            'profile_country': getattr(profile, 'country', ''),
+            'profile_postal_code': getattr(profile, 'postal_code', ''),
+        }
+    except Exception:
+        return None
+
+
+def _reservations_to_csv_response(reservations_qs, filename: str) -> HttpResponse:
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    # Excel-friendly UTF-8 BOM
+    response.write('\ufeff')
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'reservation_id',
+        'created_at',
+        'status',
+        'admin_note',
+        'payment_method',
+        'payment_status',
+        'stripe_payment_intent',
+        'tour_id',
+        'tour_title',
+        'tour_country',
+        'destination',
+        'start_date',
+        'end_date',
+        'nights',
+        'num_persons',
+        'total_price',
+        'booking_for_other',
+        'guest_full_name',
+        'guest_phone',
+        'user_id',
+        'username',
+        'email',
+        'first_name',
+        'last_name',
+        'is_staff',
+        'is_active',
+        'date_joined',
+        'last_login',
+        'profile_phone',
+        'profile_country',
+        'profile_postal_code',
+    ])
+
+    for r in reservations_qs:
+        u = r.user
+        t = r.tour
+        destination_name = ''
+        try:
+            destination_name = getattr(getattr(t, 'destination', None), 'name', '') or ''
+        except Exception:
+            destination_name = ''
+
+        profile_fields = _get_profile_fields(u) or {
+            'profile_phone': '',
+            'profile_country': '',
+            'profile_postal_code': '',
+        }
+
+        writer.writerow([
+            r.id,
+            r.created_at.isoformat() if getattr(r, 'created_at', None) else '',
+            r.status,
+            r.admin_note,
+            r.payment_method,
+            r.payment_status,
+            r.stripe_payment_intent or '',
+            getattr(t, 'id', ''),
+            getattr(t, 'title', ''),
+            getattr(t, 'country', ''),
+            destination_name,
+            r.start_date.isoformat() if r.start_date else '',
+            r.end_date.isoformat() if r.end_date else '',
+            getattr(r, 'nights', ''),
+            r.num_persons,
+            str(r.total_price),
+            'yes' if r.booking_for_other else 'no',
+            r.guest_full_name,
+            r.guest_phone,
+            u.id,
+            u.username,
+            u.email,
+            u.first_name,
+            u.last_name,
+            'yes' if u.is_staff else 'no',
+            'yes' if u.is_active else 'no',
+            u.date_joined.isoformat() if u.date_joined else '',
+            u.last_login.isoformat() if u.last_login else '',
+            profile_fields['profile_phone'],
+            profile_fields['profile_country'],
+            profile_fields['profile_postal_code'],
+        ])
+
+    return response
+
 @login_required
 def admin_reservations(request):
     if not request.user.is_staff:
         return redirect("home")
 
-    reservations = Reservation.objects.all().order_by("-created_at")
-    return render(request, "admin_reservations.html", {"reservations": reservations})
+    reservations_qs = Reservation.objects.select_related(
+        'user',
+        'tour',
+        'tour__destination',
+    ).all().order_by("-created_at")
+
+    if request.method == 'POST':
+        action = (request.POST.get('action') or '').strip()
+        selected_ids = request.POST.getlist('reservation_ids')
+        selected_qs = reservations_qs
+        if selected_ids:
+            selected_qs = reservations_qs.filter(id__in=selected_ids)
+
+        if action == 'delete_selected':
+            if not selected_ids:
+                messages.error(request, 'Select at least one reservation to delete.')
+                return redirect('admin_reservations')
+
+            deleted_count, _ = selected_qs.delete()
+            messages.success(request, f'✅ Deleted {deleted_count} reservation(s).')
+            return redirect('admin_reservations')
+
+        if action == 'download_report':
+            ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f'reservations_report_{ts}.csv'
+            return _reservations_to_csv_response(selected_qs, filename)
+
+        messages.info(request, 'Choose an action to apply.')
+        return redirect('admin_reservations')
+
+    return render(request, "admin_reservations.html", {"reservations": reservations_qs})
+
+
+@login_required
+@require_POST
+def delete_reservation(request, id):
+    if not request.user.is_staff:
+        return redirect("home")
+
+    r = get_object_or_404(Reservation, id=id)
+    r.delete()
+    messages.success(request, '✅ Reservation deleted.')
+    return redirect('admin_reservations')
+
+
+@login_required
+@require_http_methods(['GET'])
+def download_reservation_report(request, id):
+    if not request.user.is_staff:
+        return redirect("home")
+
+    qs = Reservation.objects.select_related('user', 'tour', 'tour__destination').filter(id=id)
+    r = get_object_or_404(qs, id=id)
+
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'reservation_{r.id}_report_{ts}.csv'
+    return _reservations_to_csv_response(qs, filename)
 
 
 @login_required

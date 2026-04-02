@@ -1,87 +1,133 @@
 {% extends "base.html" %}
+{% block page %}admin-reservations{% endblock %}
 {% block content %}
 <div class="container my-5">
-  <h2>Reservations management</h2>
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <div>
+      <h2 class="mb-1">Reservations management</h2>
+      <div class="text-muted small">Bulk actions: delete selected or download a full traceability report (CSV).</div>
+    </div>
+  </div>
 
-  <table class="table table-striped align-middle">
-    <thead>
-      <tr>
-        <th>User</th>
-        <th>Tour</th>
-        <th>Dates</th>
-        <th>Total</th>
+  <form method="post" class="card border-0 shadow-sm">
+    {% csrf_token %}
+    <div class="card-body">
+      <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <select class="form-select form-select-sm" name="action" style="max-width:260px" required>
+            <option value="" selected disabled>Choose action…</option>
+            <option value="download_report">Download report (CSV)</option>
+            <option value="delete_selected">Delete selected</option>
+          </select>
+          <button class="btn btn-sm btn-dark" type="submit">Apply</button>
+          <span class="text-muted small">(If nothing selected, report exports all)</span>
+        </div>
 
-        <th>Payment</th>
-        <th>Payment Status</th>
+        <div class="text-muted small">Total: <strong>{{ reservations|length }}</strong></div>
+      </div>
 
-        <th>Status</th>
-        <th>Action</th>
-      </tr>
-    </thead>
+      <div class="table-responsive">
+        <table class="table table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width:34px">
+                <input class="form-check-input" type="checkbox" id="select-all"
+                       onclick="document.querySelectorAll('input[name=reservation_ids]').forEach(cb => cb.checked = this.checked);">
+              </th>
+              <th>User</th>
+              <th>Tour</th>
+              <th>Dates</th>
+              <th>Total</th>
+              <th>Payment</th>
+              <th>Payment Status</th>
+              <th>Status</th>
+              <th style="min-width:340px">Actions</th>
+            </tr>
+          </thead>
 
-    <tbody>
-    {% for r in reservations %}
-      <tr>
-        <td>{{ r.user.username }}</td>
-        <td>{{ r.tour.title }}</td>
-        <td>{{ r.start_date }} → {{ r.end_date }}</td>
-        <td>{{ r.total_price }} $</td>
+          <tbody>
+          {% for r in reservations %}
+            <tr>
+              <td>
+                <input class="form-check-input" type="checkbox" name="reservation_ids" value="{{ r.id }}">
+              </td>
+              <td>
+                <div class="fw-semibold">{{ r.user.username }}</div>
+                <div class="text-muted small">{{ r.user.email }}</div>
+              </td>
+              <td>
+                <div class="fw-semibold">{{ r.tour.title }}</div>
+                <div class="text-muted small">#{{ r.id }} · {{ r.created_at|date:"Y-m-d H:i" }}</div>
+              </td>
+              <td>{{ r.start_date }} → {{ r.end_date }}</td>
+              <td>{{ r.total_price }} $</td>
 
-        <td>
-          <span class="badge {% if r.payment_method == 'transfer' %}bg-dark{% else %}bg-secondary{% endif %}">
-            {{ r.payment_method|upper }}
-          </span>
-        </td>
+              <td>
+                <span class="badge {% if r.payment_method == 'transfer' %}bg-dark{% else %}bg-secondary{% endif %}">
+                  {{ r.payment_method|upper }}
+                </span>
+              </td>
 
-        <td>
-          <span class="badge
-            {% if r.payment_status == 'paid' %}bg-success
-            {% elif r.payment_status == 'unpaid' %}bg-warning text-dark
-            {% else %}bg-danger{% endif %}
-          ">
-            {{ r.payment_status|upper }}
-          </span>
-        </td>
+              <td>
+                <span class="badge
+                  {% if r.payment_status == 'paid' %}bg-success
+                  {% elif r.payment_status == 'unpaid' %}bg-warning text-dark
+                  {% else %}bg-danger{% endif %}
+                ">
+                  {{ r.payment_status|upper }}
+                </span>
+              </td>
 
-        <td>
-          <span class="badge 
-            {% if r.status == 'pending' %}bg-warning text-dark
-            {% elif r.status == 'booked' %}bg-success
-            {% elif r.status == 'rejected' %}bg-danger
-            {% elif r.status == 'cancelled' %}bg-secondary
+              <td>
+                <span class="badge 
+                  {% if r.status == 'pending' %}bg-warning text-dark
+                  {% elif r.status == 'booked' %}bg-success
+                  {% elif r.status == 'rejected' %}bg-danger
+                  {% elif r.status == 'cancelled' %}bg-secondary
+                  {% endif %}
+                ">
+                  {{ r.status|upper }}
+                </span>
+              </td>
 
-            {% endif %}
-          ">
-            {{ r.status|upper }}
-          </span>
-        </td>
+              <td>
+                <div class="d-flex flex-wrap gap-2">
+                  {% if r.status == 'pending' %}
+                    <a href="{% url 'validate_reservation' r.id %}" class="btn btn-success btn-sm">Validate</a>
+                    <a href="{% url 'reject_reservation' r.id %}" class="btn btn-danger btn-sm">Reject</a>
+                  {% endif %}
 
-<td>
-  {% if r.status == 'pending' %}
-    <a href="{% url 'validate_reservation' r.id %}" class="btn btn-success btn-sm">Validate</a>
-    <a href="{% url 'reject_reservation' r.id %}" class="btn btn-danger btn-sm">Reject</a>
-  {% endif %}
+                  {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
+                    {% if r.payment_status != 'paid' %}
+                      <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-primary btn-sm">Mark Paid</a>
+                    {% endif %}
+                  {% endif %}
 
-  {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
-    {% if r.payment_status != 'paid' %}
-      <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-primary btn-sm ms-1">
-        Mark Paid
-      </a>
-    {% endif %}
-  {% endif %}
-  
-  {% if r.status == 'booked' and r.payment_status != 'paid' %}
-    <a href="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-warning btn-sm ms-1">
-      Cancel
-    </a>
-  {% endif %}
+                  {% if r.status == 'booked' and r.payment_status != 'paid' %}
+                    <a href="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-warning btn-sm">Cancel</a>
+                  {% endif %}
 
-</td>
+                  <a href="{% url 'download_reservation_report' r.id %}" class="btn btn-outline-secondary btn-sm">Download report</a>
 
+                  <form method="post" action="{% url 'delete_reservation' r.id %}" class="d-inline"
+                        onsubmit="return confirm('Delete this reservation permanently?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="9" class="text-center text-muted py-5">No reservations found.</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </form>
 
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <div class="admin-page-spacer" aria-hidden="true"></div>
 </div>
 {% endblock %}
