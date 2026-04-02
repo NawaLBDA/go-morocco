@@ -4,10 +4,13 @@ from django.db.utils import OperationalError, ProgrammingError
 def get_country_from_site(request):
     # Prefer host-based detection so maroc.local / ireland.local always win.
     host = request.get_host().split(':')[0].lower()
+
+    # Morocco must win for maroc.local (even if host contains other words)
+    if host in {'maroc.local', 'maroc.lcoal', 'morocco.local'} or 'maroc' in host or 'morocco' in host:
+        return 'morocco'
+
     if 'ireland' in host:
         return 'ireland'
-    if 'maroc' in host or 'morocco' in host:
-        return 'morocco'
 
     # Fallback: user profile (only when host does not indicate a country)
     if request.user.is_authenticated:
