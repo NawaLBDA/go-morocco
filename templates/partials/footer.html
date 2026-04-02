@@ -1,26 +1,25 @@
-<footer class="site-footer mt-5">
-  <div class="container">
-    <div class="row">
-      <div class="col-md-4">
-        <h5>Basma</h5>
-        <p>Curated Morocco experiences — personal, seamless, authentic.</p>
-      </div>
-      <div class="col-md-4">
-        <h6>Useful Links</h6>
-        <ul class="list-unstyled">
-          <li><a href="/">Home</a></li>
-          <li><a href="{% url 'blog_list' %}">Blog</a></li>
-          <li><a href="{% url 'contact' %}">Contact</a></li>
-        </ul>
-      </div>
-      <div class="col-md-4">
-        <h6>Contact</h6>
-        <p>Email: info@example.com</p>
-        <p>WhatsApp: +212 643 092 852</p>
-      </div>
+<div class="container">
+  <div class="row">
+    <div class="col-md-4">
+      <h5>Basma</h5>
+      <p>Curated Morocco experiences — personal, seamless, authentic.</p>
     </div>
-    <div class="row mt-4">
-      <div class="col-12 text-center small">© {{ now.year }} Basma. All rights reserved.</div>
+    <div class="col-md-4">
+      <h6>Useful Links</h6>
+      <ul class="list-unstyled">
+        <li><a href="/">Home</a></li>
+        <li><a href="{% url 'blog_list' %}">Our Experiences</a></li>
+        <li><a href="{% url 'contact' %}">Contact</a></li>
+      </ul>
+    </div>
+    <div class="col-md-4">
+      <h6>Contact</h6>
+      <p>Email: info@example.com</p>
+      <p>WhatsApp: +212 643 092 852</p>
     </div>
   </div>
-</footer>
+
+  <div class="row mt-4">
+    <div class="col-12 text-center small">© {% now "Y" %} Basma. All rights reserved.</div>
+  </div>
+</div>
