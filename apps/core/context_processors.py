@@ -2,6 +2,11 @@ from .models import Section, Tour
 from django.db.utils import OperationalError, ProgrammingError
 
 def get_country_from_site(request):
+    # 1) Explicit override via middleware/session (Render single-domain support)
+    override = getattr(request, 'site_country', None) or request.session.get('site_country')
+    if override in {'morocco', 'ireland'}:
+        return override
+
     # Prefer host-based detection so maroc.local / ireland.local always win.
     host = request.get_host().split(':')[0].lower()
 

@@ -24,12 +24,14 @@ SECRET_KEY = os.environ.get(
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 # ✅ Dynamic ALLOWED_HOSTS based on environment
+CUSTOM_DOMAIN = (os.environ.get("CUSTOM_DOMAIN") or "").strip()
 if os.environ.get("ENVIRONMENT") == "production":
     ALLOWED_HOSTS = [
         "go-morocco.onrender.com",
         ".onrender.com",
-        os.environ.get("CUSTOM_DOMAIN", ""),
     ]
+    if CUSTOM_DOMAIN:
+        ALLOWED_HOSTS.append(CUSTOM_DOMAIN)
 else:
     ALLOWED_HOSTS = [
         "go-morocco.onrender.com",
@@ -57,8 +59,9 @@ if DEBUG:
 # ✅ CSRF Protection
 CSRF_TRUSTED_ORIGINS = [
     "https://go-morocco.onrender.com",
-    f"https://{os.environ.get('CUSTOM_DOMAIN', '')}",
 ]
+if CUSTOM_DOMAIN:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{CUSTOM_DOMAIN}")
 
 # Twilio / Robocall config
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
@@ -111,6 +114,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "travel_agency.middleware.CountryPrefixMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
