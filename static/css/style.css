@@ -1979,10 +1979,16 @@ body[data-page="home"] .navbar-main{
 /* Light transparency over hero images for Ireland (softer than Morocco) */
 .theme-ireland .hero-overlay{
   display:block;
-  background:linear-gradient(
-    rgba(0,0,0,.18),
-    rgba(31,41,55,.30)
-  );
+  /* A light “wash” + gentle contrast so images feel slightly transparent */
+  background:
+    linear-gradient(
+      rgba(255,255,255,.14),
+      rgba(181,126,220,.10)
+    ),
+    linear-gradient(
+      rgba(0,0,0,.10),
+      rgba(31,41,55,.18)
+    );
 }
 
 /* Subtle Ireland accent on About section (not on hero) */

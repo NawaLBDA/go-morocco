@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load static %}
 {% block page %}contact{% endblock %}
 {% block content %}
 
@@ -7,10 +6,6 @@
   <div class="row g-4 align-items-stretch">
     <div class="col-lg-5">
       <div class="card border-0 shadow-sm h-100 overflow-hidden">
-        <img
-          src="{% static 'img/contact.jpg' %}"
-          alt="Contact {{ brand_name }} support"
-          style="width:100%;height:220px;object-fit:cover;">
         <div class="card-body">
           <span class="text-uppercase text-primary fw-semibold small">CONTACT US</span>
           <h2 class="fw-bold mt-2">Support & feedback</h2>
