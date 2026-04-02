@@ -1,3 +1,5 @@
+import os
+
 from .models import Section, Tour
 from django.db.utils import OperationalError, ProgrammingError
 
@@ -66,6 +68,13 @@ def sections_processor(request):
         og_image_url = request.build_absolute_uri('/static/img/hero-ma.jpg') if canonical_url else ''
         site_lang = 'en'
 
+    static_version = (
+        os.environ.get('STATIC_VERSION')
+        or os.environ.get('RENDER_GIT_COMMIT')
+        or ''
+    )
+    static_version = (static_version or '1')[:12]
+
     try:
         sections = Section.objects.filter(show_in_nav=True, country=country).order_by('order')
         # ✅ Check if there are any promotions to display the promo bar
@@ -86,4 +95,5 @@ def sections_processor(request):
         'meta_description': meta_description,
         'og_image_url': og_image_url,
         'site_lang': site_lang,
+        'static_version': static_version,
     }
