@@ -60,6 +60,11 @@ img{max-width:100%}
   padding-top:80px; /* espace navbar */
 }
 
+/* Ireland hero fallback background (ensures first slide look even if slider fails) */
+.theme-ireland .hero-home{
+  background:url("../img/hero2-ir.jpg") center/cover no-repeat;
+}
+
 /* Hero slider (4 images) */
 .hero-slider{
   position:absolute;
@@ -401,8 +406,12 @@ img{max-width:100%}
   background:
     linear-gradient(rgba(103, 103, 103, 0.382), rgba(15,23,42,.85)),
     url("/static/img/footer-bg.jpg") center/cover no-repeat;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   color:#e5e7eb;
   padding:80px 0 40px;
+  min-height: 280px;
 }
 
 /* Morocco footer uses hero-ma background */
@@ -410,6 +419,13 @@ img{max-width:100%}
   background:
     linear-gradient(rgba(0,0,0,.35), rgba(15,23,42,.88)),
     url("/static/img/hero-ma.jpg?v=20260402_2") center/cover no-repeat;
+}
+
+/* Ireland footer uses hero2-ir background */
+.theme-ireland .site-footer{
+  background:
+    linear-gradient(rgba(0,0,0,.20), rgba(15,23,42,.82)),
+    url("/static/img/hero2-ir.jpg?v=20260402_2") center/cover no-repeat;
 }
 .site-footer h5{color:#fff}
 .site-footer a{color:#cbd5e1}
@@ -743,6 +759,20 @@ img{max-width:100%}
   justify-content:center;
 }
 
+/* Auth backgrounds per site */
+.theme-morocco .auth-hero{
+  background:url("../img/hero3.jpg") center/cover no-repeat;
+}
+
+.theme-ireland .auth-hero{
+  background:url("../img/hero1-ir.png") center/cover no-repeat;
+}
+
+/* Hide footer on auth pages (login/register) */
+body[data-page="auth"] .site-footer{
+  display:none;
+}
+
 .auth-overlay{
   position:absolute;
   inset:0;
@@ -786,7 +816,7 @@ img{max-width:100%}
 }
 
 .auth-footer a{
-  color:#2a9d8f;
+  color:var(--primary);
   font-weight:600;
 }
 /* ===============================
@@ -815,7 +845,7 @@ img{max-width:100%}
 
 .auth-card input:focus{
   outline:none;
-  border-color:#2a9d8f;
+  border-color:var(--primary);
   box-shadow:0 0 0 1px rgba(42,157,143,.2);
 }
 
@@ -842,8 +872,8 @@ img{max-width:100%}
 .auth-card input[type="password"]:focus,
 .auth-card input[type="email"]:focus{
   outline:none !important;
-  border-color:#2a9d8f !important;
-  box-shadow:0 0 0 3px rgba(42,157,143,.1) !important;
+  border-color:var(--primary) !important;
+  box-shadow:0 0 0 3px rgba(181,126,220,.14) !important;
   background:#f8fafc !important;
 }
 
@@ -1050,6 +1080,49 @@ img{max-width:100%}
   border-radius: 12px;
 }
 
+/* Booking hero image (fixed height, cover, premium overlay) */
+.booking-hero-media{
+  border-radius: 18px;
+  height: 420px;
+  background: #0b1220;
+}
+
+.booking-hero-media::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(180deg, rgba(15,23,42,.10), rgba(15,23,42,.60));
+  pointer-events:none;
+  z-index:2;
+}
+
+.booking-hero-media .tour-booking-image{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  border-radius:0;
+  margin:0;
+  position:relative;
+  z-index:1;
+  transform: scale(1.01);
+  filter: brightness(0.92) contrast(1.05);
+  transition: transform .35s ease, filter .35s ease;
+}
+
+.booking-hero-media:hover .tour-booking-image{
+  transform: scale(1.05);
+  filter: brightness(0.98) contrast(1.08);
+}
+
+@media (max-width: 991.98px){
+  .booking-hero-media{ height: 320px; }
+}
+@media (max-width: 575.98px){
+  .booking-hero-media{ height: 240px; }
+}
+
 .tour-booking-image {
   position: relative;
   z-index: 1;
@@ -1066,6 +1139,22 @@ img{max-width:100%}
 
 .tour-booking-image:hover {
   filter: brightness(0.9) contrast(1.1);
+}
+
+/* Booking content polish */
+.booking-feature{
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.booking-feature:hover{
+  transform: translateY(-4px);
+  box-shadow: 0 18px 45px rgba(15,23,42,.10) !important;
+}
+
+.booking-section{
+  border: 1px solid rgba(15, 23, 42, 0.06) !important;
+  background: rgba(255,255,255,.88);
 }
 
 /* ===============================
@@ -1229,8 +1318,17 @@ img{max-width:100%}
 ================================ */
 
 .available-tours-section {
-  padding-top: 40px;
-  padding-bottom: 60px;
+  padding: 46px 26px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.55));
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.06);
+}
+
+@media (max-width: 575.98px){
+  .available-tours-section{
+    padding: 34px 16px;
+  }
 }
 
 /* Title */
@@ -1256,6 +1354,47 @@ img{max-width:100%}
 /* Improve card balance */
 .available-tours-section .card {
   background: #ffffff;
+}
+
+.available-tours-section .tour-card{
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.08);
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.available-tours-section .tour-card:hover{
+  transform: translateY(-8px);
+  box-shadow: 0 22px 55px rgba(15, 23, 42, 0.12);
+}
+
+/* Tour meta chips */
+.available-tours-section .badge.text-bg-light {
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: #222 !important;
+  font-weight: 600;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+.theme-ireland .available-tours-section .badge.text-bg-light {
+  background: rgba(255, 255, 255, 0.78) !important;
+}
+
+/* Short description */
+.available-tours-section .tour-desc{
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Price row helpers */
+.available-tours-section .price-inline{
+  flex-wrap: wrap;
+}
+.available-tours-section .price-prefix,
+.available-tours-section .price-suffix{
+  font-weight: 600;
 }
 
 /* Reduce image dominance */
@@ -1717,6 +1856,20 @@ body[data-page="home"] .hero-home{
   z-index: 1000;
 }
 
+/* Ireland header color to match theme */
+.theme-ireland .navbar-main{
+  background: linear-gradient(90deg, #1f2937, var(--primary));
+}
+
+/* Reservations list view polish */
+.reservations-list .reservations-item{
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+.reservations-list .reservations-thumb{
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
 
 
 /* Évite tout overflow blanc */
@@ -1781,11 +1934,22 @@ html, body {
   flex: 1 0 auto;
 }
 
+/* Add extra spacing so footer is reached by scrolling on short pages */
+body[data-page="contact"] .site-content,
+body[data-page="blog"] .site-content{
+  min-height: 100vh;
+  padding-bottom: 220px;
+}
+
+/* Reservations should never visually sit on the footer */
+body[data-page="reservations"] .reservations-tours{
+  margin-bottom: 220px;
+}
+
 /* Footer toujours en bas */
 .site-footer {
   flex-shrink: 0;
   margin-top: auto;
-height: 250px;
 
 }
 /* ===============================
@@ -1803,17 +1967,30 @@ body[data-page="home"] .navbar-main{
 }
 
 /* =============================== 
-   IRELAND THEME (FLOWER COLORS)
+   IRELAND THEME (LIGHT VIOLET)
 ================================ */
 .theme-ireland {
-  --primary: #4CAF50; /* Flower green */
-  --primary-dark: #388E3C;
-  --accent: #E91E63; /* Flower pink */
-  --dark: #2E7D32;
+  --primary:#b57edc;       /* light violet */
+  --primary-dark:#8f55bf;
+  --accent:#a7f3d0;        /* soft mint accent */
+  --dark:#1f2937;
 }
 
-.theme-ireland .hero-overlay {
-  background: linear-gradient(135deg, rgba(76, 175, 80, 0.7), rgba(233, 30, 99, 0.7));
+/* Light transparency over hero images for Ireland (softer than Morocco) */
+.theme-ireland .hero-overlay{
+  display:block;
+  background:linear-gradient(
+    rgba(0,0,0,.18),
+    rgba(31,41,55,.30)
+  );
+}
+
+/* Subtle Ireland accent on About section (not on hero) */
+.theme-ireland #about-us{
+  background:linear-gradient(135deg, rgba(181,126,220,.10), rgba(255,255,255,0));
+  border-radius:18px;
+  padding-top:28px;
+  padding-bottom:28px;
 }
 
 .theme-ireland .btn-primary {

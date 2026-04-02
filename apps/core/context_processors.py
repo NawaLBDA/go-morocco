@@ -26,6 +26,22 @@ def get_country_from_site(request):
 
 def sections_processor(request):
     country = get_country_from_site(request)
+
+    # Brand/contact configuration per country
+    brand_name = 'Basma'
+    support_email = 'info@basma.ma'
+    whatsapp_number = '+212 643 092 852'
+    whatsapp_wa_digits = '212643092852'
+
+    if country == 'ireland':
+        brand_name = 'Bayo'
+        support_email = 'info@bayo.ie'
+        # Display number requested by user; wa.me requires country code
+        whatsapp_number = '0644061453'
+        whatsapp_wa_digits = '353644061453'
+
+    whatsapp_link = f"https://wa.me/{whatsapp_wa_digits}"
+
     try:
         sections = Section.objects.filter(show_in_nav=True, country=country).order_by('order')
         # ✅ Check if there are any promotions to display the promo bar
@@ -34,4 +50,12 @@ def sections_processor(request):
         sections = []
         has_promotion = False
 
-    return {'sections': sections, 'has_promotion': has_promotion, 'country': country}
+    return {
+        'sections': sections,
+        'has_promotion': has_promotion,
+        'country': country,
+        'brand_name': brand_name,
+        'support_email': support_email,
+        'whatsapp_number': whatsapp_number,
+        'whatsapp_link': whatsapp_link,
+    }

@@ -11,7 +11,7 @@
 
       <h2 class="auth-title">Create account</h2>
       <p class="auth-subtitle">
-        Start planning your journey with Oma Travels
+        Start planning your journey with {{ brand_name }}
       </p>
 
       {% if messages %}
@@ -76,8 +76,8 @@
               <label>Country</label>
               <select name="country" class="form-control" required>
                 <option value="">Select country</option>
-                <option value="morocco" {% if country == 'morocco' %}selected{% endif %}>Morocco</option>
-                <option value="ireland" {% if country == 'ireland' %}selected{% endif %}>Ireland</option>
+                <option value="morocco" {% if country == 'morocco' %}selected{% endif %}>🇲🇦 Morocco</option>
+                <option value="ireland" {% if country == 'ireland' %}selected{% endif %}>🇮🇪 Ireland</option>
               </select>
             </div>
 

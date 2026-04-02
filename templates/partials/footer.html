@@ -1,8 +1,14 @@
 <div class="container">
   <div class="row">
     <div class="col-md-4">
-      <h5>Basma</h5>
-      <p>Curated Morocco experiences — personal, seamless, authentic.</p>
+      <h5>{{ brand_name }}</h5>
+      <p>
+        {% if country == 'ireland' %}
+          Local, friendly Ireland tours — taxi-driver know-how, real places, zero stress.
+        {% else %}
+          Curated Morocco experiences — personal, seamless, authentic.
+        {% endif %}
+      </p>
     </div>
     <div class="col-md-4">
       <h6>Useful Links</h6>
@@ -14,11 +20,11 @@
     </div>
     <div class="col-md-4">
       <h6>Contact</h6>
-      <p>Email: info@example.com</p>
+      <p>Email: {{ support_email }}</p>
     </div>
   </div>
 
   <div class="row mt-4">
-    <div class="col-12 text-center small">© {% now "Y" %} Basma. All rights reserved.</div>
+    <div class="col-12 text-center small">© {% now "Y" %} {{ brand_name }}. All rights reserved.</div>
   </div>
 </div>

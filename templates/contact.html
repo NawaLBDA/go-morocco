@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% block page %}contact{% endblock %}
 {% block content %}
 
 <section class="container my-5">
@@ -8,7 +9,7 @@
       <div class="card border-0 shadow-sm h-100 overflow-hidden">
         <img
           src="{% static 'img/contact.jpg' %}"
-          alt="Contact Basma support"
+          alt="Contact {{ brand_name }} support"
           style="width:100%;height:220px;object-fit:cover;">
         <div class="card-body">
           <span class="text-uppercase text-primary fw-semibold small">CONTACT US</span>
@@ -22,17 +23,19 @@
             <div class="d-flex align-items-center gap-2">
               <i class="fa-solid fa-envelope text-primary"></i>
               <span class="text-muted">Email:</span>
-              <span class="fw-semibold">info@basma.com</span>
+              <span class="fw-semibold">{{ support_email }}</span>
             </div>
             <div class="d-flex align-items-center gap-2">
               <i class="fa-brands fa-whatsapp text-success"></i>
               <span class="text-muted">WhatsApp:</span>
-              <a class="fw-semibold" href="https://wa.me/212643092852" target="_blank" rel="noopener">Message us on WhatsApp</a>
+              <a class="fw-semibold" href="{{ whatsapp_link }}" target="_blank" rel="noopener">Message us on WhatsApp</a>
             </div>
             <div class="d-flex align-items-center gap-2">
               <i class="fa-solid fa-location-dot text-danger"></i>
               <span class="text-muted">Location:</span>
-              <span class="fw-semibold">Morocco (operations based locally)</span>
+              <span class="fw-semibold">
+                {% if country == 'ireland' %}Ireland (local driver tours){% else %}Morocco (operations based locally){% endif %}
+              </span>
             </div>
           </div>
 
@@ -69,7 +72,7 @@
           <div class="mb-3">
             <label class="form-label">Message</label>
             <textarea name="message" class="form-control" rows="6" required
-                      placeholder="Example: 7 days, Marrakech + Sahara, 2 people, mid-range budget..."></textarea>
+                      placeholder="{% if country == 'ireland' %}Example: 2 days, Dublin + Cliffs of Moher, 2 people, day trips...{% else %}Example: 7 days, Marrakech + Sahara, 2 people, mid-range budget...{% endif %}"></textarea>
           </div>
 
           <button class="btn btn-primary px-4">

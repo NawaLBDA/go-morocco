@@ -32,20 +32,22 @@
           {% if tour.is_promotion and tour.discount_percent > 0 %}
             <span class="badge text-bg-danger">Promo -{{ tour.discount_percent }}%</span>
           {% endif %}
-          <span class="badge text-bg-dark">Basma</span>
+          <span class="badge text-bg-dark">{{ brand_name }}</span>
         </div>
       </div>
 
-      <div class="tour-image-container position-relative booking-hero-media">
+      <div class="tour-image-container booking-hero-media mb-4">
         {% if tour.image %}
-        <img src="{{ tour.image.url }}" class="img-fluid rounded mb-4 tour-booking-image" alt="{{ tour.title }}">
+          <img src="{{ tour.image.url }}" class="tour-booking-image" alt="{{ tour.title }}">
+        {% else %}
+          <img src="{% static 'img/placeholder.jpg' %}" class="tour-booking-image" alt="{{ tour.title }}">
         {% endif %}
       </div>
 
       <div class="row g-3 mb-4">
         {% if tour.transport %}
           <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card booking-feature border-0 shadow-sm h-100">
               <div class="card-body">
                 <div class="booking-icon mb-2"><i class="fa-solid fa-car"></i></div>
                 <div class="fw-bold">Transport</div>
@@ -57,7 +59,7 @@
 
         {% if tour.hotel %}
           <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card booking-feature border-0 shadow-sm h-100">
               <div class="card-body">
                 <div class="booking-icon mb-2"><i class="fa-solid fa-hotel"></i></div>
                 <div class="fw-bold">Stay</div>
@@ -69,7 +71,7 @@
 
         {% if tour.activities %}
           <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card booking-feature border-0 shadow-sm h-100">
               <div class="card-body">
                 <div class="booking-icon mb-2"><i class="fa-solid fa-star"></i></div>
                 <div class="fw-bold">Highlights</div>
@@ -80,14 +82,61 @@
         {% endif %}
       </div>
 
-      <div class="tour-description mb-4">
+      <div class="booking-section card border-0 shadow-sm p-4 mb-4">
         <h4 class="fw-bold mb-3">About this tour</h4>
         <p>{{ tour.description|linebreaks }}</p>
 
         {% if tour.destination.description %}
-        <hr class="my-4">
-        <h5 class="fw-bold mb-2">About {{ tour.destination.name }}</h5>
-        <p>{{ tour.destination.description|linebreaks }}</p>
+          <hr class="my-4">
+          <h5 class="fw-bold mb-2">About {{ tour.destination.name }}</h5>
+          <p class="mb-0">{{ tour.destination.description|linebreaks }}</p>
+        {% endif %}
+      </div>
+
+      <div class="booking-section card border-0 shadow-sm p-4 mb-4">
+        <h4 class="fw-bold mb-3">Your reservation</h4>
+
+        {% if reservation %}
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <div class="text-muted small">Dates</div>
+              <div class="fw-semibold">{{ reservation.start_date }} → {{ reservation.end_date }}</div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-muted small">Persons</div>
+              <div class="fw-semibold">{{ reservation.num_persons }}</div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-muted small">Nights</div>
+              <div class="fw-semibold">{{ reservation.nights }}</div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="text-muted small">Payment</div>
+              <div class="fw-semibold">{{ reservation.get_payment_method_display }}{% if reservation.payment_status %} • {{ reservation.get_payment_status_display }}{% endif %}</div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="text-muted small">Status</div>
+              <div class="fw-semibold">{{ reservation.get_status_display }}</div>
+            </div>
+            <div class="col-12">
+              <div class="text-muted small">Total</div>
+              <div class="fw-bold fs-5" style="color:var(--primary);">{{ reservation.total_price }} $</div>
+            </div>
+          </div>
+
+          {% if reservation.booking_for_other %}
+            <hr class="my-4">
+            <div class="fw-bold mb-2">Guest details</div>
+            <div class="text-muted">{{ reservation.guest_full_name }}{% if reservation.guest_phone %} • {{ reservation.guest_phone }}{% endif %}</div>
+          {% endif %}
+
+          {% if reservation.admin_note %}
+            <hr class="my-4">
+            <div class="fw-bold mb-2">Note</div>
+            <div class="text-muted">{{ reservation.admin_note|linebreaks }}</div>
+          {% endif %}
+        {% else %}
+          <p class="text-muted mb-0">Select your dates and submit your booking to generate your reservation details.</p>
         {% endif %}
       </div>
     </div>
@@ -103,13 +152,7 @@
           </span>
         </div>
 
-        <div class="booking-trust mb-3">
-          <div class="trust-item"><i class="fa-solid fa-headset"></i><span>Local support</span></div>
-          <div class="trust-item"><i class="fa-solid fa-route"></i><span>Curated itinerary</span></div>
-          <div class="trust-item"><i class="fa-brands fa-whatsapp"></i><span>Fast WhatsApp reply</span></div>
-        </div>
-
-
+        
 
 {% if tour.is_promotion and tour.discount_percent > 0 and tour.promo_price %}
   <div class="mb-3">
@@ -332,9 +375,9 @@
       Confirm booking
     </button>
 
-    <a class="btn btn-outline-success w-100 mt-2" href="https://wa.me/212643092852" target="_blank" rel="noopener">
+    <a class="btn btn-outline-success w-100 mt-2" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
       <i class="fa-brands fa-whatsapp me-1"></i>
-      Ask Basma on WhatsApp
+      Ask {{ brand_name }} on WhatsApp
     </a>
 
   </form>

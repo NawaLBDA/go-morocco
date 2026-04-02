@@ -2,6 +2,25 @@ import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 import logging
+import uuid
+
+# A per-process identifier that changes on every server restart.
+CHAT_BOOT_ID = uuid.uuid4().hex
+
+
+def _ensure_session_key(request):
+    if not request.session.session_key:
+        request.session.create()
+    return request.session.session_key or ''
+
+
+def _reset_chat_if_server_restarted(request, session_key: str) -> None:
+    """Clears chat history for this browser session when the server restarts."""
+    if not session_key:
+        return
+    if request.session.get('chat_boot_id') != CHAT_BOOT_ID:
+        ChatMessage.objects.filter(session_key=session_key).delete()
+        request.session['chat_boot_id'] = CHAT_BOOT_ID
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth import logout
@@ -127,19 +146,18 @@ def ai_chat_history(request):
     if request.method != 'GET':
         return JsonResponse({'error': 'Invalid method'}, status=405)
 
-    session_key = request.session.session_key or ''
+    session_key = _ensure_session_key(request)
     try:
-        if request.user.is_authenticated:
-            messages_qs = ChatMessage.objects.filter(user=request.user).order_by('created_at')
-        else:
-            messages_qs = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')
+        _reset_chat_if_server_restarted(request, session_key)
+        messages_qs = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')
 
         history = [{'role': m.role, 'message': m.message, 'created_at': m.created_at.isoformat()} for m in messages_qs]
         return JsonResponse({'history': history})
     except (OperationalError, ProgrammingError):
         return JsonResponse({'history': []})
 def tour_detail(request, tour_id):
-    tour = get_object_or_404(Tour, id=tour_id)
+    country = get_country_from_site(request)
+    tour = get_object_or_404(Tour, id=tour_id, country=country)
 
     reservation = None
     if request.user.is_authenticated:
@@ -223,21 +241,16 @@ def ai_chat(request):
         return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
 
     country = get_country_from_site(request) or 'morocco'
-    session_key = request.session.session_key or ''
+    session_key = _ensure_session_key(request)
+    _reset_chat_if_server_restarted(request, session_key)
 
-    if request.user.is_authenticated:
-        ChatMessage.objects.create(user=request.user, role='user', message=message)
-    else:
-        ChatMessage.objects.create(session_key=session_key, role='user', message=message)
+    ChatMessage.objects.create(session_key=session_key, role='user', message=message)
 
     bot_reply = ''
     action = {}
 
     try:
-        if request.user.is_authenticated:
-            history = ChatMessage.objects.filter(user=request.user).order_by('created_at')[:20]
-        else:
-            history = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')[:20]
+        history = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')[:20]
 
         context = f"You are a helpful travel assistant for {country.title()} tours. "
         context += f"Available tours: {', '.join([t.title for t in Tour.objects.filter(country=country)[:5]])}. "
@@ -312,10 +325,7 @@ def ai_chat(request):
     if not action:
         action = parse_actions(message, country)
 
-    if request.user.is_authenticated:
-        ChatMessage.objects.create(user=request.user, role='assistant', message=bot_reply)
-    else:
-        ChatMessage.objects.create(session_key=session_key, role='assistant', message=bot_reply)
+    ChatMessage.objects.create(session_key=session_key, role='assistant', message=bot_reply)
 
     result = {'reply': bot_reply}
     result.update(action)
@@ -485,12 +495,14 @@ def twiml_call_complete(request, reservation_id):
 
 
 def blog_list(request):
-    posts = BlogPost.objects.all().order_by('-created_at')
+    country = get_country_from_site(request)
+    posts = BlogPost.objects.filter(country=country).order_by('-created_at')
     return render(request, 'blog_list.html', {'posts': posts})
 
 
 def blog_detail(request, slug):
-    post = get_object_or_404(BlogPost, slug=slug)
+    country = get_country_from_site(request)
+    post = get_object_or_404(BlogPost, slug=slug, country=country)
     comments = post.comments.all()
 
     if request.method == 'POST' and request.user.is_authenticated:

@@ -8,10 +8,11 @@
   <div class="auth-container">
     <div class="auth-card">
 
-      <h2 class="auth-title">Sign in</h2>
-      <p class="auth-subtitle">
-        Access your bookings and travel details
-      </p>
+      <div class="mb-3 text-center">
+        <div class="text-uppercase small" style="letter-spacing:.16em;opacity:.8;">Welcome back</div>
+        <h2 class="auth-title mb-1">Sign in to {{ brand_name }}</h2>
+        <p class="auth-subtitle mb-0">Access your bookings, reservations, and travel details.</p>
+      </div>
 
       {% if messages %}
       <div class="alert alert-warning alert-dismissible fade show" role="alert">
@@ -34,7 +35,7 @@
         {% csrf_token %}
 
         <div class="mb-3">
-          <label for="id_username">Username</label>
+          <label for="id_username" class="form-label">Username</label>
           {{ form.username }}
           {% if form.username.errors %}
             <div class="invalid-feedback d-block">{{ form.username.errors.0 }}</div>
@@ -42,7 +43,7 @@
         </div>
 
         <div class="mb-3">
-          <label for="id_password">Password</label>
+          <label for="id_password" class="form-label">Password</label>
           {{ form.password }}
           {% if form.password.errors %}
             <div class="invalid-feedback d-block">{{ form.password.errors.0 }}</div>
@@ -58,6 +59,14 @@
         Don’t have an account?
         <a href="{% url 'register' %}">Create one</a>
       </p>
+
+      <div class="text-center mt-3 small" style="opacity:.85;">
+        {% if country == 'ireland' %}
+          🇮🇪 Ireland site
+        {% else %}
+          🇲🇦 Morocco site
+        {% endif %}
+      </div>
 
     </div>
   </div>

@@ -27,7 +27,7 @@
   <div class="container hero-content text-center">
     {% if country == 'morocco' %}
       <h1 class="display-4 fw-bold hero-headline reveal">
-        Discover Morocco Beyond the Ordinary — Curated 5–11 Day Experiences with Basma
+        Discover Morocco Beyond the Ordinary — Curated 5–11 Day Experiences with {{ brand_name }}
       </h1>
 
       <p class="lead mb-3 hero-tagline reveal">
@@ -39,8 +39,23 @@
         <a class="btn btn-primary btn-lg me-2" href="#available-tours">
           Explore tours
         </a>
-        <a class="btn btn-outline-light btn-lg" href="https://wa.me/212643092852" target="_blank" rel="noopener">
-          <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp Basma
+        <a class="btn btn-outline-light btn-lg" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
+          <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp {{ brand_name }}
+        </a>
+      </div>
+    {% elif country == 'ireland' %}
+      <h1 class="display-4 fw-bold hero-headline reveal">
+        Explore Ireland with {{ brand_name }} — Local taxi-driver tours & day trips
+      </h1>
+
+      <p class="lead mb-3 hero-tagline reveal">
+        Friendly local guidance, flexible pickup, and real Ireland stories — no stress.
+      </p>
+
+      <div class="hero-ctas reveal">
+        <a class="btn btn-primary btn-lg me-2" href="#available-tours">Explore tours</a>
+        <a class="btn btn-outline-light btn-lg" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
+          <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp {{ brand_name }}
         </a>
       </div>
     {% else %}
@@ -52,7 +67,7 @@
       <div class="col-md-5">
         <input name="q" class="form-control form-control-lg"
                value="{{ search_q|default:'' }}"
-               placeholder="Destination (Marrakech, Sahara, Atlas...)">
+               placeholder="{% if country == 'ireland' %}Destination (Dublin, Galway, Cliffs...){% else %}Destination (Marrakech, Sahara, Atlas...){% endif %}">
       </div>
 
       <div class="col-md-3">
@@ -109,27 +124,44 @@
   <div class="row align-items-center gy-4">
     <div class="col-lg-6 pe-lg-5">
       <span class="text-uppercase text-primary fw-semibold small reveal">ABOUT US</span>
-      <h2 class="fw-bold mt-2 reveal">Basma — Your Gateway to the Real Morocco</h2>
+      {% if country == 'ireland' %}
+        <h2 class="fw-bold mt-2 reveal">{{ brand_name }} — Local driver tours across Ireland</h2>
 
-      <p class="text-muted fs-5 mt-3 reveal">
-        <strong>Basma</strong> is more than a name. It represents trust, warmth, and authenticity.
-      </p>
+        <p class="text-muted fs-5 mt-3 reveal">
+          <strong>{{ brand_name }}</strong> is a local taxi-driver tourism service — simple, personal, and reliable.
+        </p>
 
-      <p class="text-muted fs-6 reveal">
-        We are a locally grounded tourism service built on relationships, not transactions.
-        Our strength lies in our deep connection to Moroccan culture and our network of trusted drivers
-        and local partners who know the land, the people, and the hidden experiences that make Morocco unforgettable.
-      </p>
+        <p class="text-muted fs-6 reveal">
+          From airport pickup to day trips and multi-stop routes, we help you see Ireland comfortably and safely.
+          You get local knowledge, flexible timing, and a friendly driver who knows the best viewpoints, stops, and stories.
+        </p>
 
-      <p class="text-muted fs-6 mb-0 reveal">
-        We believe that true travel is not about luxury alone — it is about connection, understanding, and experience.
-        With Basma, you are not treated as a tourist. You are welcomed as a guest.
-      </p>
+        <p class="text-muted fs-6 mb-0 reveal">
+          Tell us your dates and interests — we’ll shape the route around you.
+        </p>
+      {% else %}
+        <h2 class="fw-bold mt-2 reveal">{{ brand_name }} — Your Gateway to the Real Morocco</h2>
+
+        <p class="text-muted fs-5 mt-3 reveal">
+          <strong>{{ brand_name }}</strong> is more than a name. It represents trust, warmth, and authenticity.
+        </p>
+
+        <p class="text-muted fs-6 reveal">
+          We are a locally grounded tourism service built on relationships, not transactions.
+          Our strength lies in our deep connection to Moroccan culture and our network of trusted drivers
+          and local partners who know the land, the people, and the hidden experiences that make Morocco unforgettable.
+        </p>
+
+        <p class="text-muted fs-6 mb-0 reveal">
+          We believe that true travel is not about luxury alone — it is about connection, understanding, and experience.
+          With {{ brand_name }}, you are not treated as a tourist. You are welcomed as a guest.
+        </p>
+      {% endif %}
 
       <div class="mt-4 d-flex flex-wrap gap-2 reveal">
         <a class="btn btn-primary" href="{% url 'reservations' %}">Start a reservation</a>
-        <a class="btn btn-outline-secondary" href="https://wa.me/212643092852" target="_blank" rel="noopener">
-          <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp Basma
+        <a class="btn btn-outline-secondary" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
+          <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp {{ brand_name }}
         </a>
       </div>
     </div>
@@ -137,8 +169,8 @@
     <div class="col-lg-6">
       <div class="card border-0 shadow-sm overflow-hidden reveal">
         <img
-          src="{% static 'img/about.jpg' %}?v=20260402_1"
-          alt="About Basma"
+          src="{% if country == 'ireland' %}{% static 'img/about-ir.png' %}?v=20260402_1{% else %}{% static 'img/about.jpg' %}?v=20260402_1{% endif %}"
+          alt="About {{ brand_name }}"
           style="width:100%;height:420px;object-fit:cover;">
       </div>
     </div>
@@ -245,7 +277,13 @@
             <div class="badge rounded-pill text-bg-dark">1</div>
             <h5 class="fw-bold mb-0">You book your flight</h5>
           </div>
-          <p class="text-muted mb-0">Pick your dates and arrival city — Marrakesh, Casablanca, Rabat…</p>
+          <p class="text-muted mb-0">
+            {% if country == 'ireland' %}
+              Pick your dates and arrival city — Dublin, Cork, Shannon…
+            {% else %}
+              Pick your dates and arrival city — Marrakesh, Casablanca, Rabat…
+            {% endif %}
+          </p>
         </div>
       </div>
     </div>
@@ -255,7 +293,7 @@
         <div class="card-body">
           <div class="d-flex align-items-center gap-3 mb-2">
             <div class="badge rounded-pill text-bg-dark">2</div>
-            <h5 class="fw-bold mb-0">Basma curates your journey</h5>
+            <h5 class="fw-bold mb-0">{{ brand_name }} curates your journey</h5>
           </div>
           <p class="text-muted mb-0">Routes, stays, cultural moments, hidden gems — tailored to your pace.</p>
         </div>
@@ -267,7 +305,9 @@
         <div class="card-body">
           <div class="d-flex align-items-center gap-3 mb-2">
             <div class="badge rounded-pill text-bg-dark">3</div>
-            <h5 class="fw-bold mb-0">Enjoy Morocco — seamlessly</h5>
+            <h5 class="fw-bold mb-0">
+              {% if country == 'ireland' %}Enjoy Ireland — seamlessly{% else %}Enjoy Morocco — seamlessly{% endif %}
+            </h5>
           </div>
           <p class="text-muted mb-0">With trusted local drivers, your experience feels personal and effortless.</p>
         </div>
@@ -283,6 +323,13 @@
   <div class="section-header text-center mb-5">
     <h2 class="fw-bold section-title">Available Tours</h2>
     <div class="section-divider"></div>
+    <p class="text-muted mt-3" style="max-width:860px;margin:0 auto;">
+      {% if country == 'ireland' %}
+        Handpicked routes and day trips across Ireland — flexible pickup, local stories, and a smooth ride.
+      {% else %}
+        Compare top experiences at a glance — then pick dates and reserve in minutes.
+      {% endif %}
+    </p>
   </div>
 
   <!-- Cards grid -->
@@ -335,6 +382,22 @@
               <i class="fa-solid fa-location-dot text-success"></i>
               {{ tour.destination.name }}
             </p>
+
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              {% if tour.transport %}
+                <span class="badge rounded-pill text-bg-light border"><i class="fa-solid fa-car me-1"></i>{{ tour.transport|truncatechars:18 }}</span>
+              {% endif %}
+              {% if tour.hotel %}
+                <span class="badge rounded-pill text-bg-light border"><i class="fa-solid fa-hotel me-1"></i>{{ tour.hotel|truncatechars:18 }}</span>
+              {% endif %}
+              {% if tour.activities %}
+                <span class="badge rounded-pill text-bg-light border"><i class="fa-solid fa-star me-1"></i>{{ tour.activities|truncatechars:22 }}</span>
+              {% endif %}
+            </div>
+
+            {% if tour.description %}
+              <p class="tour-desc text-muted small mb-0">{{ tour.description|truncatewords:16 }}</p>
+            {% endif %}
           </div>
 
           <!-- PRICE + BUTTON -->
@@ -354,16 +417,25 @@
                   {{ tour.price_per_night }} $
                 </span>
               {% endif %}
+              <span class="price-suffix text-muted small">/ night</span>
             </div>
 
             <a href="{% url 'tour_detail' tour.id %}"
                class="btn btn-primary btn-sm">
-              {% if tour.user_reservation %}See{% else %}Book{% endif %}
+              {% if tour.user_reservation %}View{% else %}Book{% endif %}
+              <i class="fa-solid fa-arrow-right ms-1"></i>
             </a>
 
           </div>
 
         </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+      <div class="alert alert-light border text-center py-4 mb-0">
+        <div class="fw-bold mb-1">No tours available right now</div>
+        <div class="text-muted">Please check back soon, or contact us for a custom itinerary.</div>
       </div>
     </div>
     {% endfor %}
