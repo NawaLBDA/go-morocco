@@ -9,6 +9,10 @@
   <meta name="theme-color" content="{% if country == 'ireland' %}#6d28d9{% else %}#2a9d8f{% endif %}">
   {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
 
+  {% if schema_ld_json %}
+    <script type="application/ld+json">{{ schema_ld_json|safe }}</script>
+  {% endif %}
+
   <meta property="og:site_name" content="{{ brand_name }}">
   <meta property="og:title" content="{% block og_title %}{% if country == 'ireland' %}Ireland Discover with {{ brand_name }}{% else %}{{ brand_name }} | Morocco Experiences{% endif %}{% endblock %}">
   <meta property="og:description" content="{% block og_description %}{{ meta_description|default:'' }}{% endblock %}">
@@ -30,7 +34,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
   <!-- Font Awesome -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"></noscript>
 
   <!-- Main CSS -->
   <link rel="stylesheet" href="{% static 'css/style.css' %}?v={{ static_version }}">
@@ -214,6 +219,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const chatMessages = document.getElementById('chat-messages');
 
   const CHAT_OPEN_KEY = 'oma_chat_open_session';
+  let historyLoaded = false;
 
   function setDefaultGreeting() {
     chatMessages.innerHTML = '';
@@ -224,9 +230,16 @@ document.addEventListener('DOMContentLoaded', function () {
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  /* ========= LOAD CHAT HISTORY (SANS OUVRIR) ========= */
+  function setChatOpen(isOpen) {
+    sessionStorage.setItem(CHAT_OPEN_KEY, String(isOpen));
+    chatWidget.setAttribute('aria-hidden', String(!isOpen));
+    chatWidget.classList.toggle('chat-open', isOpen);
+  }
+
   function loadChatHistory() {
-    // Server-side session history (cleared on server restart)
+    if (historyLoaded) return;
+    historyLoaded = true;
+
     fetch('{% url "ai_chat_history" %}')
       .then(r => r.json())
       .then(data => {
@@ -246,19 +259,15 @@ document.addEventListener('DOMContentLoaded', function () {
       .catch(() => {
         setDefaultGreeting();
       });
-
-    const isOpen = sessionStorage.getItem(CHAT_OPEN_KEY) === 'true';
-    chatWidget.setAttribute('aria-hidden', !isOpen);
-    chatWidget.classList.toggle('chat-open', isOpen);
   }
 
   /* ========= TOGGLE OPEN / CLOSE ========= */
   chatToggle.addEventListener('click', function () {
-    const isHidden = chatWidget.getAttribute('aria-hidden') === 'true';
-    chatWidget.setAttribute('aria-hidden', !isHidden);
-    chatWidget.classList.toggle('chat-open', isHidden);
-
-    sessionStorage.setItem(CHAT_OPEN_KEY, isHidden);
+    const isOpen = chatWidget.getAttribute('aria-hidden') === 'true';
+    setChatOpen(isOpen);
+    if (isOpen) {
+      loadChatHistory();
+    }
   });
 
   /* ========= ADD MESSAGE ========= */
@@ -386,7 +395,12 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   /* ========= INIT ========= */
-  loadChatHistory();
+  setDefaultGreeting();
+  const shouldOpen = sessionStorage.getItem(CHAT_OPEN_KEY) === 'true';
+  setChatOpen(shouldOpen);
+  if (shouldOpen) {
+    loadChatHistory();
+  }
 
 });
 </script>

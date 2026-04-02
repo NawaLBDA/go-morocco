@@ -1,7 +1,9 @@
 import os
+import json
 
 from .models import Section, Tour
 from django.db.utils import OperationalError, ProgrammingError
+from django.templatetags.static import static as static_url
 
 def get_country_from_site(request):
     # 1) Explicit override via middleware/session (Render single-domain support)
@@ -68,6 +70,59 @@ def sections_processor(request):
         og_image_url = request.build_absolute_uri('/static/img/hero-ma.jpg') if canonical_url else ''
         site_lang = 'en'
 
+    # Basic Schema.org structured data (helps Lighthouse SEO)
+    schema_ld_json = ''
+    try:
+        base_url = request.build_absolute_uri('/')
+        if country == 'ireland':
+            logo = static_url('img/logo-ir.png')
+            area_served = 'IE'
+        else:
+            logo = static_url('img/logo4.webp')
+            area_served = 'MA'
+
+        org_id = f"{base_url}#organization"
+        site_id = f"{base_url}#website"
+
+        graph = [
+            {
+                "@type": "TravelAgency",
+                "@id": org_id,
+                "name": brand_name,
+                "url": base_url,
+                "logo": request.build_absolute_uri(logo),
+                "email": support_email,
+                "telephone": whatsapp_number,
+                "areaServed": area_served,
+            },
+            {
+                "@type": "WebSite",
+                "@id": site_id,
+                "url": base_url,
+                "name": brand_name,
+                "publisher": {"@id": org_id},
+                "inLanguage": site_lang,
+            },
+        ]
+
+        if canonical_url:
+            graph.append(
+                {
+                    "@type": "WebPage",
+                    "@id": f"{canonical_url}#webpage",
+                    "url": canonical_url,
+                    "name": f"{brand_name} | {'Ireland' if country == 'ireland' else 'Morocco'} Tours",
+                    "description": meta_description,
+                    "isPartOf": {"@id": site_id},
+                    "about": {"@id": org_id},
+                    "inLanguage": site_lang,
+                }
+            )
+
+        schema_ld_json = json.dumps({"@context": "https://schema.org", "@graph": graph})
+    except Exception:
+        schema_ld_json = ''
+
     static_version = (
         os.environ.get('STATIC_VERSION')
         or os.environ.get('RENDER_GIT_COMMIT')
@@ -96,4 +151,5 @@ def sections_processor(request):
         'og_image_url': og_image_url,
         'site_lang': site_lang,
         'static_version': static_version,
+        'schema_ld_json': schema_ld_json,
     }

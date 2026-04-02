@@ -4,9 +4,9 @@
 
 {% block extra_head %}
   {% if country == 'ireland' %}
-    <link rel="preload" as="image" href="{% static 'img/hero2-ir.jpg' %}?v=20260402_2">
+    <link rel="preload" as="image" href="{% static 'img/hero2-ir.webp' %}?v=20260402_2" fetchpriority="high">
   {% else %}
-    <link rel="preload" as="image" href="{% static 'img/hero-ma.jpg' %}?v=20260402_2">
+    <link rel="preload" as="image" href="{% static 'img/hero-ma.webp' %}?v=20260402_2" fetchpriority="high">
   {% endif %}
 {% endblock %}
 
@@ -18,15 +18,15 @@
 
   <div class="hero-slider">
       {% if country == 'ireland' %}
-        <div class="hero-slide active" style="background-image:url('{% static 'img/hero2-ir.jpg' %}?v=20260402_2')"></div>
-        <div class="hero-slide" data-bg="{% static 'img/hero1-ir.png' %}?v=20260402_2"></div>
-        <div class="hero-slide" data-bg="{% static 'img/hero3-ir.png' %}?v=20260402_2"></div>
-        <div class="hero-slide" data-bg="{% static 'img/hero4-ir.jpg' %}?v=20260402_2"></div>
+        <div class="hero-slide active" style="background-image:url('{% static 'img/hero2-ir.webp' %}?v=20260402_2')"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero1-ir.webp' %}?v=20260402_2"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero3-ir.webp' %}?v=20260402_2"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero4-ir.webp' %}?v=20260402_2"></div>
       {% elif country == 'morocco' %}
-        <div class="hero-slide active" style="background-image:url('{% static 'img/hero-ma.jpg' %}?v=20260402_2')"></div>
-        <div class="hero-slide" data-bg="{% static 'img/hero2.jpg' %}?v=20260402_2"></div>
-        <div class="hero-slide" data-bg="{% static 'img/hero3.jpg' %}?v=20260402_2"></div>
-        <div class="hero-slide" data-bg="{% static 'img/hero4.jpg' %}?v=20260402_2"></div>
+        <div class="hero-slide active" style="background-image:url('{% static 'img/hero-ma.webp' %}?v=20260402_2')"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero2.webp' %}?v=20260402_2"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero3.webp' %}?v=20260402_2"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero4.webp' %}?v=20260402_2"></div>
       {% endif %}
   </div>
 
