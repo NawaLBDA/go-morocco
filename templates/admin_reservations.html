@@ -84,7 +84,7 @@
               <td>
                 <div class="d-flex justify-content-end gap-2">
                   {% if r.status == 'pending' %}
-                    <a href="{% url 'validate_reservation' r.id %}" class="btn btn-success btn-sm" title="Validate">
+                    <a href="{% url 'validate_reservation' r.id %}" class="btn btn-outline-success btn-sm" title="Validate">
                       Validate
                     </a>
                     <a href="{% url 'reject_reservation' r.id %}" class="btn btn-outline-danger btn-sm" title="Reject">
@@ -94,24 +94,17 @@
 
                   {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
                     {% if r.payment_status != 'paid' %}
-                      <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-primary btn-sm" title="Mark paid">
+                      <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-outline-primary btn-sm" title="Mark paid">
                         Mark paid
                       </a>
                     {% endif %}
                   {% endif %}
 
                   {% if r.status == 'booked' and r.payment_status != 'paid' %}
-                    <a href="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-warning btn-sm" title="Cancel">
+                    <a href="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-outline-warning btn-sm" title="Cancel">
                       Cancel
                     </a>
                   {% endif %}
-
-                  <a href="{% url 'download_reservation_report' r.id %}"
-                     class="btn btn-outline-secondary btn-sm"
-                     title="Download report (CSV)"
-                     aria-label="Download report (CSV)">
-                    <i class="fa-solid fa-download"></i>
-                  </a>
 
                   <form method="post" action="{% url 'delete_reservation' r.id %}" class="d-inline"
                         onsubmit="return confirm('Delete this reservation permanently?');">
