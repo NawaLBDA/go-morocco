@@ -7,49 +7,74 @@
     <div class="col-lg-5">
       <div class="card border-0 shadow-sm h-100 overflow-hidden">
         <div class="card-body">
-          <span class="text-uppercase text-primary fw-semibold small">CONTACT US</span>
-          <h2 class="fw-bold mt-2">Support & feedback</h2>
+          <span class="text-uppercase text-primary fw-semibold small">CONTACT</span>
+          <h2 class="fw-bold mt-2">On vous répond vite</h2>
           <p class="text-muted mt-3 mb-4">
-            Need help with a booking, have questions, or want to share feedback? Reach out anytime — we respond promptly
-            and guide you to the best option for your trip.
+            Une question, un devis, une réservation ? Écrivez-nous — réponse rapide.
           </p>
 
-          <div class="d-flex flex-column gap-2">
-            <div class="d-flex align-items-center gap-2">
-              <i class="fa-solid fa-envelope text-primary"></i>
-              <span class="text-muted">Email:</span>
-              <span class="fw-semibold">{{ support_email }}</span>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-              <i class="fa-brands fa-whatsapp text-success"></i>
-              <span class="text-muted">WhatsApp:</span>
-              <a class="fw-semibold" href="{{ whatsapp_link }}" target="_blank" rel="noopener">Message us on WhatsApp</a>
-            </div>
-            <div class="d-flex align-items-center gap-2">
+          <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-success" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
+              <i class="fa-brands fa-whatsapp me-1"></i>
+              WhatsApp
+            </a>
+            <a class="btn btn-outline-primary" href="mailto:{{ support_email }}">
+              <i class="fa-solid fa-envelope me-1"></i>
+              Email
+            </a>
+          </div>
+
+          <div class="mt-4">
+            <div class="d-flex align-items-center gap-2 mb-2">
               <i class="fa-solid fa-location-dot text-danger"></i>
-              <span class="text-muted">Location:</span>
               <span class="fw-semibold">
-                {% if country == 'ireland' %}Ireland (local driver tours){% else %}Morocco (operations based locally){% endif %}
+                {% if country == 'ireland' %}Irlande{% else %}Maroc{% endif %}
               </span>
+              <span class="text-muted small">
+                {% if country == 'ireland' %}(tours avec chauffeur local){% else %}(opérations locales){% endif %}
+              </span>
+            </div>
+
+            <div class="small text-muted">
+              <div class="fw-semibold text-dark mb-1">Pour aller plus vite</div>
+              <ul class="mb-0 ps-3">
+                <li>dates + nombre de personnes</li>
+                <li>villes / itinéraire souhaité</li>
+                <li>budget (éco / mid / premium)</li>
+              </ul>
             </div>
           </div>
 
-          <div class="alert alert-light border mt-4 mb-0 small">Tip: For fastest response, message us on WhatsApp.</div>
+          <div class="alert alert-light border mt-4 mb-0 small">
+            Conseil : WhatsApp = réponse la plus rapide.
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-lg-7">
       <div class="card p-4 border-0 shadow-sm h-100">
-        <h3 class="fw-bold mb-2">Send a message</h3>
-        <p class="text-muted mb-4">Tell us your dates, cities, and travel style — we’ll take it from there.</p>
+        <h3 class="fw-bold mb-2">Envoyer un message</h3>
+        <p class="text-muted mb-3">Décrivez votre projet en 2–3 lignes. On s’occupe du reste.</p>
+
+        <details class="mb-4">
+          <summary class="fw-semibold">Quoi inclure ? (facultatif)</summary>
+          <div class="mt-2 text-muted small">
+            Exemple :
+            {% if country == 'ireland' %}
+              « 2 jours, Dublin + Cliffs of Moher, 2 personnes, départ le matin, retour le soir. »
+            {% else %}
+              « 7 jours, Marrakech + Sahara, 2 personnes, niveau mid-range, hôtels + activités. »
+            {% endif %}
+          </div>
+        </details>
 
         <form method="post">
           {% csrf_token %}
 
           <div class="row">
             <div class="col-md-6 mb-3">
-              <label class="form-label">Name</label>
+              <label class="form-label">Nom</label>
               <input name="name" class="form-control" required>
             </div>
 
@@ -60,19 +85,19 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Subject</label>
-            <input name="subject" class="form-control" placeholder="Customized itinerary / Question / Booking">
+            <label class="form-label">Objet</label>
+            <input name="subject" class="form-control" placeholder="Devis / Question / Réservation">
           </div>
 
           <div class="mb-3">
             <label class="form-label">Message</label>
             <textarea name="message" class="form-control" rows="6" required
-                      placeholder="{% if country == 'ireland' %}Example: 2 days, Dublin + Cliffs of Moher, 2 people, day trips...{% else %}Example: 7 days, Marrakech + Sahara, 2 people, mid-range budget...{% endif %}"></textarea>
+                      placeholder="{% if country == 'ireland' %}Ex : 2 jours, Dublin + Cliffs of Moher, 2 personnes...{% else %}Ex : 7 jours, Marrakech + Sahara, 2 personnes, budget mid-range...{% endif %}"></textarea>
           </div>
 
           <button class="btn btn-primary px-4">
             <i class="fa-solid fa-paper-plane me-1"></i>
-            Send message
+            Envoyer
           </button>
         </form>
       </div>
