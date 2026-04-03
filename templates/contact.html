@@ -8,9 +8,9 @@
       <div class="card border-0 shadow-sm h-100 overflow-hidden">
         <div class="card-body">
           <span class="text-uppercase text-primary fw-semibold small">CONTACT</span>
-          <h2 class="fw-bold mt-2">On vous répond vite</h2>
+          <h2 class="fw-bold mt-2">Fast support</h2>
           <p class="text-muted mt-3 mb-4">
-            Une question, un devis, une réservation ? Écrivez-nous — réponse rapide.
+            Questions, quotes, or bookings — message us anytime. We reply quickly.
           </p>
 
           <div class="d-flex gap-2 flex-wrap">
@@ -28,25 +28,25 @@
             <div class="d-flex align-items-center gap-2 mb-2">
               <i class="fa-solid fa-location-dot text-danger"></i>
               <span class="fw-semibold">
-                {% if country == 'ireland' %}Irlande{% else %}Maroc{% endif %}
+                {% if country == 'ireland' %}Ireland{% else %}Morocco{% endif %}
               </span>
               <span class="text-muted small">
-                {% if country == 'ireland' %}(tours avec chauffeur local){% else %}(opérations locales){% endif %}
+                {% if country == 'ireland' %}(local driver tours){% else %}(local operations){% endif %}
               </span>
             </div>
 
             <div class="small text-muted">
-              <div class="fw-semibold text-dark mb-1">Pour aller plus vite</div>
+              <div class="fw-semibold text-dark mb-1">To help us reply faster</div>
               <ul class="mb-0 ps-3">
-                <li>dates + nombre de personnes</li>
-                <li>villes / itinéraire souhaité</li>
-                <li>budget (éco / mid / premium)</li>
+                <li>dates + number of people</li>
+                <li>cities / itinerary</li>
+                <li>budget level (economy / mid-range / premium)</li>
               </ul>
             </div>
           </div>
 
           <div class="alert alert-light border mt-4 mb-0 small">
-            Conseil : WhatsApp = réponse la plus rapide.
+            Tip: WhatsApp is the fastest way to reach us.
           </div>
         </div>
       </div>
@@ -54,17 +54,17 @@
 
     <div class="col-lg-7">
       <div class="card p-4 border-0 shadow-sm h-100">
-        <h3 class="fw-bold mb-2">Envoyer un message</h3>
-        <p class="text-muted mb-3">Décrivez votre projet en 2–3 lignes. On s’occupe du reste.</p>
+        <h3 class="fw-bold mb-2">Send a message</h3>
+        <p class="text-muted mb-3">Share your plan in 2–3 lines — we’ll take it from there.</p>
 
         <details class="mb-4">
-          <summary class="fw-semibold">Quoi inclure ? (facultatif)</summary>
+          <summary class="fw-semibold">What to include (optional)</summary>
           <div class="mt-2 text-muted small">
-            Exemple :
+            Example:
             {% if country == 'ireland' %}
-              « 2 jours, Dublin + Cliffs of Moher, 2 personnes, départ le matin, retour le soir. »
+              “2 days, Dublin + Cliffs of Moher, 2 people, morning pickup, evening drop-off.”
             {% else %}
-              « 7 jours, Marrakech + Sahara, 2 personnes, niveau mid-range, hôtels + activités. »
+              “7 days, Marrakech + Sahara, 2 people, mid-range, hotels + activities.”
             {% endif %}
           </div>
         </details>
@@ -74,7 +74,7 @@
 
           <div class="row">
             <div class="col-md-6 mb-3">
-              <label class="form-label">Nom</label>
+              <label class="form-label">Name</label>
               <input name="name" class="form-control" required>
             </div>
 
@@ -85,19 +85,19 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Objet</label>
-            <input name="subject" class="form-control" placeholder="Devis / Question / Réservation">
+            <label class="form-label">Subject</label>
+            <input name="subject" class="form-control" placeholder="Quote / Question / Booking">
           </div>
 
           <div class="mb-3">
             <label class="form-label">Message</label>
             <textarea name="message" class="form-control" rows="6" required
-                      placeholder="{% if country == 'ireland' %}Ex : 2 jours, Dublin + Cliffs of Moher, 2 personnes...{% else %}Ex : 7 jours, Marrakech + Sahara, 2 personnes, budget mid-range...{% endif %}"></textarea>
+                      placeholder="{% if country == 'ireland' %}Example: 2 days, Dublin + Cliffs of Moher, 2 people...{% else %}Example: 7 days, Marrakech + Sahara, 2 people, mid-range budget...{% endif %}"></textarea>
           </div>
 
           <button class="btn btn-primary px-4">
             <i class="fa-solid fa-paper-plane me-1"></i>
-            Envoyer
+            Send
           </button>
         </form>
       </div>
