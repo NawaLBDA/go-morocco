@@ -74,18 +74,18 @@
   <div class="container px-4">
 
     <!-- BRAND -->
-    <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}" aria-label="{% if country == 'ireland' %}Bayo Ireland{% else %}Basmae Morocco{% endif %}">
+    <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}" aria-label="{% if country == 'ireland' %}Ireland Experiences{% else %}Morocco Experiences{% endif %}">
       {% if country == 'ireland' %}
         <img src="{% static 'img/logo-ir.png' %}" alt="Ireland Travel Logo" width="32" height="32" style="height:32px;margin-right:8px">
         <strong>
-          <span class="brand-full d-none d-lg-inline">Bayo | Ireland Experiences</span>
-          <span class="brand-short d-lg-none">Bayo</span>
+          <span class="brand-full d-none d-lg-inline">Ireland Experiences</span>
+          <span class="brand-short d-lg-none">Ireland</span>
         </strong>
       {% else %}
         <img src="{% static 'img/logo4.webp' %}" alt="Morocco Travel Logo" width="32" height="32" style="height:32px;margin-right:8px">
         <strong>
-          <span class="brand-full d-none d-lg-inline">Basmae | Morocco Experiences</span>
-          <span class="brand-short d-lg-none">Basmae</span>
+          <span class="brand-full d-none d-lg-inline">Morocco Experiences</span>
+          <span class="brand-short d-lg-none">Morocco</span>
         </strong>
       {% endif %}
     </a>
