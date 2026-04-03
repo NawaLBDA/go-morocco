@@ -6,7 +6,7 @@
   {% if country == 'ireland' %}
     <link rel="preload" as="image" href="{% static 'img/hero2-ir.webp' %}?v=20260402_2" fetchpriority="high">
   {% else %}
-    <link rel="preload" as="image" href="{% static 'img/hero-ma.webp' %}?v=20260402_2" fetchpriority="high">
+    <link rel="preload" as="image" href="{% static 'img/hero1.jpeg' %}?v=20260403_1" fetchpriority="high">
   {% endif %}
 {% endblock %}
 
@@ -23,10 +23,14 @@
         <div class="hero-slide" data-bg="{% static 'img/hero3-ir.webp' %}?v=20260402_2"></div>
         <div class="hero-slide" data-bg="{% static 'img/hero4-ir.webp' %}?v=20260402_2"></div>
       {% elif country == 'morocco' %}
-        <div class="hero-slide active" style="background-image:url('{% static 'img/hero-ma.webp' %}?v=20260402_2')"></div>
-        <div class="hero-slide" data-bg="{% static 'img/hero2.webp' %}?v=20260402_2"></div>
-        <div class="hero-slide" data-bg="{% static 'img/hero3.webp' %}?v=20260402_2"></div>
-        <div class="hero-slide" data-bg="{% static 'img/hero4.webp' %}?v=20260402_2"></div>
+        <div class="hero-slide active" style="background-image:url('{% static 'img/hero1.jpeg' %}?v=20260403_1')"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero2.jpeg' %}?v=20260403_1"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero3.jpeg' %}?v=20260403_1"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero4.jpeg' %}?v=20260403_1"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero5.jpeg' %}?v=20260403_1"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero6.jpeg' %}?v=20260403_1"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero7.jpeg' %}?v=20260403_1"></div>
+        <div class="hero-slide" data-bg="{% static 'img/hero8.jpeg' %}?v=20260403_1"></div>
       {% endif %}
   </div>
 
@@ -121,10 +125,21 @@
   </div>
 
   <div class="hero-dots">
-    <button type="button" class="dot active" aria-label="Slide 1"></button>
-    <button type="button" class="dot" aria-label="Slide 2"></button>
-    <button type="button" class="dot" aria-label="Slide 3"></button>
-    <button type="button" class="dot" aria-label="Slide 4"></button>
+    {% if country == 'morocco' %}
+      <button type="button" class="dot active" aria-label="Slide 1"></button>
+      <button type="button" class="dot" aria-label="Slide 2"></button>
+      <button type="button" class="dot" aria-label="Slide 3"></button>
+      <button type="button" class="dot" aria-label="Slide 4"></button>
+      <button type="button" class="dot" aria-label="Slide 5"></button>
+      <button type="button" class="dot" aria-label="Slide 6"></button>
+      <button type="button" class="dot" aria-label="Slide 7"></button>
+      <button type="button" class="dot" aria-label="Slide 8"></button>
+    {% else %}
+      <button type="button" class="dot active" aria-label="Slide 1"></button>
+      <button type="button" class="dot" aria-label="Slide 2"></button>
+      <button type="button" class="dot" aria-label="Slide 3"></button>
+      <button type="button" class="dot" aria-label="Slide 4"></button>
+    {% endif %}
   </div>
 
 </section>
