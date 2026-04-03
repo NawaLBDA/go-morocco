@@ -39,7 +39,7 @@ try:
 except ImportError:
     InferenceClient = None
 
-from .models import Tour, Reservation, BlogPost, Destination, ContactMessage, BlogComment, UserProfile, CountryContent, Information, ChatMessage
+from .models import Tour, Reservation, BlogPost, Destination, ContactMessage, BlogComment, UserProfile, CountryContent, Section, Information, ChatMessage
 from .context_processors import get_country_from_site
 
 
