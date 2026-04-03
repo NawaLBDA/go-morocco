@@ -2102,6 +2102,35 @@ body[data-page="home"] .navbar-main{
 }
 
 /* ===============================
+   IRELAND – CHAT WIDGET (LOGO GREEN)
+================================ */
+.theme-ireland .btn-chatbot{
+  background:#c7dd10;
+}
+
+.theme-ireland .btn-chatbot:hover{
+  background:#8f9f0c;
+}
+
+.theme-ireland .chat-header{
+  background:linear-gradient(90deg, #1f2937, #8f9f0c);
+}
+
+.theme-ireland .chat-input button,
+.theme-ireland .msg.user{
+  background:#8f9f0c;
+}
+
+.theme-ireland .chat-input button:hover{
+  background:#77850a;
+}
+
+.theme-ireland .msg.bot{
+  background:#f6f9d6;
+  color:#1f2937;
+}
+
+/* ===============================
    HEADER + HOME POLISH (2026-04)
 ================================ */
 .navbar-main{
