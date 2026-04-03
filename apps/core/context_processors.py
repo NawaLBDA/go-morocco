@@ -75,7 +75,7 @@ def sections_processor(request):
     try:
         base_url = request.build_absolute_uri('/')
         if country == 'ireland':
-            logo = static_url('img/logo-ir.png')
+            logo = static_url('img/logo-ir1.png')
             area_served = 'IE'
         else:
             logo = static_url('img/logo4.webp')
