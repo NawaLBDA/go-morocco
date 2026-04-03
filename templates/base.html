@@ -80,7 +80,10 @@
         <strong>Ireland Discover with {{ brand_name }}</strong>
       {% else %}
         <img src="{% static 'img/logo4.webp' %}" alt="Morocco Travel Logo" width="32" height="32" style="height:32px;margin-right:8px">
-        <strong>{{ brand_name }}</strong>
+        <strong>
+          <span class="brand-full d-none d-lg-inline">{{ brand_name }} | Morocco Experiences</span>
+          <span class="brand-short d-lg-none">{{ brand_name }}</span>
+        </strong>
       {% endif %}
     </a>
 

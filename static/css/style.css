@@ -1948,6 +1948,18 @@ body, html {
 .navbar-brand strong{
   font-size: 1rem;
 }
+
+/* Brand text: keep header spacing stable */
+.navbar-brand strong{
+  white-space:nowrap;
+}
+
+@media (min-width: 992px){
+  .navbar-brand strong{
+    font-size: .98rem;
+    letter-spacing: .2px;
+  }
+}
 .navbar-nav .nav-link{
   padding: 6px 10px;
   font-size: 0.95rem;
