@@ -1985,32 +1985,18 @@ body[data-page="blog"] .site-content{
   padding-bottom: 220px;
 }
 
-/* Contact page: simple, modern, professional */
+/* Contact page: clean + professional (light) */
 body[data-page="contact"] .contact-shell{
-  background:
-    radial-gradient(1200px 500px at 0% 0%, rgba(42, 157, 143, 0.10), rgba(255,255,255,0)),
-    radial-gradient(900px 420px at 100% 0%, rgba(38, 70, 83, 0.10), rgba(255,255,255,0));
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 18px;
-  padding: 22px;
-}
-
-@media (min-width: 992px){
-  body[data-page="contact"] .contact-shell{ padding: 28px; }
-}
-
-body[data-page="contact"] .contact-header{
-  padding-bottom: 14px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 0;
 }
 
 body[data-page="contact"] .contact-card,
 body[data-page="contact"] .contact-form{
-  background: rgba(255,255,255,0.9);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 14px;
   padding: 18px;
-  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.06);
+  box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
 }
 
 @media (min-width: 992px){
@@ -2018,51 +2004,8 @@ body[data-page="contact"] .contact-form{
   body[data-page="contact"] .contact-form{ padding: 22px; }
 }
 
-body[data-page="contact"] .contact-icon{
-  width: 44px;
-  height: 44px;
+body[data-page="contact"] .contact-page .btn{
   border-radius: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(42, 157, 143, 0.10);
-  color: #0f172a;
-  flex: 0 0 44px;
-}
-
-body[data-page="contact"] .contact-actions{
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
-body[data-page="contact"] .contact-meta{
-  margin-top: 2px;
-}
-
-body[data-page="contact"] details summary{
-  cursor: pointer;
-}
-
-body[data-page="contact"] details summary::-webkit-details-marker{
-  display: none;
-}
-
-body[data-page="contact"] details summary::after{
-  content: "▾";
-  float: right;
-  opacity: .75;
-}
-
-body[data-page="contact"] details[open] summary::after{
-  content: "▴";
-}
-
-body[data-page="contact"] .contact-details{
-  background: rgba(15, 23, 42, 0.03);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 12px;
-  padding: 12px 12px;
 }
 
 /* Admin reservations: keep comfortable space before footer */
