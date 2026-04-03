@@ -242,10 +242,10 @@
 
 <!-- ================= CHAT WIDGET ================= -->
 <div id="chat-widget" class="chat-widget" aria-hidden="true">
-  <div class="chat-header">Your virtual assistant</div>
+  <div class="chat-header">Your virtual assistant for {% if country == 'ireland' %}Ireland{% else %}Morocco{% endif %}</div>
   <div id="chat-messages" class="chat-messages">
     <div class="msg bot">
-      Hello 👋 Your virtual assistant is ready. You can ask in English for tours, booking, travel tips.
+      Hello! Your virtual assistant is ready for {% if country == 'ireland' %}Ireland{% else %}Morocco{% endif %}. You can ask in English or French about tours, booking, and travel tips.
     </div>
   </div>
   <form id="chat-form" class="chat-input" aria-label="Chat input">
@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', function () {
     chatMessages.innerHTML = '';
     const msg = document.createElement('div');
     msg.className = 'msg bot';
-    msg.textContent = 'Hello! Your virtual assistant is ready. You can ask in English for tours, booking, travel tips.';
+    msg.textContent = 'Hello! Your virtual assistant is ready for {% if country == "ireland" %}Ireland{% else %}Morocco{% endif %}. You can ask in English or French about tours, booking, and travel tips.';
     chatMessages.appendChild(msg);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }

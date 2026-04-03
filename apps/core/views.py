@@ -43,6 +43,110 @@ from .models import Tour, Reservation, BlogPost, Destination, ContactMessage, Bl
 from .context_processors import get_country_from_site
 
 
+def _normalize_country(country: str) -> str:
+    country = (country or '').strip().lower()
+    return country if country in {'morocco', 'ireland'} else 'morocco'
+
+
+def _country_label(country: str) -> str:
+    return 'Morocco' if country == 'morocco' else 'Ireland'
+
+
+def _build_booking_rules_context() -> str:
+    return (
+        "Booking rules: maximum stay is 11 nights. "
+        "Single-group rule: if there is any pending/booked reservation in a country, other tours in that country are unavailable for overlapping dates. "
+        "Buffer rule: 3-day buffer after each reservation end date."
+    )
+
+
+def _score_doc_relevance(message: str, doc_title: str, doc_content: str) -> int:
+    msg = (message or '').lower()
+    if not msg:
+        return 0
+    text = f"{doc_title or ''} {doc_content or ''}".lower()
+    # Simple keyword overlap scoring (fast + predictable)
+    score = 0
+    for token in set([t for t in msg.replace('\n', ' ').split(' ') if len(t) >= 4]):
+        if token in text:
+            score += 1
+    return score
+
+
+def _build_country_catalog_context(country: str, user_message: str) -> str:
+    """Build a compact, factual context from the DB for the current country."""
+    country = _normalize_country(country)
+
+    try:
+        tours_qs = (
+            Tour.objects.filter(country=country)
+            .select_related('destination')
+            .order_by('id')
+        )
+        tours = list(tours_qs[:12])
+    except (OperationalError, ProgrammingError):
+        tours = []
+
+    destinations = []
+    try:
+        destinations = list(
+            Destination.objects.filter(tours__country=country)
+            .distinct()
+            .order_by('name')[:12]
+        )
+    except (OperationalError, ProgrammingError):
+        destinations = []
+
+    catalog_lines = []
+    if destinations:
+        catalog_lines.append(
+            "Destinations: " + ", ".join([d.name for d in destinations])
+        )
+    if tours:
+        for t in tours:
+            dest_name = getattr(t.destination, 'name', '') or ''
+            promo = f" (promo -{t.discount_percent}%)" if getattr(t, 'is_promotion', False) and getattr(t, 'discount_percent', 0) else ""
+            line = f"- Tour #{t.id}: {t.title} — {dest_name} — {t.price_per_night} per night{promo}."
+            if t.transport:
+                line += f" Transport: {t.transport}."
+            if t.hotel:
+                line += f" Hotel: {t.hotel}."
+            if t.activities:
+                activities = [a.strip() for a in t.activities.replace('\n', ',').split(',') if a.strip()]
+                if activities:
+                    line += " Activities: " + ", ".join(activities[:8]) + ("." if len(activities) <= 8 else ", …")
+            catalog_lines.append(line)
+
+    info_lines = []
+    try:
+        docs = list(Information.objects.filter(country=country))
+        ranked = sorted(
+            ((
+                _score_doc_relevance(user_message, d.title, d.content),
+                d.title,
+                (d.content or '')
+            ) for d in docs),
+            key=lambda x: x[0],
+            reverse=True,
+        )
+        for score, title, content in ranked[:3]:
+            if score <= 0:
+                continue
+            snippet = content.strip().replace('\n', ' ')
+            info_lines.append(f"- {title}: {snippet[:400]}")
+    except (OperationalError, ProgrammingError):
+        info_lines = []
+
+    parts = []
+    if catalog_lines:
+        parts.append("Catalog:\n" + "\n".join(catalog_lines))
+    if info_lines:
+        parts.append("Extra info (from site admin):\n" + "\n".join(info_lines))
+    parts.append(_build_booking_rules_context())
+
+    return "\n\n".join(parts).strip()
+
+
 def home(request):
     q = request.GET.get('q', '').strip()
     # Backward compatible: old param `date` maps to `start_date`
@@ -159,7 +263,13 @@ def ai_chat_history(request):
         _reset_chat_if_server_restarted(request, session_key)
         messages_qs = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')
 
-        history = [{'role': m.role, 'message': m.message, 'created_at': m.created_at.isoformat()} for m in messages_qs]
+        history = []
+        for m in messages_qs:
+            role = m.role
+            # Backward compatibility: older rows used role='assistant'
+            if role == 'assistant':
+                role = 'bot'
+            history.append({'role': role, 'message': m.message, 'created_at': m.created_at.isoformat()})
         return JsonResponse({'history': history})
     except (OperationalError, ProgrammingError):
         return JsonResponse({'history': []})
@@ -264,7 +374,7 @@ def ai_chat(request):
     if not message:
         return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
 
-    country = get_country_from_site(request) or 'morocco'
+    country = _normalize_country(get_country_from_site(request) or 'morocco')
     session_key = _ensure_session_key(request)
     _reset_chat_if_server_restarted(request, session_key)
 
@@ -276,29 +386,35 @@ def ai_chat(request):
     try:
         history = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')[:20]
 
-        context = f"You are a helpful travel assistant for {country.title()} tours. "
-        context += f"Available tours: {', '.join([t.title for t in Tour.objects.filter(country=country)[:5]])}. "
+        country_label = _country_label(country)
+        site_context = _build_country_catalog_context(country, message)
 
-        info_docs = Information.objects.filter(country=country)
-        relevant_info = ''
-        for doc in info_docs:
-            if any(word in message.lower() for word in (doc.title + ' ' + doc.content).lower().split()):
-                relevant_info += f"{doc.title}: {doc.content[:500]} "
-
-        if relevant_info:
-            context += f"Relevant information: {relevant_info}"
+        system_prompt = (
+            f"You are the official virtual assistant for the {country_label} travel website only. "
+            f"You must ONLY answer using information relevant to {country_label}. "
+            "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
+            "Respond in the same language as the user (French or English). "
+            "Be conversational, concise, and helpful. Ask 1 short follow-up question when needed. "
+            "If the user wants to book, select the most relevant tour from the catalog and include: "
+            "[NAVIGATE: /tour/<id>/] and optionally [PREFILL: start_date=YYYY-MM-DD,end_date=YYYY-MM-DD,persons=N]. "
+            "Never invent tours, destinations, or prices; use the provided catalog/context.\n\n"
+            f"{site_context}"
+        )
 
         if settings.OPENAI_API_KEY:
             try:
                 client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-                messages = [
-                    {"role": "system", "content": context + " Respond helpfully and conversationally. If user wants to book a tour, navigate to booking page and prefill dates/persons. Use markers like [NAVIGATE: /tour/1] [PREFILL: start_date=2024-04-15,end_date=2024-04-20,persons=2] in your response when appropriate. Keep responses engaging and helpful."}
-                ]
+                messages = [{"role": "system", "content": system_prompt}]
                 for msg in history:
-                    messages.append({"role": msg.role, "content": msg.message})
+                    role = msg.role
+                    if role in {'bot', 'assistant'}:
+                        role = 'assistant'
+                    elif role != 'user':
+                        role = 'user'
+                    messages.append({"role": role, "content": msg.message})
 
                 response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
+                    model=getattr(settings, 'OPENAI_MODEL', None) or "gpt-4o",
                     messages=messages,
                     max_tokens=300,
                     temperature=0.7
@@ -349,7 +465,7 @@ def ai_chat(request):
     if not action:
         action = parse_actions(message, country)
 
-    ChatMessage.objects.create(session_key=session_key, role='assistant', message=bot_reply)
+    ChatMessage.objects.create(session_key=session_key, role='bot', message=bot_reply)
 
     result = {'reply': bot_reply}
     result.update(action)
@@ -357,13 +473,15 @@ def ai_chat(request):
 
 
 def generate_fallback_reply(message, country):
+    country = _normalize_country(country)
+    country_label = _country_label(country)
     msg_lower = message.lower()
     if 'price' in msg_lower or 'cost' in msg_lower:
-        return 'Our price starts at 2000$ per night.'
+        return f"Prices vary by tour on the {country_label} site. Tell me your dates + number of people and I’ll guide you to the best option."
     elif 'book' in msg_lower or 'reserve' in msg_lower or 'booking' in msg_lower:
-        return 'Say "book Morocco 15 April 20 April 2 people" and I prefill the form for you.'
+        return f"Say \"book {country_label} 15 April 20 April 2 people\" (or the same in French) and I will prefill the booking form for you."
     else:
-        return f'Hello! I am your virtual assistant for {country.title()} tours. How can I help you plan your trip?'
+        return f"Hello! I am your virtual assistant for {country_label}. How can I help you plan your trip?"
 
 
 def parse_actions_from_response(response, country):

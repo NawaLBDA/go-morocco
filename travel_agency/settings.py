@@ -72,6 +72,7 @@ ROBOCALL_SECONDARY_NUMBER = os.environ.get("ROBOCALL_SECONDARY_NUMBER", "+212643
 
 # OpenAI Chat Assistant (laissez vide si pas de clé)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 
 # HuggingFace Mistral (laissez vide si pas de clé)
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN", "")
