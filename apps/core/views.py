@@ -60,6 +60,189 @@ def _build_booking_rules_context() -> str:
     )
 
 
+def _detect_language(message: str) -> str:
+    """Very small heuristic: returns 'fr' or 'en'."""
+    msg = (message or '').lower()
+    if any(ch in msg for ch in ['é', 'è', 'à', 'ù', 'ô', 'ç']):
+        return 'fr'
+    fr_markers = [
+        'bonjour', 'salut', 'svp', "s'il", 'réserver', 'reserver', 'réservation',
+        'du ', ' au ', 'pour ', 'personnes', 'nuit', 'nuits', 'disponible', 'disponibles'
+    ]
+    if any(m in msg for m in fr_markers):
+        return 'fr'
+    return 'en'
+
+
+def _extract_booking_details(message: str):
+    """Extract (start_date, end_date, persons, destination_hint) from FR/EN/ISO-ish messages."""
+    msg_lower = (message or '').lower()
+    import re
+
+    months = {
+        'january': 1, 'jan': 1, 'janvier': 1,
+        'february': 2, 'feb': 2, 'février': 2, 'fevrier': 2,
+        'march': 3, 'mar': 3, 'mars': 3,
+        'april': 4, 'apr': 4, 'avril': 4,
+        'may': 5, 'mai': 5,
+        'june': 6, 'jun': 6, 'juin': 6,
+        'july': 7, 'jul': 7, 'juillet': 7,
+        'august': 8, 'aug': 8, 'août': 8, 'aout': 8,
+        'september': 9, 'sep': 9, 'sept': 9, 'septembre': 9,
+        'october': 10, 'oct': 10, 'octobre': 10,
+        'november': 11, 'nov': 11, 'novembre': 11,
+        'december': 12, 'dec': 12, 'décembre': 12, 'decembre': 12,
+    }
+
+    def parse_month(m: str) -> int | None:
+        if not m:
+            return None
+        m = m.strip().lower()
+        return months.get(m)
+
+    start_date = None
+    end_date = None
+
+    # ISO range: 2026-04-20 to 2026-04-25
+    iso = re.search(r'(\d{4}-\d{2}-\d{2})\s*(?:to|au|\-|–|—)\s*(\d{4}-\d{2}-\d{2})', msg_lower)
+    if iso:
+        try:
+            start_date = datetime.strptime(iso.group(1), '%Y-%m-%d').date()
+            end_date = datetime.strptime(iso.group(2), '%Y-%m-%d').date()
+        except ValueError:
+            start_date = end_date = None
+
+    # English: from 20 April to 25 April
+    if not (start_date and end_date):
+        m = re.search(
+            r'(?:from\s*)?(\d{1,2})\s*(?:st|nd|rd|th)?\s*(?:of\s*)?'
+            r'(january|jan|janvier|february|feb|février|fevrier|march|mar|mars|april|apr|avril|may|mai|june|jun|juin|july|jul|juillet|august|aug|août|aout|september|sep|sept|septembre|october|oct|octobre|november|nov|novembre|december|dec|décembre|decembre)'
+            r'\s*(?:to|until|\-|–|—)\s*(\d{1,2})\s*(?:st|nd|rd|th)?\s*(?:of\s*)?'
+            r'(january|jan|janvier|february|feb|février|fevrier|march|mar|mars|april|apr|avril|may|mai|june|jun|juin|july|jul|juillet|august|aug|août|aout|september|sep|sept|septembre|october|oct|octobre|november|nov|novembre|december|dec|décembre|decembre)'
+            r'(?:\s*(\d{4}))?',
+            msg_lower,
+        )
+        if m:
+            try:
+                sday, smonth, eday, emonth, year = m.groups()
+                y = int(year) if year else date.today().year
+                start_date = date(y, parse_month(smonth) or 1, int(sday))
+                end_date = date(y, parse_month(emonth) or 1, int(eday))
+            except Exception:
+                start_date = end_date = None
+
+    # French: du 20 avril au 25 avril
+    if not (start_date and end_date):
+        m = re.search(
+            r'(?:du|de)\s*(\d{1,2})\s*'
+            r'(january|jan|janvier|february|feb|février|fevrier|march|mar|mars|april|apr|avril|may|mai|june|jun|juin|july|jul|juillet|august|aug|août|aout|september|sep|sept|septembre|october|oct|octobre|november|nov|novembre|december|dec|décembre|decembre)'
+            r'\s*(?:au|à|a)\s*(\d{1,2})\s*'
+            r'(january|jan|janvier|february|feb|février|fevrier|march|mar|mars|april|apr|avril|may|mai|june|jun|juin|july|jul|juillet|august|aug|août|aout|september|sep|sept|septembre|october|oct|octobre|november|nov|novembre|december|dec|décembre|decembre)?'
+            r'(?:\s*(\d{4}))?',
+            msg_lower,
+        )
+        if m:
+            try:
+                sday, smonth, eday, emonth, year = m.groups()
+                y = int(year) if year else date.today().year
+                start_date = date(y, parse_month(smonth) or 1, int(sday))
+                # If end month omitted, assume same month
+                em = parse_month(emonth) if emonth else (parse_month(smonth) or 1)
+                end_date = date(y, em, int(eday))
+            except Exception:
+                start_date = end_date = None
+
+    if start_date and end_date and end_date < start_date:
+        start_date, end_date = end_date, start_date
+
+    persons = None
+    pm = re.search(r'(\d+)\s*(persons|personnes|people|person)', msg_lower)
+    if pm:
+        try:
+            persons = int(pm.group(1))
+        except ValueError:
+            persons = None
+
+    destination_hint = None
+    # light hinting for common cities
+    for city in ['rabat', 'marrakech', 'fes', 'fez', 'casablanca', 'tangier', 'dublin', 'galway', 'cork', 'belfast']:
+        if city in msg_lower:
+            destination_hint = city
+            break
+
+    return start_date, end_date, persons, destination_hint
+
+
+def _get_country_blocked_ranges(country: str, buffer_days: int = 3):
+    """Returns list of blocked date ranges (start, end_inclusive) for a country."""
+    country = _normalize_country(country)
+    active_statuses = ['pending', 'booked']
+    try:
+        reservations = Reservation.objects.filter(
+            tour__country=country,
+            status__in=active_statuses,
+        ).order_by('start_date')
+    except (OperationalError, ProgrammingError):
+        return []
+
+    ranges = []
+    for r in reservations:
+        try:
+            ranges.append((r.start_date, r.end_date + timedelta(days=buffer_days)))
+        except Exception:
+            continue
+
+    # merge overlaps
+    merged = []
+    for start, end in sorted(ranges, key=lambda x: x[0]):
+        if not merged:
+            merged.append([start, end])
+            continue
+        last = merged[-1]
+        if start <= last[1] + timedelta(days=1):
+            last[1] = max(last[1], end)
+        else:
+            merged.append([start, end])
+    return [(s, e) for s, e in merged]
+
+
+def _is_range_available(country: str, start_date: date, end_date: date, buffer_days: int = 3) -> bool:
+    if not start_date or not end_date:
+        return False
+    country = _normalize_country(country)
+    blocked = _get_country_blocked_ranges(country, buffer_days=buffer_days)
+    # booking overlap check with buffer: block window_start .. end_date
+    window_start = start_date - timedelta(days=buffer_days)
+    for s, e in blocked:
+        if s <= end_date and e >= window_start:
+            return False
+    return True
+
+
+def _suggest_available_ranges(country: str, nights: int = 5, horizon_days: int = 120, limit: int = 4, buffer_days: int = 3):
+    """Suggest next available continuous date ranges for a given stay length."""
+    country = _normalize_country(country)
+    nights = max(1, min(int(nights), 11))
+    today = date.today()
+
+    suggestions = []
+    d = today
+    end_horizon = today + timedelta(days=horizon_days)
+
+    while d <= end_horizon and len(suggestions) < limit:
+        start = d
+        end = d + timedelta(days=nights)
+        # end_date is checkout date; nights = (end - start).days
+        if end > end_horizon:
+            break
+        if _is_range_available(country, start, end, buffer_days=buffer_days):
+            suggestions.append((start, end))
+            d = start + timedelta(days=7)
+        else:
+            d = d + timedelta(days=1)
+    return suggestions
+
+
 def _score_doc_relevance(message: str, doc_title: str, doc_content: str) -> int:
     msg = (message or '').lower()
     if not msg:
@@ -145,6 +328,22 @@ def _build_country_catalog_context(country: str, user_message: str) -> str:
     parts.append(_build_booking_rules_context())
 
     return "\n\n".join(parts).strip()
+
+
+def _pick_tour_for_booking(country: str, destination_hint: str | None = None):
+    country = _normalize_country(country)
+    try:
+        qs = Tour.objects.filter(country=country)
+        if destination_hint:
+            tour = qs.filter(
+                Q(destination__name__icontains=destination_hint) |
+                Q(title__icontains=destination_hint)
+            ).select_related('destination').first()
+            if tour:
+                return tour
+        return qs.select_related('destination').first()
+    except (OperationalError, ProgrammingError):
+        return None
 
 
 def home(request):
@@ -382,6 +581,86 @@ def ai_chat(request):
 
     bot_reply = ''
     action = {}
+    lang = _detect_language(message)
+
+    # Booking intelligence (works even without OpenAI credits)
+    booking_intent = any(k in message.lower() for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
+    start_date_req, end_date_req, persons_req, destination_hint = _extract_booking_details(message)
+
+    if booking_intent:
+        # If dates provided, validate rules + availability first.
+        if start_date_req and end_date_req:
+            requested_nights = max(0, (end_date_req - start_date_req).days)
+            if requested_nights > 11:
+                bot_reply = (
+                    "Désolé, la durée maximale est de 11 nuits. Peux-tu choisir une période plus courte ?"
+                    if lang == 'fr' else
+                    "Sorry — the maximum stay is 11 nights. Can you pick a shorter date range?"
+                )
+            elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=3):
+                suggestions = _suggest_available_ranges(country, nights=min(max(requested_nights, 3), 11), limit=4)
+                if lang == 'fr':
+                    if suggestions:
+                        sug_txt = " ; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
+                        bot_reply = (
+                            "Ces dates semblent déjà bloquées sur ce site. Voici des alternatives disponibles : "
+                            + sug_txt
+                            + ". Tu préfères laquelle ?"
+                        )
+                    else:
+                        bot_reply = "Ces dates semblent déjà bloquées sur ce site. Donne-moi une autre période (et le nombre de personnes) et je te propose des options."
+                else:
+                    if suggestions:
+                        sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
+                        bot_reply = (
+                            "Those dates look unavailable on this site. Here are available alternatives: "
+                            + sug_txt
+                            + ". Which one do you prefer?"
+                        )
+                    else:
+                        bot_reply = "Those dates look unavailable on this site. Share another date range (+ number of people) and I’ll suggest options."
+            else:
+                # Dates are available. If persons is given, we can navigate/prefill.
+                if not persons_req:
+                    bot_reply = (
+                        "Parfait — pour combien de personnes ?"
+                        if lang == 'fr' else
+                        "Great — for how many people?"
+                    )
+                else:
+                    tour = _pick_tour_for_booking(country, destination_hint)
+                    if tour:
+                        action['navigate'] = reverse('tour_detail', args=[tour.id])
+                        action['prefill'] = {
+                            'start_date': start_date_req.strftime('%Y-%m-%d'),
+                            'end_date': end_date_req.strftime('%Y-%m-%d'),
+                            'persons': persons_req,
+                        }
+                        if lang == 'fr':
+                            bot_reply = f"Super — je t’ouvre la réservation pour {tour.title}."
+                        else:
+                            bot_reply = f"Great — I’m opening the booking for {tour.title}."
+        else:
+            # No dates provided: propose real free windows.
+            suggestions = _suggest_available_ranges(country, nights=5, limit=4)
+            if lang == 'fr':
+                if suggestions:
+                    sug_txt = " ; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
+                    bot_reply = (
+                        "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes (et la ville si tu veux). "
+                        "Exemples de périodes disponibles (5 nuits) : " + sug_txt + "."
+                    )
+                else:
+                    bot_reply = "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes, et je vérifie la disponibilité."
+            else:
+                if suggestions:
+                    sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
+                    bot_reply = (
+                        "Sure — tell me your dates and number of people (and the destination if you want). "
+                        "Examples of available windows (5 nights): " + sug_txt + "."
+                    )
+                else:
+                    bot_reply = "Sure — tell me your dates and number of people and I’ll check availability."
 
     try:
         history = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')[:20]
@@ -395,13 +674,14 @@ def ai_chat(request):
             "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
             "Respond in the same language as the user (French or English). "
             "Be conversational, concise, and helpful. Ask 1 short follow-up question when needed. "
+            "Do NOT tell the user to type a specific magic command like 'book ...'. Instead, understand natural language and ask for missing info. "
             "If the user wants to book, select the most relevant tour from the catalog and include: "
             "[NAVIGATE: /tour/<id>/] and optionally [PREFILL: start_date=YYYY-MM-DD,end_date=YYYY-MM-DD,persons=N]. "
             "Never invent tours, destinations, or prices; use the provided catalog/context.\n\n"
             f"{site_context}"
         )
 
-        if settings.OPENAI_API_KEY:
+        if settings.OPENAI_API_KEY and not bot_reply:
             try:
                 client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
                 messages = [{"role": "system", "content": system_prompt}]
@@ -425,13 +705,14 @@ def ai_chat(request):
 
             except Exception:
                 logging.exception('[ai_chat] OpenAI exception')
-                bot_reply = ''
-                action = {}
+                # Keep any already computed deterministic reply (availability checks, etc).
+                bot_reply = bot_reply or ''
+                action = action or {}
 
         if not bot_reply and settings.HF_API_TOKEN and InferenceClient:
             try:
                 hf_client = InferenceClient(token=settings.HF_API_TOKEN)
-                hf_prompt = context + "\nUser: " + message + "\nAssistant:"
+                hf_prompt = system_prompt + "\nUser: " + message + "\nAssistant:"
                 hf_result = hf_client.text_generation(
                     model="mistralai/mistral-7b-instruct",
                     inputs=hf_prompt,
@@ -476,12 +757,41 @@ def generate_fallback_reply(message, country):
     country = _normalize_country(country)
     country_label = _country_label(country)
     msg_lower = message.lower()
-    if 'price' in msg_lower or 'cost' in msg_lower:
-        return f"Prices vary by tour on the {country_label} site. Tell me your dates + number of people and I’ll guide you to the best option."
-    elif 'book' in msg_lower or 'reserve' in msg_lower or 'booking' in msg_lower:
-        return f"Say \"book {country_label} 15 April 20 April 2 people\" (or the same in French) and I will prefill the booking form for you."
-    else:
-        return f"Hello! I am your virtual assistant for {country_label}. How can I help you plan your trip?"
+    lang = _detect_language(message)
+
+    if any(w in msg_lower for w in ['price', 'cost', 'prix', 'tarif']):
+        if lang == 'fr':
+            return f"Les prix dépendent du tour sur le site {country_label}. Dis-moi la destination, les dates et le nombre de personnes, et je te propose la meilleure option."
+        return f"Prices vary by tour on the {country_label} site. Tell me the destination, dates, and number of people, and I’ll suggest the best option."
+
+    if any(k in msg_lower for k in ['book', 'reserve', 'booking', 'réserver', 'reserver', 'réservation', 'reservation']):
+        start_date_req, end_date_req, persons_req, destination_hint = _extract_booking_details(message)
+        if start_date_req and end_date_req:
+            if lang == 'fr':
+                return "Parfait. Je vérifie la disponibilité pour ces dates. Si tu confirmes le nombre de personnes, je peux pré-remplir la réservation."
+            return "Great — I’ll check availability for those dates. If you confirm the number of people, I can prefill the booking."
+
+        suggestions = _suggest_available_ranges(country, nights=5, limit=4)
+        if lang == 'fr':
+            if suggestions:
+                sug_txt = " ; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
+                return (
+                    "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes. "
+                    "Exemples de périodes disponibles (5 nuits) : " + sug_txt + "."
+                )
+            return "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes, et je vérifie la disponibilité."
+
+        if suggestions:
+            sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
+            return (
+                "Sure — tell me your exact dates and number of people. "
+                "Examples of available windows (5 nights): " + sug_txt + "."
+            )
+        return "Sure — tell me your exact dates and number of people and I’ll check availability."
+
+    if lang == 'fr':
+        return f"Bonjour ! Je suis votre assistant virtuel pour {country_label}. Que souhaitez-vous organiser (destination, dates, budget) ?"
+    return f"Hello! I’m your virtual assistant for {country_label}. What would you like to plan (destination, dates, budget)?"
 
 
 def parse_actions_from_response(response, country):
@@ -534,60 +844,21 @@ def parse_actions(message, country):
     elif 'blog' in msg_lower:
         action['navigate'] = reverse('blog_list')
 
-    # Parse dates and persons for booking
-    import re
-    months = {
-        'january': 1, 'janvier': 1, 'february': 2, 'feb': 2, 'march': 3, 'mars': 3,
-        'april': 4, 'avril': 4, 'may': 5, 'mai': 5, 'june': 6, 'juin': 6,
-        'july': 7, 'juillet': 7, 'august': 8, 'août': 8, 'september': 9, 'septembre': 9,
-        'october': 10, 'octobre': 10, 'november': 11, 'novembre': 11, 'december': 12, 'décembre': 12
-    }
-
-    start_date = None
-    end_date = None
-    persons = None
-
-    date_match2 = re.search(r'(\d{1,2})\s*(?:st|nd|rd|th)?\s*(?:of\s*)?(janvier|jan|february|feb|march|mars|april|avr|may|mai|june|juin|july|juil|august|aout|september|sept|october|oct|november|nov|december|dec)\s*to\s*(\d{1,2})\s*(?:st|nd|rd|th)?\s*(?:of\s*)?(janvier|jan|february|feb|march|mars|april|avr|may|mai|june|juin|july|juil|august|aout|september|sept|october|oct|november|nov|december|dec)', msg_lower)
-    if date_match2:
-        try:
-            groups = date_match2.groups()
-            if len(groups) >= 4:
-                sday, smonth, eday, emonth = groups[:4]
-                year = date.today().year
-                start_date = date(year, months.get(smonth, 4), int(sday))
-                end_date = date(year, months.get(emonth, 4), int(eday))
-        except (ValueError, TypeError):
-            pass
-
-    persons_match = re.search(r'(\d+)\s*(persons|personnes|people|person)', msg_lower)
-    if persons_match:
-        persons = int(persons_match.group(1))
-
-    if start_date and end_date and persons and ('reserve' in msg_lower or 'book' in msg_lower or 'booking' in msg_lower):
-        try:
-            # Support explicit city-based requests (e.g. "rabat")
-            if 'rabat' in msg_lower:
-                target_tour = Tour.objects.filter(
-                    country=country,
-                    destination__name__icontains='rabat'
-                ).first()
-            else:
-                target_tour = Tour.objects.filter(country=country).first()
-
-            if not target_tour and 'rabat' in msg_lower:
-                # fallback to any tour if exact destination not found
-                target_tour = Tour.objects.filter(country=country).first()
-
-            if target_tour:
-                action['navigate'] = reverse('tour_detail', args=[target_tour.id])
-                action['prefill'] = {
-                    'start_date': start_date.strftime('%Y-%m-%d'),
-                    'end_date': end_date.strftime('%Y-%m-%d'),
-                    'persons': persons,
-                }
-        except Exception as e:
-            logging.exception('[parse_actions] Failed to build output')
-            return {}
+    # Parse dates/persons from natural language and only prefill when the range is actually available.
+    booking_intent = any(k in msg_lower for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
+    if booking_intent:
+        start_date, end_date, persons, destination_hint = _extract_booking_details(message)
+        if start_date and end_date and persons:
+            requested_nights = max(0, (end_date - start_date).days)
+            if requested_nights <= 11 and _is_range_available(country, start_date, end_date, buffer_days=3):
+                target_tour = _pick_tour_for_booking(country, destination_hint)
+                if target_tour:
+                    action['navigate'] = reverse('tour_detail', args=[target_tour.id])
+                    action['prefill'] = {
+                        'start_date': start_date.strftime('%Y-%m-%d'),
+                        'end_date': end_date.strftime('%Y-%m-%d'),
+                        'persons': persons,
+                    }
 
     return action
 
