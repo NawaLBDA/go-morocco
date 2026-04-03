@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 from datetime import date
 
 from apps.core.models import Reservation, Tour
+from apps.core.context_processors import get_country_from_site
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -22,7 +23,8 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 # ============================================================
 @login_required
 def tour_detail(request, tour_id):
-    tour = get_object_or_404(Tour, id=tour_id)
+    country = get_country_from_site(request)
+    tour = get_object_or_404(Tour, id=tour_id, country=country)
 
     # Compute promo price for template display.
     if tour.is_promotion and (tour.discount_percent or 0) > 0:
@@ -34,44 +36,40 @@ def tour_detail(request, tour_id):
     else:
         tour.promo_price = None
 
-    # ✅ Reservation du user courant sur ce tour (active)
     reservation = Reservation.objects.filter(
         user=request.user,
-        tour=tour
-    ).exclude(status__in=["cancelled"]).order_by("-created_at").first()
-
-    # ✅ Bloquer uniquement les ranges BOOKED par d'autres users
-    booked_by_others = Reservation.objects.filter(
         tour=tour,
-        status="booked",
+    ).exclude(status__in=["rejected", "cancelled"]).order_by("-created_at").first()
+
+    # Single group booking rules:
+    # - block any already reserved dates across ALL tours in the same country
+    # - include pending + booked
+    # - add a buffer after each tour so the group can reset/prep
+    buffer_days = 3
+    active_statuses = ['pending', 'booked']
+
+    active_reservations = Reservation.objects.filter(
+        tour__country=country,
+        status__in=active_statuses,
     ).exclude(user=request.user)
 
-    disabled_ranges = []
-    booked_months = set()
-    for r in booked_by_others:
-        booked_months.add((r.start_date.year, r.start_date.month))
-
-    # Disable entire months that have bookings
-    for year, month in booked_months:
-        # Get first and last day of the month
-        from datetime import datetime
-        first_day = date(year, month, 1)
-        if month == 12:
-            last_day = date(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            last_day = date(year, month + 1, 1) - timedelta(days=1)
-        disabled_ranges.append({
-            "from": first_day.strftime("%Y-%m-%d"),
-            "to": last_day.strftime("%Y-%m-%d"),
-        })
+    disabled_ranges = [
+        {
+            "from": r.start_date.isoformat(),
+            "to": (r.end_date + timedelta(days=buffer_days)).isoformat(),
+        }
+        for r in active_reservations.order_by('start_date')
+    ]
 
     return render(request, "booking.html", {
         "tour": tour,
         "reservation": reservation,
         "disabled_ranges": disabled_ranges,
         "STRIPE_PUBLIC_KEY": settings.STRIPE_PUBLIC_KEY,
-        "activities_list": [activity.strip() for activity in tour.activities.split(',')] if tour.activities else [],
+        "activities_list": [a.strip() for a in (tour.activities or '').replace('\n', ',').split(',') if a.strip()],
         "today": date.today(),
+        "booking_max_nights": 11,
+        "booking_buffer_days": buffer_days,
     })
 
 

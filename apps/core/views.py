@@ -65,7 +65,8 @@ def home(request):
             tours = Tour.objects.none()
 
     # Date filtering: treat selected date as trip start by default.
-    # If end_date is provided, filter by range overlap.
+    # Single-group rule: if the group is booked for ANY tour in this country,
+    # then NO other tour is available for those dates.
     if start_date_str:
         try:
             start_date_val = datetime.strptime(start_date_str, '%Y-%m-%d').date()
@@ -83,12 +84,19 @@ def home(request):
             # If only start date is set, we still treat it as a 1-day range.
             range_end = end_date_val or start_date_val
 
+            buffer_days = 3
+            active_statuses = ['pending', 'booked']
+            window_start = start_date_val - timedelta(days=buffer_days)
+
             try:
-                tours = tours.exclude(
-                    reservations__status__in=['pending', 'booked'],
-                    reservations__start_date__lte=range_end,
-                    reservations__end_date__gte=start_date_val,
-                )
+                has_conflict = Reservation.objects.filter(
+                    tour__country=country,
+                    status__in=active_statuses,
+                    start_date__lte=range_end,
+                    end_date__gte=window_start,
+                ).exists()
+                if has_conflict:
+                    tours = Tour.objects.none()
             except (OperationalError, ProgrammingError):
                 tours = Tour.objects.none()
         except ValueError:
@@ -583,12 +591,19 @@ def reservations(request):
 
             range_end = end_date_val or start_date_val
 
+            buffer_days = 3
+            active_statuses = ['pending', 'booked']
+            window_start = start_date_val - timedelta(days=buffer_days)
+
             try:
-                tours = tours.exclude(
-                    reservations__status__in=['pending', 'booked'],
-                    reservations__start_date__lte=range_end,
-                    reservations__end_date__gte=start_date_val,
-                )
+                has_conflict = Reservation.objects.filter(
+                    tour__country=country,
+                    status__in=active_statuses,
+                    start_date__lte=range_end,
+                    end_date__gte=window_start,
+                ).exists()
+                if has_conflict:
+                    tours = Tour.objects.none()
             except (OperationalError, ProgrammingError):
                 tours = Tour.objects.none()
         except ValueError:
