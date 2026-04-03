@@ -321,45 +321,165 @@ document.addEventListener('DOMContentLoaded', function () {
     msg.textContent = text;
     chatMessages.appendChild(msg);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    return msg;
   }
 
-  function addMessageStreamed(text, type) {
-    if (type !== 'bot') {
-      return addMessage(text, type);
+  async function streamBotReply(userText) {
+    const botMsgEl = addMessage('', 'bot');
+    botMsgEl.setAttribute('data-streaming', 'true');
+
+    let finalAction = null;
+
+    async function fallbackToJson() {
+      try {
+        const r = await fetch('{% url "ai_chat" %}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: userText })
+        });
+        const data = await r.json();
+        const reply = data.reply || data.error || 'Sorry — no reply.';
+        botMsgEl.textContent = reply;
+        botMsgEl.removeAttribute('data-streaming');
+
+        finalAction = data.action || null;
+        // Backward-compat if older API shape
+        if (!finalAction && (data.navigate || data.prefill)) {
+          finalAction = { navigate: data.navigate, prefill: data.prefill };
+        }
+        return true;
+      } catch (e) {
+        return false;
+      }
     }
 
-    const words = text.split(' ');
-    let chunk = '';
-    let delay = 0;
+    try {
+      const response = await fetch('{% url "ai_chat_stream" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        },
+        body: JSON.stringify({ message: userText })
+      });
 
-    words.forEach((word, idx) => {
-      chunk += (idx === 0 ? '' : ' ') + word;
-      if (idx % 8 === 0) {
-        setTimeout(() => {
-          const existing = document.querySelector('.msg.bot:last-child');
-          if (existing && existing.getAttribute('data-stream') === 'true') {
-            existing.textContent = chunk;
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-          } else {
-            const msg = document.createElement('div');
-            msg.className = 'msg bot';
-            msg.setAttribute('data-stream', 'true');
-            msg.textContent = chunk;
-            chatMessages.appendChild(msg);
+      if (!response.ok) {
+        // If server returned JSON error, show it.
+        let text = '';
+        try { text = await response.text(); } catch {}
+        botMsgEl.textContent = text || 'Sorry — the assistant is unavailable right now.';
+        botMsgEl.removeAttribute('data-streaming');
+        // Try JSON fallback too.
+        await fallbackToJson();
+        return;
+      }
+
+      // Some browsers/environments may not expose ReadableStream.
+      if (!response.body) {
+        const ok = await fallbackToJson();
+        if (!ok) {
+          botMsgEl.textContent = 'Sorry — streaming is not supported in this browser.';
+          botMsgEl.removeAttribute('data-streaming');
+        }
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let fullText = '';
+
+      const processEventBlock = (block) => {
+        // SSE block: lines like "data: {...}"
+        const lines = block.split('\n');
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const payloadStr = line.slice(5).trim();
+          if (!payloadStr) continue;
+          let payload;
+          try {
+            payload = JSON.parse(payloadStr);
+          } catch {
+            continue;
+          }
+
+          if (payload.type === 'delta' && payload.text) {
+            fullText += payload.text;
+            botMsgEl.textContent = fullText;
             chatMessages.scrollTop = chatMessages.scrollHeight;
           }
-        }, delay);
-        delay += 80;
-      }
-    });
 
-    setTimeout(() => {
-      const existing = document.querySelector('.msg.bot:last-child');
-      if (existing && existing.getAttribute('data-stream') === 'true') {
-        existing.textContent = text;
-        existing.removeAttribute('data-stream');
+          if (payload.type === 'final') {
+            if (typeof payload.text === 'string') {
+              fullText = payload.text;
+              botMsgEl.textContent = fullText;
+            }
+            finalAction = payload.action || null;
+            botMsgEl.removeAttribute('data-streaming');
+          }
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let idx;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const block = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          if (block.trim()) {
+            processEventBlock(block);
+          }
+        }
       }
-    }, delay + 80);
+
+      // Process any remaining buffered block
+      if (buffer.trim()) {
+        processEventBlock(buffer);
+      }
+
+    } catch (e) {
+      const ok = await fallbackToJson();
+      if (!ok) {
+        botMsgEl.textContent = 'Sorry — the assistant is unavailable right now.';
+        botMsgEl.removeAttribute('data-streaming');
+      }
+    }
+
+    // Handle action (navigate/prefill) after stream ends
+    if (finalAction) {
+      if (finalAction.navigate && finalAction.prefill) {
+        const query = new URLSearchParams({
+          start_date: finalAction.prefill.start_date,
+          end_date: finalAction.prefill.end_date,
+          persons: finalAction.prefill.persons,
+        }).toString();
+        setTimeout(() => { window.location.href = finalAction.navigate + '?' + query; }, 600);
+        return;
+      }
+
+      if (finalAction.navigate) {
+        setTimeout(() => { window.location.href = finalAction.navigate; }, 600);
+        return;
+      }
+
+      if (finalAction.prefill) {
+        const startInput = document.getElementById('start_date');
+        const endInput = document.getElementById('end_date');
+        const personsInput = document.getElementById('persons');
+
+        if (startInput && endInput && personsInput) {
+          startInput.value = finalAction.prefill.start_date;
+          endInput.value = finalAction.prefill.end_date;
+          personsInput.value = finalAction.prefill.persons;
+          addMessage('✅ Booking form prefilled based on your request (not submitted). Please click Book Now manually.', 'bot');
+        } else {
+          addMessage('✅ Pre-fill request ready; go to a tour booking page for form population.', 'bot');
+        }
+      }
+    }
   }
 
   /* ========= FORM SUBMIT ========= */
@@ -372,70 +492,8 @@ document.addEventListener('DOMContentLoaded', function () {
     addMessage(text, 'user');
     chatInput.value = '';
 
-    // call AI backend first, fallback to local rules when endpoint fails or no key
-    fetch('{% url "ai_chat" %}', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ message: text })
-    })
-      .then(response => response.json())
-      .then(data => {
-        const botReply = data.reply || data.error || 'Sorry, I did not understand. Please rephrase.';
-        addMessageStreamed(botReply, 'bot');
-
-        // If API instructs to navigate + prefill, provide query parameters and redirect
-        if (data.navigate && data.prefill) {
-          const query = new URLSearchParams({
-            start_date: data.prefill.start_date,
-            end_date: data.prefill.end_date,
-            persons: data.prefill.persons,
-          }).toString();
-          setTimeout(() => { window.location.href = data.navigate + '?' + query; }, 600);
-          return;
-        }
-
-        // If API instructs to navigate only
-        if (data.navigate) {
-          setTimeout(() => { window.location.href = data.navigate; }, 600);
-          return;
-        }
-
-        // If API instructs to prefill booking form on current page
-        if (data.prefill) {
-          const startInput = document.getElementById('start_date');
-          const endInput = document.getElementById('end_date');
-          const personsInput = document.getElementById('persons');
-
-          if (startInput && endInput && personsInput) {
-            startInput.value = data.prefill.start_date;
-            endInput.value = data.prefill.end_date;
-            personsInput.value = data.prefill.persons;
-            addMessage('✅ Booking form prefilled based on your request (not submitted). Please click Book Now manually.', 'bot');
-          } else {
-            addMessage('✅ Pre-fill request ready; go to a tour booking page for form population.', 'bot');
-          }
-        }
-      })
-      .catch(() => {
-        // Fallback rule-based
-        const t = text.toLowerCase();
-        let reply = 'How can I help you today?';
-
-        if (t.includes('price') || t.includes('cost')) {
-          reply = 'Our tours start from 2000 $ per night per person.';
-        } else if (t.includes('book') || t.includes('booking') || t.includes('reserve')) {
-          reply = 'To book a tour 👇\n1️⃣ Browse available tours\n2️⃣ Select your dates & persons\n3️⃣ Price is calculated automatically\n4️⃣ Confirm booking ✅';
-          setTimeout(() => { window.location.href = '{% url "home" %}#available-tours'; }, 2000);
-        } else if (t.includes('hello') || t.includes('hi')) {
-          reply = 'Hello! Welcome to {{ brand_name|escapejs }}!';
-        } else if (t.includes('whatsapp')) {
-          reply = 'Contact us on WhatsApp: {{ whatsapp_number|escapejs }}';
-        }
-
-        addMessage(reply, 'bot');
-      });
+    // Real streaming from backend (no predefined client-side answers)
+    streamBotReply(text);
   });
 
   /* ========= INIT ========= */

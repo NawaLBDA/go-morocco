@@ -27,7 +27,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.forms import UserCreationForm
 from django.db.models import Q
 from django.conf import settings
-from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, StreamingHttpResponse
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 
@@ -41,6 +41,209 @@ except ImportError:
 
 from .models import Tour, Reservation, BlogPost, Destination, ContactMessage, BlogComment, UserProfile, CountryContent, Information, ChatMessage
 from .context_processors import get_country_from_site
+
+
+def _sse_pack(obj: dict) -> str:
+    return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
+
+
+def _build_llm_prompt(system_prompt: str, history) -> str:
+    # HF text generation endpoint is not a chat API; we build a chat-like prompt.
+    lines = [system_prompt.strip(), "", "Conversation:"]
+    for msg in history:
+        role = msg.role
+        if role in {'bot', 'assistant'}:
+            lines.append(f"Assistant: {msg.message}")
+        else:
+            lines.append(f"User: {msg.message}")
+    lines.append("Assistant:")
+    return "\n".join(lines).strip() + " "
+
+
+@csrf_exempt
+def ai_chat_stream(request):
+    """Streaming AI chat endpoint (SSE over POST).
+
+    Response is text/event-stream with messages:
+    - {type:'delta', text:'...'} repeated
+    - {type:'final', text:'...', action:{...}} once
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        return JsonResponse({'error': 'Invalid JSON payload.'}, status=400)
+
+    message = (payload.get('message') or '').strip()
+    if not message:
+        return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
+
+    country = _normalize_country(get_country_from_site(request) or 'morocco')
+    session_key = _ensure_session_key(request)
+    _reset_chat_if_server_restarted(request, session_key)
+    ChatMessage.objects.create(session_key=session_key, role='user', message=message)
+
+    lang = _detect_language(message)
+    history = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')[:20]
+    country_label = _country_label(country)
+    site_context = _build_country_catalog_context(country, message)
+
+    system_prompt = (
+        f"You are the official virtual assistant for the {country_label} travel website only. "
+        f"You must ONLY answer using information relevant to {country_label}. "
+        "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
+        "Respond in the same language as the user (French or English). "
+        "Be conversational, natural, and helpful. Ask 1 short follow-up question when needed. "
+        "Never invent tours, destinations, prices, or policies; use the provided catalog/context. "
+        "If the user wants to book, ask for missing info (dates, people) and respect the booking rules in context.\n\n"
+        f"{site_context}"
+    )
+
+    # Deterministic action computation (optional) so the UI can still navigate/prefill.
+    action = {}
+    msg_lower = message.lower()
+    booking_intent = any(k in msg_lower for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
+    start_date_req, end_date_req, persons_req, parsed_dest = _extract_booking_details(message)
+    destination_hint = _resolve_destination_hint(country, message, parsed_dest) or request.session.get('chat_last_destination')
+    if destination_hint:
+        request.session['chat_last_destination'] = destination_hint
+
+    # If booking details are complete and the range is available, prepare a navigation action.
+    if booking_intent and start_date_req and end_date_req and persons_req:
+        requested_nights = max(0, (end_date_req - start_date_req).days)
+        if requested_nights <= 11 and _is_range_available(country, start_date_req, end_date_req, buffer_days=3):
+            tour = _pick_tour_for_booking(country, destination_hint)
+            if tour:
+                action['navigate'] = reverse('tour_detail', args=[tour.id])
+                action['prefill'] = {
+                    'start_date': start_date_req.strftime('%Y-%m-%d'),
+                    'end_date': end_date_req.strftime('%Y-%m-%d'),
+                    'persons': persons_req,
+                }
+
+    def event_stream():
+        full_text_parts: list[str] = []
+
+        # Prefer HuggingFace streaming when configured.
+        used_model = None
+        try:
+            if settings.HF_API_TOKEN and InferenceClient:
+                hf_model = getattr(settings, 'HF_MODEL', None) or 'mistralai/Mistral-7B-Instruct-v0.3'
+                used_model = hf_model
+                hf_client = InferenceClient(model=hf_model, token=settings.HF_API_TOKEN)
+                prompt = _build_llm_prompt(system_prompt, history)
+
+                # huggingface_hub can stream tokens for text_generation.
+                stream = hf_client.text_generation(
+                    prompt,
+                    max_new_tokens=int(getattr(settings, 'HF_MAX_NEW_TOKENS', 300) or 300),
+                    temperature=float(getattr(settings, 'HF_TEMPERATURE', 0.7) or 0.7),
+                    top_p=float(getattr(settings, 'HF_TOP_P', 0.95) or 0.95),
+                    stream=True,
+                    return_full_text=False,
+                )
+
+                for chunk in stream:
+                    # chunk can be a str or an object with `.token.text`
+                    token_text = None
+                    if isinstance(chunk, str):
+                        token_text = chunk
+                    else:
+                        token = getattr(chunk, 'token', None)
+                        token_text = getattr(token, 'text', None) if token is not None else None
+                    if not token_text:
+                        continue
+                    full_text_parts.append(token_text)
+                    yield _sse_pack({'type': 'delta', 'text': token_text})
+
+            elif settings.OPENAI_API_KEY:
+                used_model = getattr(settings, 'OPENAI_MODEL', None) or 'gpt-4o'
+                client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+                messages = [{"role": "system", "content": system_prompt}]
+                for msg in history:
+                    role = msg.role
+                    if role in {'bot', 'assistant'}:
+                        role = 'assistant'
+                    elif role != 'user':
+                        role = 'user'
+                    messages.append({"role": role, "content": msg.message})
+
+                response = client.chat.completions.create(
+                    model=used_model,
+                    messages=messages,
+                    max_tokens=300,
+                    temperature=0.7,
+                    stream=True,
+                )
+                for event in response:
+                    try:
+                        delta = event.choices[0].delta
+                        token_text = getattr(delta, 'content', None)
+                    except Exception:
+                        token_text = None
+                    if not token_text:
+                        continue
+                    full_text_parts.append(token_text)
+                    yield _sse_pack({'type': 'delta', 'text': token_text})
+            else:
+                # No model configured.
+                if lang == 'fr':
+                    fallback = "Le chatbot n’est pas configuré (clé HuggingFace/OpenAI manquante). Ajoute HF_API_TOKEN (et HF_MODEL) sur le serveur."
+                else:
+                    fallback = "Chat assistant isn’t configured (missing HuggingFace/OpenAI key). Set HF_API_TOKEN (and HF_MODEL) on the server."
+                full_text_parts.append(fallback)
+                yield _sse_pack({'type': 'delta', 'text': fallback})
+
+        except Exception as e:
+            logging.exception('[ai_chat_stream] streaming exception')
+
+            err = None
+            # Common case in this project: OpenAI key present but quota exhausted.
+            try:
+                is_rate_limit = isinstance(e, getattr(openai, 'RateLimitError', Exception))
+            except Exception:
+                is_rate_limit = False
+            msg = str(e or '').lower()
+            if is_rate_limit or 'insufficient_quota' in msg or 'exceeded your current quota' in msg:
+                if lang == 'fr':
+                    err = (
+                        "Le quota OpenAI est dépassé sur le serveur. "
+                        "Pour avoir un chat vraiment génératif + streaming, configure HuggingFace: HF_API_TOKEN et HF_MODEL."
+                    )
+                else:
+                    err = (
+                        "OpenAI quota is exceeded on the server. "
+                        "For a real generative + streaming chat, configure HuggingFace: set HF_API_TOKEN and HF_MODEL."
+                    )
+
+            if not err:
+                if lang == 'fr':
+                    err = "Désolé — le modèle IA a eu un problème. Réessaie dans un instant."
+                else:
+                    err = "Sorry — the AI model had an issue. Please try again in a moment."
+
+            full_text_parts = [err]
+            yield _sse_pack({'type': 'delta', 'text': err})
+
+        final_text = ''.join(full_text_parts).strip()
+        # Remove any action markers if the model emits them.
+        parsed_action, cleaned = parse_actions_from_response(final_text, country)
+        final_action = action or parsed_action or {}
+        final_text = cleaned.strip() if cleaned else final_text
+
+        try:
+            ChatMessage.objects.create(session_key=session_key, role='bot', message=final_text)
+        except Exception:
+            logging.exception('[ai_chat_stream] failed to store bot message')
+
+        yield _sse_pack({'type': 'final', 'text': final_text, 'action': final_action, 'model': used_model})
+
+    resp = StreamingHttpResponse(event_stream(), content_type='text/event-stream; charset=utf-8')
+    resp['Cache-Control'] = 'no-cache'
+    resp['X-Accel-Buffering'] = 'no'
+    return resp
 
 
 def _normalize_country(country: str) -> str:
@@ -260,6 +463,36 @@ def _build_country_catalog_context(country: str, user_message: str) -> str:
     """Build a compact, factual context from the DB for the current country."""
     country = _normalize_country(country)
 
+    # Country-level content (hero, etc.)
+    country_content_lines = []
+    try:
+        cc = CountryContent.objects.filter(country=country).first()
+        if cc:
+            if getattr(cc, 'hero_title', None):
+                country_content_lines.append(f"Hero title: {cc.hero_title}")
+            if getattr(cc, 'hero_subtitle', None):
+                subtitle = (cc.hero_subtitle or '').strip().replace('\n', ' ')
+                if subtitle:
+                    country_content_lines.append(f"Hero subtitle: {subtitle[:280]}")
+    except (OperationalError, ProgrammingError):
+        country_content_lines = []
+
+    # Main page sections
+    section_lines = []
+    try:
+        sections = list(Section.objects.filter(country=country).order_by('order')[:8])
+        for s in sections:
+            title = (getattr(s, 'title', '') or '').strip()
+            content = (getattr(s, 'content', '') or '').strip().replace('\n', ' ')
+            if not title and not content:
+                continue
+            if content:
+                section_lines.append(f"- {title}: {content[:320]}")
+            else:
+                section_lines.append(f"- {title}")
+    except (OperationalError, ProgrammingError):
+        section_lines = []
+
     try:
         tours_qs = (
             Tour.objects.filter(country=country)
@@ -321,6 +554,10 @@ def _build_country_catalog_context(country: str, user_message: str) -> str:
         info_lines = []
 
     parts = []
+    if country_content_lines:
+        parts.append("Site content:\n" + "\n".join(country_content_lines))
+    if section_lines:
+        parts.append("Site sections:\n" + "\n".join(section_lines))
     if catalog_lines:
         parts.append("Catalog:\n" + "\n".join(catalog_lines))
     if info_lines:
@@ -344,6 +581,183 @@ def _pick_tour_for_booking(country: str, destination_hint: str | None = None):
         return qs.select_related('destination').first()
     except (OperationalError, ProgrammingError):
         return None
+
+
+def _find_relevant_tours(country: str, destination_hint: str | None, limit: int = 3):
+    country = _normalize_country(country)
+    hint = (destination_hint or '').strip()
+    if not hint:
+        return []
+    try:
+        qs = (
+            Tour.objects.filter(country=country)
+            .select_related('destination')
+            .filter(
+                Q(destination__name__icontains=hint) |
+                Q(title__icontains=hint)
+            )
+            .order_by('id')
+        )
+        return list(qs[: max(1, int(limit))])
+    except (OperationalError, ProgrammingError):
+        return []
+
+
+def _resolve_destination_hint(country: str, message: str, parsed_hint: str | None):
+    """Try to resolve a destination/city from the message or DB."""
+    country = _normalize_country(country)
+    msg = (message or '').strip()
+    if parsed_hint:
+        return parsed_hint
+    if not msg:
+        return None
+
+    # If user replies with a single word/city like "Rabat"
+    if len(msg) <= 40 and ' ' not in msg:
+        try:
+            # Prefer destinations that actually have tours in this country.
+            dest = (
+                Destination.objects.filter(tours__country=country)
+                .distinct()
+                .filter(name__iexact=msg)
+                .first()
+            )
+            if dest:
+                return dest.name
+        except (OperationalError, ProgrammingError):
+            return msg
+        return msg
+
+    # Otherwise try to match any destination name contained in the message.
+    try:
+        dest = (
+            Destination.objects.filter(tours__country=country)
+            .distinct()
+            .filter(name__icontains=msg)
+            .order_by('name')
+            .first()
+        )
+        if dest:
+            return dest.name
+    except (OperationalError, ProgrammingError):
+        pass
+    return None
+
+
+def _detect_info_intent(message: str):
+    """Return set like {'price','activities','included'} based on the message."""
+    msg = (message or '').lower()
+    intents = set()
+    if any(w in msg for w in ['price', 'cost', 'prix', 'tarif', 'per night', 'par nuit', 'night', 'nuit']):
+        intents.add('price')
+    if any(w in msg for w in ['activity', 'activities', 'activités', 'activites', 'included', 'includes', 'inclus', 'comprend', 'what is included', 'inclusions', 'include']):
+        intents.add('activities')
+        intents.add('included')
+    if any(w in msg for w in ['transport', 'hotel', 'hébergement', 'hebergement']):
+        intents.add('included')
+    return intents
+
+
+def _format_tour_info_reply(
+    country: str,
+    tours,
+    intents: set[str],
+    lang: str,
+    include_booking_tip: bool = False,
+    include_admin_hint: bool = False,
+) -> str:
+    country_label = _country_label(country)
+    if not tours:
+        if lang == 'fr':
+            return f"Je n’ai trouvé aucun tour correspondant sur le site {country_label}. Tu peux me donner une autre ville/destination ?"
+        return f"I couldn’t find a matching tour on the {country_label} site. Can you share another destination/city?"
+
+    def _is_placeholder(text: str) -> bool:
+        t = (text or '').strip().lower()
+        return (not t) or t in {'test', 'todo', 'tbd', 'lorem', 'lorem ipsum'}
+
+    lines = []
+    for t in tours:
+        dest_name = getattr(t.destination, 'name', '') or ''
+        header = f"{t.title} ({dest_name})" if dest_name else t.title
+
+        if 'price' in intents:
+            if lang == 'fr':
+                line = f"- {header}: {t.price_per_night} par nuit."
+            else:
+                line = f"- {header}: {t.price_per_night} per night."
+            if getattr(t, 'is_promotion', False) and getattr(t, 'discount_percent', 0):
+                if lang == 'fr':
+                    line += f" Promo: -{t.discount_percent}%."
+                else:
+                    line += f" Promo: -{t.discount_percent}%."
+            lines.append(line)
+
+        if 'activities' in intents or 'included' in intents:
+            details = []
+            transport_val = (getattr(t, 'transport', '') or '').strip()
+            hotel_val = (getattr(t, 'hotel', '') or '').strip()
+            activities_val = (getattr(t, 'activities', '') or '').strip()
+
+            if transport_val:
+                details.append(("Transport" if lang == 'en' else "Transport") + f": {transport_val}")
+            if hotel_val:
+                details.append(("Hotel" if lang == 'en' else "Hôtel") + f": {hotel_val}")
+            if activities_val:
+                activities = [a.strip() for a in activities_val.replace('\n', ',').split(',') if a.strip()]
+                if activities:
+                    if lang == 'fr':
+                        details.append("Activités: " + ", ".join(activities[:10]) + ("" if len(activities) <= 10 else ", …"))
+                    else:
+                        details.append("Activities: " + ", ".join(activities[:10]) + ("" if len(activities) <= 10 else ", …"))
+
+            if details:
+                lines.append(f"- {header}: " + " | ".join(details))
+            else:
+                # Fallback: sometimes the tour/destination description contains inclusions.
+                tour_desc = (getattr(t, 'description', '') or '').strip()
+                dest_desc = (getattr(getattr(t, 'destination', None), 'description', '') or '').strip()
+                fallback_text = None
+                if not _is_placeholder(tour_desc) and len(tour_desc) >= 25:
+                    fallback_text = tour_desc
+                elif not _is_placeholder(dest_desc) and len(dest_desc) >= 25:
+                    fallback_text = dest_desc
+
+                if fallback_text:
+                    if lang == 'fr':
+                        lines.append(f"- {header}: Je n’ai pas une liste d’activités/inclusions structurée, mais voici la description disponible: {fallback_text[:260]}")
+                    else:
+                        lines.append(f"- {header}: I don’t have a structured inclusions/activities list, but here’s the available description: {fallback_text[:260]}")
+                else:
+                    if lang == 'fr':
+                        line = f"- {header}: Les activités/inclusions ne sont pas encore renseignées pour ce tour sur le site."
+                    else:
+                        line = f"- {header}: Activities/inclusions aren’t filled in for this tour on the site yet."
+
+                    # If the user asked about activities (not price), still provide the price as a helpful factual detail.
+                    if 'price' not in intents and getattr(t, 'price_per_night', None) is not None:
+                        if lang == 'fr':
+                            line += f" Prix actuel: {t.price_per_night} par nuit."
+                        else:
+                            line += f" Current price: {t.price_per_night} per night."
+                    if include_admin_hint:
+                        try:
+                            admin_url = reverse('admin:core_tour_change', args=[t.id])
+                            if lang == 'fr':
+                                line += f" (Admin: {admin_url})"
+                            else:
+                                line += f" (Admin: {admin_url})"
+                        except Exception:
+                            pass
+                    lines.append(line)
+
+    if include_booking_tip:
+        if lang == 'fr':
+            lines.append("Si tu me donnes tes dates + nombre de personnes, je peux aussi vérifier la disponibilité et pré-remplir la réservation.")
+        else:
+            lines.append("If you share your dates + number of people, I can also check availability and prefill the booking.")
+
+    return "\n".join(lines)
 
 
 def home(request):
@@ -583,11 +997,32 @@ def ai_chat(request):
     action = {}
     lang = _detect_language(message)
 
-    # Booking intelligence (works even without OpenAI credits)
     booking_intent = any(k in message.lower() for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
-    start_date_req, end_date_req, persons_req, destination_hint = _extract_booking_details(message)
+    include_admin_hint = bool(getattr(request, 'user', None) and getattr(request.user, 'is_staff', False))
 
-    if booking_intent:
+    # Parse once, reuse everywhere
+    start_date_req, end_date_req, persons_req, parsed_dest = _extract_booking_details(message)
+    destination_hint = _resolve_destination_hint(country, message, parsed_dest)
+    if destination_hint:
+        request.session['chat_last_destination'] = destination_hint
+    else:
+        destination_hint = request.session.get('chat_last_destination')
+
+    # DB-backed informational Q&A (price / activities / what's included) — highest priority
+    info_intents = _detect_info_intent(message)
+    if info_intents and not bot_reply:
+        tours = _find_relevant_tours(country, destination_hint, limit=3) if destination_hint else []
+        bot_reply = _format_tour_info_reply(
+            country,
+            tours,
+            info_intents,
+            lang,
+            include_booking_tip=booking_intent,
+            include_admin_hint=include_admin_hint,
+        )
+
+    # Booking intelligence (works even without OpenAI credits)
+    if booking_intent and not bot_reply:
         # If dates provided, validate rules + availability first.
         if start_date_req and end_date_req:
             requested_nights = max(0, (end_date_req - start_date_req).days)
@@ -661,6 +1096,18 @@ def ai_chat(request):
                     )
                 else:
                     bot_reply = "Sure — tell me your dates and number of people and I’ll check availability."
+
+    # If user sends just a destination name, be helpful instead of resetting the conversation
+    if not bot_reply and destination_hint:
+        tours = _find_relevant_tours(country, destination_hint, limit=2)
+        bot_reply = _format_tour_info_reply(
+            country,
+            tours,
+            {'price', 'activities'},
+            lang,
+            include_booking_tip=False,
+            include_admin_hint=include_admin_hint,
+        )
 
     try:
         history = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')[:20]

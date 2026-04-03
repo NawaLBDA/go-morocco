@@ -76,6 +76,10 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 
 # HuggingFace Mistral (laissez vide si pas de clé)
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN", "")
+HF_MODEL = os.environ.get("HF_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
+HF_MAX_NEW_TOKENS = int(os.environ.get("HF_MAX_NEW_TOKENS", "300"))
+HF_TEMPERATURE = float(os.environ.get("HF_TEMPERATURE", "0.7"))
+HF_TOP_P = float(os.environ.get("HF_TOP_P", "0.95"))
 
 # ==============================
 # APPLICATIONS
