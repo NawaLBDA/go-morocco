@@ -154,7 +154,6 @@
             <div class="col-12 col-md-6">
               <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
-                  <div class="fw-bold fs-5">{{ tour.title }}</div>
                   <div class="text-muted">
                     <i class="fa-solid fa-location-dot text-success"></i>
                     {{ tour.destination.name }}
@@ -166,21 +165,6 @@
                 {% endif %}
               </div>
 
-              <div class="d-flex flex-wrap gap-2 mt-2">
-                {% if tour.transport %}
-                  <span class="badge rounded-pill text-bg-light border"><i class="fa-solid fa-car me-1"></i>{{ tour.transport|truncatechars:18 }}</span>
-                {% endif %}
-                {% if tour.hotel %}
-                  <span class="badge rounded-pill text-bg-light border"><i class="fa-solid fa-hotel me-1"></i>{{ tour.hotel|truncatechars:18 }}</span>
-                {% endif %}
-                {% if tour.activities %}
-                  <span class="badge rounded-pill text-bg-light border"><i class="fa-solid fa-star me-1"></i>{{ tour.activities|truncatechars:24 }}</span>
-                {% endif %}
-              </div>
-
-              {% if tour.description %}
-                <div class="text-muted small mt-2">{{ tour.description|truncatewords:20 }}</div>
-              {% endif %}
             </div>
 
             <div class="col-12 col-md-3">
