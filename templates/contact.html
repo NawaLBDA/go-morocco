@@ -2,104 +2,131 @@
 {% block page %}contact{% endblock %}
 {% block content %}
 
-<section class="container my-5">
-  <div class="row g-4 align-items-stretch">
-    <div class="col-lg-5">
-      <div class="card border-0 shadow-sm h-100 overflow-hidden">
-        <div class="card-body">
-          <span class="text-uppercase text-primary fw-semibold small">CONTACT</span>
-          <h2 class="fw-bold mt-2">Fast support</h2>
-          <p class="text-muted mt-3 mb-4">
-            Questions, quotes, or bookings — message us anytime. We reply quickly.
-          </p>
+<section class="container my-5 contact-page">
+  <div class="contact-shell">
+    <div class="contact-header">
+      <span class="text-uppercase text-primary fw-semibold small">Contact</span>
+      <h1 class="fw-bold mt-2 mb-2">How can we help?</h1>
+      <p class="text-muted mb-0">
+        Questions, quotes, or bookings — send a message and we’ll respond quickly.
+      </p>
+    </div>
 
-          <div class="d-flex gap-2 flex-wrap">
-            <a class="btn btn-success" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
-              <i class="fa-brands fa-whatsapp me-1"></i>
-              WhatsApp
-            </a>
-            <a class="btn btn-outline-primary" href="mailto:{{ support_email }}">
-              <i class="fa-solid fa-envelope me-1"></i>
-              Email
-            </a>
+    <div class="row g-4 align-items-stretch mt-1">
+      <div class="col-lg-5">
+        <div class="contact-card h-100">
+          <div class="d-flex align-items-start gap-3">
+            <div class="contact-icon">
+              <i class="fa-solid fa-headset"></i>
+            </div>
+            <div>
+              <div class="fw-bold">Fast support</div>
+              <div class="text-muted small">Usually same-day replies.</div>
+            </div>
           </div>
 
-          <div class="mt-4">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="fa-solid fa-location-dot text-danger"></i>
-              <span class="fw-semibold">
-                {% if country == 'ireland' %}Ireland{% else %}Morocco{% endif %}
-              </span>
-              <span class="text-muted small">
-                {% if country == 'ireland' %}(local driver tours){% else %}(local operations){% endif %}
-              </span>
+          <div class="contact-actions mt-3">
+            <a class="btn btn-success w-100" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
+              <i class="fa-brands fa-whatsapp me-1"></i>
+              Chat on WhatsApp
+            </a>
+            <a class="btn btn-outline-primary w-100" href="mailto:{{ support_email }}">
+              <i class="fa-solid fa-envelope me-1"></i>
+              Email support
+            </a>
+            <div class="contact-meta small text-muted">
+              <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-at"></i>
+                <span>{{ support_email }}</span>
+              </div>
             </div>
+          </div>
 
-            <div class="small text-muted">
-              <div class="fw-semibold text-dark mb-1">To help us reply faster</div>
+          <hr class="my-4">
+
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="fa-solid fa-location-dot text-danger"></i>
+            <span class="fw-semibold">
+              {% if country == 'ireland' %}Ireland{% else %}Morocco{% endif %}
+            </span>
+            <span class="text-muted small">
+              {% if country == 'ireland' %}(local driver tours){% else %}(local operations){% endif %}
+            </span>
+          </div>
+
+          <details class="contact-details" open>
+            <summary class="fw-semibold">To help us reply faster</summary>
+            <div class="mt-2 text-muted small">
               <ul class="mb-0 ps-3">
                 <li>dates + number of people</li>
                 <li>cities / itinerary</li>
                 <li>budget level (economy / mid-range / premium)</li>
               </ul>
             </div>
-          </div>
+          </details>
 
           <div class="alert alert-light border mt-4 mb-0 small">
-            Tip: WhatsApp is the fastest way to reach us.
+            Tip: WhatsApp is usually the fastest option.
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="col-lg-7">
-      <div class="card p-4 border-0 shadow-sm h-100">
-        <h3 class="fw-bold mb-2">Send a message</h3>
-        <p class="text-muted mb-3">Share your plan in 2–3 lines — we’ll take it from there.</p>
-
-        <details class="mb-4">
-          <summary class="fw-semibold">What to include (optional)</summary>
-          <div class="mt-2 text-muted small">
-            Example:
-            {% if country == 'ireland' %}
-              “2 days, Dublin + Cliffs of Moher, 2 people, morning pickup, evening drop-off.”
-            {% else %}
-              “7 days, Marrakech + Sahara, 2 people, mid-range, hotels + activities.”
-            {% endif %}
+      <div class="col-lg-7">
+        <div class="contact-form h-100">
+          <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+            <div>
+              <h2 class="h4 fw-bold mb-1">Send a message</h2>
+              <div class="text-muted">Share your plan in 2–3 lines — we’ll take it from there.</div>
+            </div>
+            <div class="text-muted small d-none d-md-block">Secure form • No spam</div>
           </div>
-        </details>
 
-        <form method="post">
-          {% csrf_token %}
+          <details class="mb-4">
+            <summary class="fw-semibold">Example message (optional)</summary>
+            <div class="mt-2 text-muted small">
+              {% if country == 'ireland' %}
+                “2 days, Dublin + Cliffs of Moher, 2 people, morning pickup, evening drop-off.”
+              {% else %}
+                “7 days, Marrakech + Sahara, 2 people, mid-range, hotels + activities.”
+              {% endif %}
+            </div>
+          </details>
 
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Name</label>
-              <input name="name" class="form-control" required>
+          <form method="post" class="contact-form-fields">
+            {% csrf_token %}
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Name</label>
+                <input name="name" class="form-control" autocomplete="name" required>
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-control" autocomplete="email" required>
+              </div>
             </div>
 
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Email</label>
-              <input type="email" name="email" class="form-control" required>
+            <div class="mb-3">
+              <label class="form-label">Subject</label>
+              <input name="subject" class="form-control" placeholder="Quote / Question / Booking">
             </div>
-          </div>
 
-          <div class="mb-3">
-            <label class="form-label">Subject</label>
-            <input name="subject" class="form-control" placeholder="Quote / Question / Booking">
-          </div>
+            <div class="mb-3">
+              <label class="form-label">Message</label>
+              <textarea name="message" class="form-control" rows="6" required
+                        placeholder="{% if country == 'ireland' %}Example: 2 days, Dublin + Cliffs of Moher, 2 people...{% else %}Example: 7 days, Marrakech + Sahara, 2 people, mid-range budget...{% endif %}"></textarea>
+            </div>
 
-          <div class="mb-3">
-            <label class="form-label">Message</label>
-            <textarea name="message" class="form-control" rows="6" required
-                      placeholder="{% if country == 'ireland' %}Example: 2 days, Dublin + Cliffs of Moher, 2 people...{% else %}Example: 7 days, Marrakech + Sahara, 2 people, mid-range budget...{% endif %}"></textarea>
-          </div>
-
-          <button class="btn btn-primary px-4">
-            <i class="fa-solid fa-paper-plane me-1"></i>
-            Send
-          </button>
-        </form>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <button class="btn btn-primary px-4">
+                <i class="fa-solid fa-paper-plane me-1"></i>
+                Send message
+              </button>
+              <span class="text-muted small">We usually reply within a few hours.</span>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
