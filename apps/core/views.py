@@ -539,7 +539,8 @@ def blog_detail(request, slug):
 
 
 def about(request):
-    return redirect(reverse('home') + '#about-us')
+    country = get_country_from_site(request)
+    return render(request, 'about.html', {'country': country})
 
 
 def contact(request):
