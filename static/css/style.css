@@ -2000,6 +2000,48 @@ body[data-page="reservations"] .reservations-tours{
   margin-bottom: 220px;
 }
 
+/* Reservations page: cleaner layout */
+body[data-page="reservations"] .quick-chips .badge{
+  padding: .55rem .8rem;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+body[data-page="reservations"] .steps-card .step-row{
+  padding: 6px 0;
+}
+
+body[data-page="reservations"] .steps-card .step-badge{
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+  flex: 0 0 34px;
+}
+
+body[data-page="reservations"] .reservations-sticky{
+  position: sticky;
+  top: calc(var(--topbar-h) + 18px);
+}
+
+@media (max-width: 991.98px){
+  body[data-page="reservations"] .reservations-sticky{ position: static; }
+}
+
+body[data-page="reservations"] .reservations-search .btn-outline-secondary{
+  white-space: nowrap;
+}
+
+@media (max-width: 767.98px){
+  body[data-page="reservations"] .reservations-search .col-12.col-md-2 .d-flex{
+    flex-direction: column;
+  }
+}
+
 /* Footer toujours en bas */
 .site-footer {
   flex-shrink: 0;

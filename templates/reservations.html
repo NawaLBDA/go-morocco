@@ -6,7 +6,7 @@
 {% block title %}{{ brand_name }} | Reservations{% endblock %}
 
 {% block content %}
-<section class="container my-5">
+<section class="container my-5 reservations-hero">
   <div class="row align-items-center g-4">
     <div class="col-lg-7">
       <span class="text-uppercase text-primary fw-semibold small">RESERVATIONS</span>
@@ -19,27 +19,33 @@
         {% endif %}
       </p>
 
-      <div class="card border-0 shadow-sm mt-4">
+      <div class="d-flex flex-wrap gap-2 mt-3 quick-chips">
+        <span class="badge rounded-pill text-bg-light border"><i class="fa-solid fa-bolt me-1 text-primary"></i>Fast replies</span>
+        <span class="badge rounded-pill text-bg-light border"><i class="fa-solid fa-headset me-1 text-primary"></i>Personal support</span>
+        <span class="badge rounded-pill text-bg-light border"><i class="fa-solid fa-route me-1 text-primary"></i>Tailored planning</span>
+      </div>
+
+      <div class="card border-0 shadow-sm mt-4 steps-card">
         <div class="card-body">
-          <div class="d-flex gap-3 align-items-start mb-3">
-            <div class="badge rounded-pill text-bg-dark">Step 1</div>
+          <div class="d-flex gap-3 align-items-start mb-3 step-row">
+            <div class="step-badge">1</div>
             <div>
-              <div class="fw-bold">Select your preferred itinerary</div>
-              <div class="text-muted">Choose a tour below (or search by destination).</div>
+              <div class="fw-bold">Pick a tour</div>
+              <div class="text-muted">Use the list below or search by destination.</div>
             </div>
           </div>
-          <div class="d-flex gap-3 align-items-start mb-3">
-            <div class="badge rounded-pill text-bg-dark">Step 2</div>
+          <div class="d-flex gap-3 align-items-start mb-3 step-row">
+            <div class="step-badge">2</div>
             <div>
-              <div class="fw-bold">Submit your reservation request</div>
-              <div class="text-muted">Pick your dates & persons on the tour page.</div>
+              <div class="fw-bold">Choose dates & travelers</div>
+              <div class="text-muted">Open the tour page to select dates and number of people.</div>
             </div>
           </div>
-          <div class="d-flex gap-3 align-items-start">
-            <div class="badge rounded-pill text-bg-dark">Step 3</div>
+          <div class="d-flex gap-3 align-items-start step-row">
+            <div class="step-badge">3</div>
             <div>
-              <div class="fw-bold">Receive confirmation & travel details</div>
-              <div class="text-muted">We’ll send preparation details once validated.</div>
+              <div class="fw-bold">Confirmation & details</div>
+              <div class="text-muted">We confirm availability and share the next steps.</div>
             </div>
           </div>
 
@@ -60,16 +66,35 @@
     </div>
 
     <div class="col-lg-5">
-      <div class="card border-0 shadow-sm overflow-hidden">
-        <img
-          src="{% if country == 'ireland' %}{% static 'img/reservation-ir.webp' %}?v=20260402_3{% else %}{% static 'img/reservation.webp' %}?v=20260402_3{% endif %}"
-          alt="{% if country == 'ireland' %}Reservations in Ireland{% else %}Reservations in Morocco{% endif %}"
-          width="800" height="360" decoding="async"
-          style="width:100%;height:360px;object-fit:cover;">
-        <div class="card-body">
-          <div class="fw-bold">You book your flight.</div>
-          <div class="text-muted">We take care of everything else.</div>
+      <div class="reservations-sticky">
+        <div class="card border-0 shadow-sm overflow-hidden">
+          <img
+            src="{% if country == 'ireland' %}{% static 'img/reservation-ir.webp' %}?v=20260402_3{% else %}{% static 'img/reservation.webp' %}?v=20260402_3{% endif %}"
+            alt="{% if country == 'ireland' %}Reservations in Ireland{% else %}Reservations in Morocco{% endif %}"
+            width="800" height="320" decoding="async"
+            style="width:100%;height:320px;object-fit:cover;">
+          <div class="card-body">
+            <div class="fw-bold">You book your flight.</div>
+            <div class="text-muted">We help you plan everything else.</div>
+
+            <hr class="my-3">
+
+            <div class="small text-muted mb-2">Need help choosing the best option?</div>
+            <a class="btn btn-success w-100" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
+              <i class="fa-brands fa-whatsapp me-1"></i>
+              Chat on WhatsApp
+            </a>
+          </div>
         </div>
+
+        <details class="mt-3">
+          <summary class="fw-semibold">FAQ</summary>
+          <div class="mt-2 text-muted small">
+            <div class="mb-2"><span class="fw-semibold text-dark">How long does confirmation take?</span><br>Usually same day (often within a few hours).</div>
+            <div class="mb-2"><span class="fw-semibold text-dark">Can I customize a tour?</span><br>Yes — message us your dates and preferences.</div>
+            <div><span class="fw-semibold text-dark">Do you help with hotels/activities?</span><br>Yes, depending on the tour package.</div>
+          </div>
+        </details>
       </div>
     </div>
   </div>
@@ -79,10 +104,10 @@
   <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
     <div>
       <h2 class="fw-bold mb-1">Available Tours</h2>
-      <div class="text-muted">List view for fast comparison.</div>
+      <div class="text-muted">List view for fast comparison.{% if tours %} <span class="ms-1">({{ tours|length }} found)</span>{% endif %}</div>
     </div>
 
-    <form method="get" class="row g-2" style="min-width: min(100%, 760px);">
+    <form method="get" class="row g-2 reservations-search" style="min-width: min(100%, 760px);">
       <div class="col-12 col-md-4">
          <input name="q" class="form-control" value="{{ search_q|default:'' }}"
            placeholder="Destination or tour name" aria-label="Destination or tour name">
@@ -96,7 +121,15 @@
            value="{{ search_end_date|default:'' }}" aria-label="End date">
       </div>
       <div class="col-12 col-md-2">
-        <button class="btn btn-primary w-100">Search</button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary w-100">
+            <i class="fa-solid fa-magnifying-glass me-1"></i>
+            Search
+          </button>
+          <a class="btn btn-outline-secondary" href="{% url 'reservations' %}" aria-label="Clear filters">
+            Clear
+          </a>
+        </div>
       </div>
     </form>
   </div>
@@ -175,6 +208,9 @@
     <div class="alert alert-warning">
       No tours match your search for the selected dates.
       Try another destination or adjust the date range.
+      <div class="mt-3">
+        <a class="btn btn-outline-secondary" href="{% url 'reservations' %}">Clear filters</a>
+      </div>
     </div>
   {% endif %}
 </section>
