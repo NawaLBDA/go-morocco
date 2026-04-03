@@ -87,6 +87,16 @@
         <h4 class="fw-bold mb-3">About this tour</h4>
         <p>{{ tour.description|linebreaks }}</p>
 
+        {% if activities_list %}
+          <hr class="my-4">
+          <h5 class="fw-bold mb-2">Activities</h5>
+          <div class="d-flex flex-wrap gap-2">
+            {% for a in activities_list %}
+              <span class="badge rounded-pill text-bg-light border text-secondary">{{ a }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
         {% if tour.destination.description %}
           <hr class="my-4">
           <h5 class="fw-bold mb-2">About {{ tour.destination.name }}</h5>
@@ -300,6 +310,10 @@
     
     <label class="fw-bold">Dates</label>
 
+    <div class="text-muted small mb-2">
+      Max duration: {{ booking_max_nights|default:11 }} nights. Unavailable dates include a {{ booking_buffer_days|default:3 }}-day buffer after each trip.
+    </div>
+
     <input type="text" id="start_date" name="start_date"
            class="form-control booking-date mb-2"
            placeholder="Start date" autocomplete="off" required>
@@ -311,6 +325,11 @@
     <div id="dateWarning" class="alert alert-warning py-2 px-3 small d-none mt-2">
       <i class="fa-solid fa-triangle-exclamation me-1"></i>
       This date range is already booked. Please select another date.
+    </div>
+
+    <div id="durationWarning" class="alert alert-warning py-2 px-3 small d-none mt-2">
+      <i class="fa-solid fa-triangle-exclamation me-1"></i>
+      Maximum allowed duration is <span id="maxNightsLabel">11</span> nights.
     </div>
 
     <div class="d-flex justify-content-between align-items-center small text-muted mb-3">
@@ -446,17 +465,28 @@ document.addEventListener("DOMContentLoaded", function () {
   const totalOutput  = document.getElementById("live-price");
   const nightsOutput = document.getElementById("live-nights");
   const dateWarning  = document.getElementById("dateWarning");
+  const durationWarning = document.getElementById("durationWarning");
 
   // ✅ si pas de form => stop calendrier فقط
   if (!startInput || !endInput || !personsInput || !basePriceEl) return;
 
   const basePrice = parseFloat(basePriceEl.value || "0");
   const disabledRanges = {{ disabled_ranges|default:"[]"|safe }};
+  const MAX_NIGHTS = parseInt("{{ booking_max_nights|default:11 }}", 10);
+
+  const maxNightsLabel = document.getElementById('maxNightsLabel');
+  if (maxNightsLabel && Number.isFinite(MAX_NIGHTS)) maxNightsLabel.textContent = String(MAX_NIGHTS);
 
   function showDateWarning(show=true){
     if (!dateWarning) return;
     if (show) dateWarning.classList.remove("d-none");
     else dateWarning.classList.add("d-none");
+  }
+
+  function showDurationWarning(show=true){
+    if (!durationWarning) return;
+    if (show) durationWarning.classList.remove('d-none');
+    else durationWarning.classList.add('d-none');
   }
 
   function rangesOverlap(aStart, aEnd, bStart, bEnd){
@@ -490,6 +520,15 @@ document.addEventListener("DOMContentLoaded", function () {
       if (nightsOutput) nightsOutput.textContent = "—";
       return;
     }
+
+    if (Number.isFinite(MAX_NIGHTS) && nights > MAX_NIGHTS){
+      if (nightsOutput) nightsOutput.textContent = "—";
+      showDurationWarning(true);
+      totalOutput.textContent = '0 $';
+      return;
+    }
+
+    showDurationWarning(false);
 
     if (nightsOutput) nightsOutput.textContent = nights + (nights === 1 ? " night" : " nights");
 
@@ -526,16 +565,29 @@ document.addEventListener("DOMContentLoaded", function () {
     const s = startDate.dateInstance;
     const e = endDate.dateInstance;
 
+    const nights = Math.round((e - s) / (1000 * 60 * 60 * 24));
+    if (Number.isFinite(MAX_NIGHTS) && nights > MAX_NIGHTS) {
+      startInput.value = "";
+      endInput.value = "";
+      picker.clearSelection();
+      calculateTotal();
+      showDateWarning(false);
+      showDurationWarning(true);
+      return;
+    }
+
     if (isRangeConflict(s, e)) {
       startInput.value = "";
       endInput.value = "";
       picker.clearSelection();
       calculateTotal();
       showDateWarning(true);
+      showDurationWarning(false);
       return;
     }
 
     showDateWarning(false);
+    showDurationWarning(false);
     calculateTotal();
   });
 

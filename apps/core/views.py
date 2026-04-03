@@ -166,12 +166,26 @@ def tour_detail(request, tour_id):
             tour=tour
         ).exclude(status__in=["rejected", "cancelled"]).order_by("-created_at").first()
 
-    # disable ranges for booked reservations
-    reservations = Reservation.objects.filter(tour=tour, status='booked')
+    # Single group booking rules:
+    # - block any already reserved dates across ALL tours in the same country
+    # - include pending + booked
+    # - add a buffer after each tour so the group can reset/prep
+    buffer_days = 3
+    active_statuses = ['pending', 'booked']
+
+    active_reservations = Reservation.objects.filter(
+        tour__country=country,
+        status__in=active_statuses,
+    )
+    if request.user.is_authenticated:
+        active_reservations = active_reservations.exclude(user=request.user)
 
     disabled_ranges = [
-        {"from": r.start_date.isoformat(), "to": (r.end_date + timedelta(days=2)).isoformat()}
-        for r in reservations
+        {
+            "from": r.start_date.isoformat(),
+            "to": (r.end_date + timedelta(days=buffer_days)).isoformat(),
+        }
+        for r in active_reservations.order_by('start_date')
     ]
 
     tour.promo_price = None
@@ -184,7 +198,9 @@ def tour_detail(request, tour_id):
         "disabled_ranges": disabled_ranges,
         "today": date.today(),  # ✅ IMPORTANT
         "STRIPE_PUBLIC_KEY": settings.STRIPE_PUBLIC_KEY,
-        "activities_list": [activity.strip() for activity in tour.activities.split(',')] if tour.activities else [],
+        "activities_list": [a.strip() for a in (tour.activities or '').replace('\n', ',').split(',') if a.strip()],
+        "booking_max_nights": 11,
+        "booking_buffer_days": buffer_days,
     })
 
 

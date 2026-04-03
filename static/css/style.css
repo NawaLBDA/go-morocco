@@ -1985,29 +1985,6 @@ body[data-page="blog"] .site-content{
   padding-bottom: 220px;
 }
 
-/* Contact page: clean + professional (light) */
-body[data-page="contact"] .contact-shell{
-  padding: 0;
-}
-
-body[data-page="contact"] .contact-card,
-body[data-page="contact"] .contact-form{
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  border-radius: 14px;
-  padding: 18px;
-  box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
-}
-
-@media (min-width: 992px){
-  body[data-page="contact"] .contact-card,
-  body[data-page="contact"] .contact-form{ padding: 22px; }
-}
-
-body[data-page="contact"] .contact-page .btn{
-  border-radius: 12px;
-}
-
 /* Admin reservations: keep comfortable space before footer */
 body[data-page="admin-reservations"] .site-content{
   min-height: 100vh;
@@ -2021,6 +1998,14 @@ body[data-page="admin-reservations"] .admin-page-spacer{
 /* Reservations should never visually sit on the footer */
 body[data-page="reservations"] .reservations-tours{
   margin-bottom: 220px;
+}
+
+/* Booking: activity badges should look subtle */
+.booking-section .badge.text-bg-light.border.text-secondary{
+  background: rgba(255,255,255,0.9) !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  color: rgba(15, 23, 42, 0.70) !important;
+  font-weight: 600;
 }
 
 /* Footer toujours en bas */

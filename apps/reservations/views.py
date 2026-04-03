@@ -102,18 +102,40 @@ def book_tour(request, tour_id):
         messages.error(request, "Invalid date range")
         return redirect("tour_detail", tour_id=tour.id)
 
-    # ✅ conflit seulement avec BOOKED (pas pending)
-    # Bloquer si une réservation existe dans le même mois
-    conflict = Reservation.objects.filter(
-        tour=tour,
-        status="booked",
-        start_date__year=start_date.year,
-        start_date__month=start_date.month
-    ).exclude(user=request.user).exists()
-
-    if conflict:
-        messages.error(request, "❌ This month is already fully booked. Please choose another month.")
+    # ✅ business rule: reservations must not exceed 11 nights
+    max_nights = 11
+    if nights > max_nights:
+        messages.error(request, f"Maximum allowed duration is {max_nights} nights.")
         return redirect("tour_detail", tour_id=tour.id)
+
+    # ✅ single-group rule:
+    # Block ANY overlap with other active reservations across the same country,
+    # plus a buffer after the existing trip for reset/prep.
+    buffer_days = 3
+    active_statuses = ["pending", "booked"]
+    window_start = start_date - timedelta(days=buffer_days)
+    window_end = end_date + timedelta(days=buffer_days)
+
+    candidates = Reservation.objects.filter(
+        tour__country=tour.country,
+        status__in=active_statuses,
+        start_date__lte=window_end,
+        end_date__gte=window_start,
+    ).exclude(user=request.user)
+
+    def _overlaps(a_start, a_end, b_start, b_end):
+        return a_start <= b_end and a_end >= b_start
+
+    for r in candidates.order_by('start_date'):
+        blocked_start = r.start_date
+        blocked_end = r.end_date + timedelta(days=buffer_days)
+        if _overlaps(start_date, end_date, blocked_start, blocked_end):
+            messages.error(
+                request,
+                "❌ These dates are unavailable (our group is already booked). "
+                "Please choose another date range."
+            )
+            return redirect("tour_detail", tour_id=tour.id)
 
     # total
     base_price = Decimal(tour.price_per_night)
@@ -128,16 +150,16 @@ def book_tour(request, tour_id):
     if persons >= 5:
         total = (total * Decimal("0.90")).quantize(Decimal("0.01"))
 
-    # ✅ If user has pending/booked reservation, cancel it first (modification)
-    existing = Reservation.objects.filter(
+    # ✅ single-group: user can only have one active reservation per country.
+    # If they submit new dates, cancel any previous active reservation in this country.
+    existing_qs = Reservation.objects.filter(
         user=request.user,
-        tour=tour
-    ).exclude(status__in=["cancelled", "rejected"]).first()
+        tour__country=tour.country,
+    ).exclude(status__in=["cancelled", "rejected"]).order_by('-created_at')
 
-    if existing:
-        existing.status = "cancelled"
-        existing.save()
-        messages.info(request, "ℹ️ Your previous booking has been updated with new dates.")
+    if existing_qs.exists():
+        existing_qs.update(status="cancelled")
+        messages.info(request, "ℹ️ Your previous booking was updated with new dates.")
 
     Reservation.objects.create(
         user=request.user,
