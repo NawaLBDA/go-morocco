@@ -230,7 +230,26 @@ img{max-width:100%}
 }
 
 .hero-ctas{
-  margin:18px 0 14px;
+  margin:18px 0 22px;
+}
+
+/* Ireland hero headline sizing: match Morocco style (main/sub lines) */
+.theme-ireland .hero-headline .hero-headline-main,
+.theme-ireland .hero-headline .hero-headline-sub{
+  display:block;
+}
+
+.theme-ireland .hero-headline .hero-headline-main{
+  font-size:clamp(2.1rem, 3.3vw, 3.1rem);
+  line-height:1.08;
+}
+
+.theme-ireland .hero-headline .hero-headline-sub{
+  margin-top:.35rem;
+  font-size:clamp(1.1rem, 1.55vw, 1.5rem);
+  line-height:1.2;
+  font-weight:600;
+  opacity:.96;
 }
 
 .btn-outline-light{
