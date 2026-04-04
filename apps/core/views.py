@@ -558,6 +558,9 @@ def ai_chat_stream(request):
         "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
         + language_instruction +
         "Be conversational, natural, and helpful. Ask 1 short follow-up question when needed. "
+        "When the user greets (hello/hi/salut/salam) or asks to start (e.g., 'can I ask?'), greet warmly and say: "
+        f"'Hello! Your virtual assistant is ready for {country_label}. You can ask in English or French about tours, booking, and travel tips.' "
+        "Then invite their question. "
         "Do NOT repeat or dump the provided site context verbatim; never echo long blocks of text. "
         "Only include booking navigation markers when the user explicitly asks to book AND provides a date range AND number of people, "
         "AND the mentioned tour/destination exists on this site AND the dates are available. "
@@ -820,6 +823,8 @@ def ai_chat_stream(request):
     def event_stream():
         full_text_parts: list[str] = []
 
+        llm_available = bool(getattr(settings, 'HF_API_TOKEN', '') or getattr(settings, 'OPENAI_API_KEY', ''))
+
         if getattr(settings, 'CHAT_DEBUG', False):
             yield _sse_pack({
                 'type': 'debug',
@@ -830,15 +835,15 @@ def ai_chat_stream(request):
                 'session_memory': session_memory,
             })
 
-        # Avoid hitting external LLM providers for simple greetings.
-        if _is_greeting(message) and not getattr(settings, 'CHAT_FORCE_LLM', False):
+        # If no LLM is configured, fall back to deterministic responses.
+        if _is_greeting(message) and (not llm_available or not getattr(settings, 'CHAT_FORCE_LLM', False)):
             greet = _greeting_reply(country, lang)
             greet = _redact_secrets(greet)
             yield _sse_pack({'type': 'delta', 'text': greet})
             yield _sse_pack({'type': 'final', 'text': greet, 'action': action or {}, 'model': None})
             return
 
-        if deterministic_reply and not getattr(settings, 'CHAT_FORCE_LLM', False):
+        if deterministic_reply and (not llm_available or not getattr(settings, 'CHAT_FORCE_LLM', False)):
             reply = _redact_secrets(deterministic_reply)
             yield _sse_pack({'type': 'delta', 'text': reply})
             yield _sse_pack({'type': 'final', 'text': reply, 'action': action or {}, 'model': None})
@@ -2217,6 +2222,9 @@ def ai_chat(request):
             "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
             + language_instruction +
             "Be conversational, concise, and helpful. Ask 1 short follow-up question when needed. "
+            "When the user greets (hello/hi/salut/salam) or asks to start (e.g., 'can I ask?'), greet warmly and say: "
+            f"'Hello! Your virtual assistant is ready for {country_label}. You can ask in English or French about tours, booking, and travel tips.' "
+            "Then invite their question. "
             "Do NOT repeat or dump the provided site context verbatim; never echo long blocks of text. "
             "Do NOT tell the user to type a specific magic command like 'book ...'. Instead, understand natural language and ask for missing info. "
             "Only include booking navigation markers when the user explicitly asks to book AND provides a date range AND number of people, "

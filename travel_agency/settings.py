@@ -86,7 +86,8 @@ HF_TEMPERATURE = float(os.environ.get("HF_TEMPERATURE", "0.7"))
 HF_TOP_P = float(os.environ.get("HF_TOP_P", "0.95"))
 
 # Chat behavior
-CHAT_FORCE_LLM = os.environ.get("CHAT_FORCE_LLM", "False") == "True"
+# Default to generative answers when a provider key is configured.
+CHAT_FORCE_LLM = os.environ.get("CHAT_FORCE_LLM", "True") == "True"
 
 # Chat debugging / session memory (safe metadata only; never logs secrets)
 CHAT_DEBUG = os.environ.get("CHAT_DEBUG", "False") == "True"
