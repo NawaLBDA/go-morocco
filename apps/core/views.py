@@ -525,6 +525,7 @@ def ai_chat_stream(request):
         return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
 
     country = _normalize_country(get_country_from_site(request) or 'morocco')
+    country_label = _country_label(country)
     # Privacy: do NOT store chat messages in DB.
 
     request_id = uuid.uuid4().hex
@@ -543,13 +544,26 @@ def ai_chat_stream(request):
 
     lang = getattr(settings, 'CHAT_FORCE_LANGUAGE', '') or _detect_language(message)
     history = []
-    country_label = _country_label(country)
+    welcome_should_show = _welcome_should_show(request)
+    welcome_enabled = bool(welcome_should_show and _is_starting_chat(message))
+    if welcome_enabled:
+        # Mark as shown immediately; streaming responses can't reliably persist session writes inside the generator.
+        _mark_welcome_shown(request)
+
     site_context = _build_country_catalog_context(country, message)
+    booking_rules_context = _build_booking_rules_context()
 
     language_instruction = (
         "Respond in English only. " if lang == 'en' else (
             "Respond in French only. " if lang == 'fr' else "Respond in the same language as the user (French or English). "
         )
+    )
+
+    welcome_rule = (
+        f"Welcome line (use only if welcome_enabled=YES and only once per session): {_welcome_line(country_label)} "
+        f"welcome_enabled={'YES' if welcome_enabled else 'NO'}. "
+        "If welcome_enabled=YES, start your reply with exactly the welcome line. "
+        "If welcome_enabled=NO, do NOT include or repeat that welcome line."
     )
 
     system_prompt = (
@@ -558,15 +572,14 @@ def ai_chat_stream(request):
         "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
         + language_instruction +
         "Be conversational, natural, and helpful. Ask 1 short follow-up question when needed. "
-        "When the user greets (hello/hi/salut/salam) or asks to start (e.g., 'can I ask?'), greet warmly and say: "
-        f"'Hello! Your virtual assistant is ready for {country_label}. You can ask in English or French about tours, booking, and travel tips.' "
-        "Then invite their question. "
+        + welcome_rule + " "
         "Do NOT repeat or dump the provided site context verbatim; never echo long blocks of text. "
         "Only include booking navigation markers when the user explicitly asks to book AND provides a date range AND number of people, "
         "AND the mentioned tour/destination exists on this site AND the dates are available. "
         "When those conditions are met, include: [NAVIGATE: /tour/<id>/] and [PREFILL: start_date=YYYY-MM-DD,end_date=YYYY-MM-DD,persons=N]. "
         "Never invent tours, destinations, prices, or policies; use the provided catalog/context. "
         "If the user wants to book, ask for missing info (dates, people) and respect the booking rules in context.\n\n"
+        f"{booking_rules_context}\n\n"
         f"{site_context}"
     )
 
@@ -976,6 +989,9 @@ def ai_chat_stream(request):
             yield _sse_pack({'type': 'delta', 'text': err})
 
         final_text = _redact_secrets(''.join(full_text_parts).strip())
+
+        if not welcome_enabled:
+            final_text = _strip_welcome_banner(final_text, country_label)
         # Remove any action markers if the model emits them.
         parsed_action, cleaned = parse_actions_from_response(final_text, country)
         parsed_action = _filter_navigation_action(
@@ -1017,11 +1033,70 @@ def _country_label(country: str) -> str:
     return 'Morocco' if country == 'morocco' else 'Ireland'
 
 
+def _welcome_line(country_label: str) -> str:
+    return (
+        f"Hello! Your virtual assistant is ready for {country_label}. "
+        "You can ask in English or French about tours, booking, and travel tips."
+    )
+
+
+def _is_starting_chat(message: str) -> bool:
+    msg = (message or '').strip().lower()
+    if not msg:
+        return True
+    if _is_greeting(msg):
+        return True
+    # Common “can I ask / puis-je demander” openers.
+    starters = [
+        'can i ask', 'can i ask?', 'may i ask', 'may i ask?',
+        'je peux', 'je peux demander', 'puis-je', 'puis je', 'puis-je demander',
+    ]
+    return any(s in msg for s in starters)
+
+
+def _welcome_should_show(request) -> bool:
+    try:
+        return not bool(request.session.get('chat_welcomed_v1'))
+    except Exception:
+        return True
+
+
+def _mark_welcome_shown(request) -> None:
+    try:
+        request.session['chat_welcomed_v1'] = True
+    except Exception:
+        pass
+
+
+def _strip_welcome_banner(text: str, country_label: str) -> str:
+    """Remove the welcome line if the model repeats it."""
+    s = (text or '').strip()
+    if not s:
+        return s
+
+    # Exact match removal (most common case).
+    wl = _welcome_line(country_label)
+    if s.startswith(wl):
+        s = s[len(wl):].lstrip()
+
+    # Also handle variants that include extra spaces/newlines.
+    pattern = re.compile(
+        r"^Hello!\s+Your\s+virtual\s+assistant\s+is\s+ready\s+for\s+(Morocco|Ireland)\.\s+"
+        r"You\s+can\s+ask\s+in\s+English\s+or\s+French\s+about\s+tours,\s+booking,\s+and\s+travel\s+tips\.\s*",
+        flags=re.IGNORECASE,
+    )
+    s = pattern.sub('', s).lstrip()
+    return s
+
+
 def _build_booking_rules_context() -> str:
     return (
         "Booking rules: maximum stay is 11 nights. "
         "Single-group rule: if there is any pending/booked reservation in a country, other tours in that country are unavailable for overlapping dates. "
-        "Buffer rule: 3-day buffer after each reservation end date."
+        "Buffer rule: 3-day buffer after each reservation end date. "
+        "Pricing rules: the base price is per person per day and covers the guided tour, activities, and meals (lunch & dinner). "
+        "Hotel and transport are optional add-ons unless explicitly selected (Full package = Transport + Hotel). "
+        "Extra activities are optional add-ons; some are per day and some per trip (per person)."
     )
 
 
@@ -1962,6 +2037,12 @@ def ai_chat(request):
         return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
 
     country = _normalize_country(get_country_from_site(request) or 'morocco')
+    country_label = _country_label(country)
+
+    welcome_should_show = _welcome_should_show(request)
+    welcome_enabled = bool(welcome_should_show and _is_starting_chat(message))
+    if welcome_enabled:
+        _mark_welcome_shown(request)
     # Privacy: do NOT store chat messages in DB.
 
     request_id = uuid.uuid4().hex
@@ -2207,7 +2288,7 @@ def ai_chat(request):
     system_prompt = ''
 
     try:
-        country_label = _country_label(country)
+        booking_rules_context = _build_booking_rules_context()
         site_context = _build_country_catalog_context(country, message)
 
         language_instruction = (
@@ -2216,21 +2297,27 @@ def ai_chat(request):
             )
         )
 
+        welcome_rule = (
+            f"Welcome line (use only if welcome_enabled=YES and only once per session): {_welcome_line(country_label)} "
+            f"welcome_enabled={'YES' if welcome_enabled else 'NO'}. "
+            "If welcome_enabled=YES, start your reply with exactly the welcome line. "
+            "If welcome_enabled=NO, do NOT include or repeat that welcome line."
+        )
+
         system_prompt = (
             f"You are the official virtual assistant for the {country_label} travel website only. "
             f"You must ONLY answer using information relevant to {country_label}. "
             "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
             + language_instruction +
             "Be conversational, concise, and helpful. Ask 1 short follow-up question when needed. "
-            "When the user greets (hello/hi/salut/salam) or asks to start (e.g., 'can I ask?'), greet warmly and say: "
-            f"'Hello! Your virtual assistant is ready for {country_label}. You can ask in English or French about tours, booking, and travel tips.' "
-            "Then invite their question. "
+            + welcome_rule + " "
             "Do NOT repeat or dump the provided site context verbatim; never echo long blocks of text. "
             "Do NOT tell the user to type a specific magic command like 'book ...'. Instead, understand natural language and ask for missing info. "
             "Only include booking navigation markers when the user explicitly asks to book AND provides a date range AND number of people, "
             "AND the mentioned tour/destination exists on this site AND the dates are available. "
             "When those conditions are met, include: [NAVIGATE: /tour/<id>/] and [PREFILL: start_date=YYYY-MM-DD,end_date=YYYY-MM-DD,persons=N]. "
             "Never invent tours, destinations, or prices; use the provided catalog/context.\n\n"
+            f"{booking_rules_context}\n\n"
             f"{site_context}"
         )
 
@@ -2354,6 +2441,8 @@ def ai_chat(request):
         action = parse_actions(message, country)
 
     bot_reply = _redact_secrets(bot_reply)
+    if not welcome_enabled:
+        bot_reply = _strip_welcome_banner(bot_reply, country_label)
 
     if session_memory:
         try:
