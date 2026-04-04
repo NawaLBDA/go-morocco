@@ -1,0 +1,173 @@
+[
+{
+  "model": "core.destination",
+  "pk": 5,
+  "fields": {
+    "name": "Rabat",
+    "image": "",
+    "description": "Rabat, the capital of Morocco, is a refined coastal city known as The City of Light. It offers a unique blend of modern elegance and deep historical roots, making it one of the most pleasant and peaceful destinations in the country.\r\n\r\nThe city is home to iconic landmarks such as the Hassan Tower, a symbol of Rabat’s rich past, and the picturesque Kasbah of the Udayas, a UNESCO World Heritage site overlooking the Atlantic Ocean. Visitors can also explore the lively Medina of Rabat, where traditional markets and local crafts reflect authentic Moroccan culture.\r\n\r\nRabat stands out for its clean streets, green parks, and relaxed atmosphere compared to other major Moroccan cities. With its mix of history, culture, and seaside charm, it offers a perfect experience for travelers seeking both discovery and comfort."
+  }
+},
+{
+  "model": "core.destination",
+  "pk": 6,
+  "fields": {
+    "name": "Ireland",
+    "image": "",
+    "description": ""
+  }
+},
+{
+  "model": "core.destination",
+  "pk": 7,
+  "fields": {
+    "name": "Marrakech",
+    "image": "",
+    "description": "Marrakech is one of Morocco’s most famous cities, known for its vibrant culture, historic architecture, and lively atmosphere. \r\n\r\nAt the heart of the city lies Jemaa el-Fnaa, a UNESCO-listed square filled with street performers, food stalls, and local life. Nearby, the beautiful Bahia Palace showcases stunning Moroccan craftsmanship.\r\n\r\nThe Medina of Marrakech is a maze of narrow streets full of souks where visitors can shop for spices, textiles, and handmade goods.\r\n\r\nMarrakech is a sensory experience like no other—perfect for travelers seeking adventure, culture, and unforgettable moments."
+  }
+},
+{
+  "model": "core.tour",
+  "pk": 6,
+  "fields": {
+    "destination": 5,
+    "title": "The City of Light",
+    "image": "image/upload/v1775310799/vevepg6jwqimztrlzh6s.jpg",
+    "price_per_night": "100.00",
+    "description": "Discover the elegance and history of Rabat, Morocco’s capital known as The City of Light. This tour takes you through a perfect blend of ancient heritage and modern charm. From iconic landmarks to peaceful coastal views, Rabat offers a unique cultural experience filled with history, architecture, and authentic Moroccan atmosphere.",
+    "transport": "Tramway",
+    "transport_price_per_night": "5.00",
+    "hotel": "Hotel Farah",
+    "hotel_price_per_night": "80.00",
+    "activities": "Visit Hassan Tower\r\nExplore Kasbah of the Udayas\r\nWalk through the old Medina",
+    "included": "Guided city tour\r\nEntrance to monuments\r\nProfessional local guide\r\nFree time for exploration",
+    "not_included": "Personal expenses",
+    "is_promotion": false,
+    "discount_percent": 0,
+    "country": "morocco"
+  }
+},
+{
+  "model": "core.tour",
+  "pk": 7,
+  "fields": {
+    "destination": 6,
+    "title": "Dublin City Tour",
+    "image": "image/upload/v1775046142/djj4qb8wcoyionrekl5c.jpg",
+    "price_per_night": "150.00",
+    "description": "Explore Dublin",
+    "transport": "",
+    "transport_price_per_night": null,
+    "hotel": "",
+    "hotel_price_per_night": null,
+    "activities": "",
+    "included": "",
+    "not_included": "",
+    "is_promotion": false,
+    "discount_percent": 0,
+    "country": "ireland"
+  }
+},
+{
+  "model": "core.tour",
+  "pk": 8,
+  "fields": {
+    "destination": 6,
+    "title": "Galway Countryside",
+    "image": "image/upload/v1775046129/kuoit3eujsupqw7tygzc.jpg",
+    "price_per_night": "120.00",
+    "description": "Irish countryside",
+    "transport": "",
+    "transport_price_per_night": null,
+    "hotel": "",
+    "hotel_price_per_night": null,
+    "activities": "",
+    "included": "",
+    "not_included": "",
+    "is_promotion": false,
+    "discount_percent": 0,
+    "country": "ireland"
+  }
+},
+{
+  "model": "core.tour",
+  "pk": 9,
+  "fields": {
+    "destination": 7,
+    "title": "The Red City",
+    "image": "image/upload/v1775310986/pygsdfejru7izozf8viz.jpg",
+    "price_per_night": "130.00",
+    "description": "Experience the vibrant energy of Marrakech, known as The Red City. This unforgettable journey immerses you in a world of colors, spices, and traditions. From bustling souks to magnificent palaces, Marrakech offers a rich cultural experience where history and modern life meet in a unique atmosphere.",
+    "transport": "Taxi",
+    "transport_price_per_night": "10.00",
+    "hotel": "Riad Mina",
+    "hotel_price_per_night": "90.00",
+    "activities": "Visit Jemaa el-Fnaa\r\nExplore Bahia Palace\r\nDiscover the souks of the Medina of Marrakech",
+    "included": "Guided city tour\r\nEntrance to monuments\r\nProfessional local guide\r\nFree time for exploration",
+    "not_included": "Personal expenses",
+    "is_promotion": false,
+    "discount_percent": 0,
+    "country": "morocco"
+  }
+},
+{
+  "model": "core.tourextraactivity",
+  "pk": 1,
+  "fields": {
+    "tour": 6,
+    "title": "Traditional Moroccan Hammam Experience",
+    "description": "Relax in a traditional Moroccan spa with steam bath and massage for a true local wellness experience.",
+    "price": "5.00",
+    "is_per_night": false,
+    "is_active": true
+  }
+},
+{
+  "model": "core.tourextraactivity",
+  "pk": 2,
+  "fields": {
+    "tour": 6,
+    "title": "Shopping in the Medina",
+    "description": "Explore the vibrant souks of the Medina of Rabat and discover traditional Moroccan crafts, handmade goods, textiles, pottery, jewelry, and souvenirs. Enjoy bargaining with local vendors and experience authentic Moroccan shopping culture.",
+    "price": "20.00",
+    "is_per_night": false,
+    "is_active": true
+  }
+},
+{
+  "model": "core.tourextraactivity",
+  "pk": 3,
+  "fields": {
+    "tour": 6,
+    "title": "Street Food Experience",
+    "description": "Taste authentic Moroccan street food while walking through the Medina of Rabat. Try local favorites like msemen, harira, grilled meats, and fresh juices.",
+    "price": "15.00",
+    "is_per_night": false,
+    "is_active": true
+  }
+},
+{
+  "model": "core.tourextraactivity",
+  "pk": 4,
+  "fields": {
+    "tour": 9,
+    "title": "Street Food Experience",
+    "description": "Taste authentic Moroccan street food at Jemaa el-Fnaa including tagine, harira, and fresh juices.",
+    "price": "20.00",
+    "is_per_night": false,
+    "is_active": true
+  }
+},
+{
+  "model": "core.tourextraactivity",
+  "pk": 5,
+  "fields": {
+    "tour": 9,
+    "title": "Hot Air Balloon Ride",
+    "description": "",
+    "price": "120.00",
+    "is_per_night": false,
+    "is_active": true
+  }
+}
+]

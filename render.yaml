@@ -3,7 +3,7 @@ services:
     name: go-morocco
     env: python
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: python manage.py migrate --noinput && gunicorn travel_agency.wsgi:application
+    startCommand: python manage.py migrate --noinput && python manage.py seed_core_data && gunicorn travel_agency.wsgi:application
     envVars:
       - key: ENVIRONMENT
         value: production
