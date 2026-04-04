@@ -6,7 +6,8 @@ from .models import (
     BlogPost, BlogImage,
     Promotion,
     ContactMessage,
-    Information, ChatMessage
+    Information, ChatMessage,
+    TourExtraActivity,
 )
 
 
@@ -35,11 +36,17 @@ class ChatMessageAdmin(admin.ModelAdmin):
     search_fields = ('message',)
 
 
+class TourExtraActivityInline(admin.TabularInline):
+    model = TourExtraActivity
+    extra = 1
+
+
 @admin.register(Tour)
 class TourAdmin(admin.ModelAdmin):
     list_display = ('title', 'destination', 'price_per_night', 'is_promotion', 'discount_percent')
     list_filter = ('destination', 'is_promotion')
-    search_fields = ('title',)
+    search_fields = ('title', 'description', 'transport', 'hotel', 'activities', 'included', 'not_included')
+    inlines = [TourExtraActivityInline]
 
 
 @admin.register(Reservation)
@@ -47,6 +54,8 @@ class ReservationAdmin(admin.ModelAdmin):
     list_display = (
         'tour', 'user', 'num_persons',
         'start_date', 'end_date',
+        'full_package', 'include_transport', 'include_hotel',
+        'extras_total',
         'total_price', 'status',
         'payment_method', 'payment_status',
         'created_at'

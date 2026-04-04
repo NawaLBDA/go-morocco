@@ -29,6 +29,16 @@
             {% endfor %}
           </div>
         {% endif %}
+
+        {% if tour.included %}
+          <h5>Included</h5>
+          <div class="mb-3">{{ tour.included|linebreaks }}</div>
+        {% endif %}
+
+        {% if tour.not_included %}
+          <h5>Not included</h5>
+          <div class="mb-3">{{ tour.not_included|linebreaks }}</div>
+        {% endif %}
       </div>
     </div>
   </div>

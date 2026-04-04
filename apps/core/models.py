@@ -134,8 +134,25 @@ class Tour(models.Model):
     description = models.TextField(blank=True)
 
     transport = models.CharField(max_length=255, blank=True)
+    transport_price_per_night = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Optional: transport add-on price per night per person.",
+    )
     hotel = models.CharField(max_length=255, blank=True)
+    hotel_price_per_night = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Optional: hotel add-on price per night per person.",
+    )
     activities = models.TextField(blank=True)
+
+    included = models.TextField(blank=True, help_text="What is included (one item per line).")
+    not_included = models.TextField(blank=True, help_text="What is NOT included (one item per line).")
 
     is_promotion = models.BooleanField(default=False)
     discount_percent = models.IntegerField(default=0)
@@ -144,6 +161,26 @@ class Tour(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class TourExtraActivity(models.Model):
+    """Optional add-on activity priced per tour."""
+
+    tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='extra_activities')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=8, decimal_places=2)
+    is_per_night = models.BooleanField(
+        default=False,
+        help_text="If enabled, the price is charged per night per person. Otherwise per trip per person.",
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.tour.title} - {self.title}"
 
 
 class Information(models.Model):
@@ -182,6 +219,7 @@ class Reservation(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('booked', 'Booked'),
+        ('completed', 'Completed'),
         ('rejected', 'Rejected'),
         ('cancelled', 'Cancelled'),
     )
@@ -205,6 +243,18 @@ class Reservation(models.Model):
 
     num_persons = models.PositiveIntegerField(default=1)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    # Package selections (pricing is computed server-side)
+    full_package = models.BooleanField(default=False)
+    include_transport = models.BooleanField(default=False)
+    include_hotel = models.BooleanField(default=False)
+    selected_extra_activities = models.JSONField(default=list, blank=True)
+    extras_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    # Snapshot of prices at booking time (so totals remain auditable if Tour pricing changes)
+    base_price_per_night = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    transport_price_per_night = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    hotel_price_per_night = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     booking_for_other = models.BooleanField(default=False)
     guest_full_name = models.CharField(max_length=150, blank=True)

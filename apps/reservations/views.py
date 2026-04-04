@@ -12,7 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_http_methods
 from datetime import date
 
-from apps.core.models import Reservation, Tour
+from apps.core.models import Reservation, Tour, TourExtraActivity
 from apps.core.context_processors import get_country_from_site
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -39,7 +39,7 @@ def tour_detail(request, tour_id):
     reservation = Reservation.objects.filter(
         user=request.user,
         tour=tour,
-    ).exclude(status__in=["rejected", "cancelled"]).order_by("-created_at").first()
+    ).exclude(status__in=["rejected", "cancelled", "completed"]).order_by("-created_at").first()
 
     # Single group booking rules:
     # - block any already reserved dates across ALL tours in the same country
@@ -67,6 +67,7 @@ def tour_detail(request, tour_id):
         "disabled_ranges": disabled_ranges,
         "STRIPE_PUBLIC_KEY": settings.STRIPE_PUBLIC_KEY,
         "activities_list": [a.strip() for a in (tour.activities or '').replace('\n', ',').split(',') if a.strip()],
+        "extra_activities": list(tour.extra_activities.filter(is_active=True).order_by('id')),
         "today": date.today(),
         "booking_max_nights": 11,
         "booking_buffer_days": buffer_days,
@@ -85,7 +86,11 @@ def book_tour(request, tour_id):
 
     start = request.POST.get("start_date")
     end = request.POST.get("end_date")
-    persons = int(request.POST.get("persons", 1))
+    try:
+        persons = int(request.POST.get("persons", 1))
+    except Exception:
+        persons = 1
+    persons = max(1, persons)
     payment_method = request.POST.get("payment_method", "cash")
 
     try:
@@ -135,16 +140,52 @@ def book_tour(request, tour_id):
             )
             return redirect("tour_detail", tour_id=tour.id)
 
-    # total
-    base_price = Decimal(tour.price_per_night)
-
-    if tour.is_promotion and tour.discount_percent > 0:
+    # =====================
+    # Pricing
+    # =====================
+    base_price = Decimal(tour.price_per_night or 0)
+    # Promo applies to base only.
+    if tour.is_promotion and (tour.discount_percent or 0) > 0:
         discount = (Decimal(100) - Decimal(tour.discount_percent)) / Decimal(100)
         base_price = (base_price * discount).quantize(Decimal("0.01"))
 
-    total = base_price * Decimal(nights) * Decimal(persons)
+    full_package = bool(request.POST.get('full_package'))
+    include_transport = bool(request.POST.get('include_transport'))
+    include_hotel = bool(request.POST.get('include_hotel'))
+    if full_package:
+        include_transport = True
+        include_hotel = True
 
-    # ✅ 10% discount for 5+ persons
+    transport_price = Decimal(getattr(tour, 'transport_price_per_night', None) or 0)
+    hotel_price = Decimal(getattr(tour, 'hotel_price_per_night', None) or 0)
+    transport_add = transport_price if include_transport else Decimal('0')
+    hotel_add = hotel_price if include_hotel else Decimal('0')
+
+    # Extra activities
+    extra_ids = request.POST.getlist('extra_activity_ids')
+    extras_qs = TourExtraActivity.objects.filter(tour=tour, is_active=True)
+    if extra_ids:
+        extras_qs = extras_qs.filter(id__in=extra_ids)
+    extras = list(extras_qs.order_by('id'))
+
+    extras_total = Decimal('0')
+    selected_extras_payload = []
+    for e in extras:
+        price = Decimal(e.price or 0)
+        line = price * Decimal(persons) * (Decimal(nights) if e.is_per_night else Decimal('1'))
+        extras_total += line
+        selected_extras_payload.append({
+            'id': int(e.id),
+            'title': e.title,
+            'price': str(price),
+            'is_per_night': bool(e.is_per_night),
+        })
+    extras_total = extras_total.quantize(Decimal('0.01'))
+
+    nightly_total = (base_price + transport_add + hotel_add) * Decimal(nights) * Decimal(persons)
+    total = (nightly_total + extras_total).quantize(Decimal('0.01'))
+
+    # ✅ 10% discount for 5+ persons (applies to the whole booking)
     if persons >= 5:
         total = (total * Decimal("0.90")).quantize(Decimal("0.01"))
 
@@ -167,9 +208,14 @@ def book_tour(request, tour_id):
         num_persons=persons,
         total_price=total,
 
-        booking_for_other=request.POST.get("booking_for") == "other",
-        guest_full_name=request.POST.get("guest_full_name", ""),
-        guest_phone=request.POST.get("guest_phone", ""),
+        full_package=full_package,
+        include_transport=include_transport,
+        include_hotel=include_hotel,
+        selected_extra_activities=selected_extras_payload,
+        extras_total=extras_total,
+        base_price_per_night=base_price,
+        transport_price_per_night=transport_add,
+        hotel_price_per_night=hotel_add,
 
         # ✅ ALWAYS pending
         status="pending",
@@ -229,11 +275,15 @@ def create_payment_intent_for_reservation(request, reservation_id):
 # ============================================================
 @login_required
 def cancel_reservation(request, id):
-    r = get_object_or_404(Reservation, id=id, user=request.user)
+    if not request.user.is_staff:
+        messages.info(request, "Please contact us to cancel your reservation.")
+        return redirect("home")
+
+    r = get_object_or_404(Reservation, id=id)
 
     today = date.today()
-    # ✅ cannot cancel if booked OR date passed
-    if r.status == "booked" or r.end_date < today:
+    # ✅ cannot cancel if booked/completed OR date passed
+    if r.status in {"booked", "completed"} or r.end_date < today:
         messages.info(request, "You cannot cancel this reservation.")
         return redirect("home")
 
@@ -282,6 +332,14 @@ def _reservation_report_headers():
         'nights',
         'num_persons',
         'total_price',
+        'full_package',
+        'include_transport',
+        'transport_price_per_night',
+        'include_hotel',
+        'hotel_price_per_night',
+        'extras_total',
+        'selected_extra_activities',
+        'base_price_per_night',
         'booking_for_other',
         'guest_full_name',
         'guest_phone',
@@ -332,6 +390,14 @@ def _reservation_report_row(r):
         getattr(r, 'nights', ''),
         r.num_persons,
         str(r.total_price),
+        'yes' if getattr(r, 'full_package', False) else 'no',
+        'yes' if getattr(r, 'include_transport', False) else 'no',
+        str(getattr(r, 'transport_price_per_night', '') or ''),
+        'yes' if getattr(r, 'include_hotel', False) else 'no',
+        str(getattr(r, 'hotel_price_per_night', '') or ''),
+        str(getattr(r, 'extras_total', '') or ''),
+        str(getattr(r, 'selected_extra_activities', '') or ''),
+        str(getattr(r, 'base_price_per_night', '') or ''),
         'yes' if r.booking_for_other else 'no',
         r.guest_full_name,
         r.guest_phone,

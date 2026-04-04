@@ -2,10 +2,453 @@ import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 import logging
+import re
 import uuid
+
+import requests
+from urllib.parse import quote
 
 # A per-process identifier that changes on every server restart.
 CHAT_BOOT_ID = uuid.uuid4().hex
+
+
+_REDACTION_PATTERNS: list[tuple[re.Pattern, str]] = [
+    # OpenAI keys (old + project keys)
+    (re.compile(r"\bsk-(?:proj-)?[-_A-Za-z0-9]{10,}\b"), "sk-[REDACTED]"),
+    # Hugging Face tokens
+    (re.compile(r"\bhf_[-_A-Za-z0-9]{10,}\b"), "hf_[REDACTED]"),
+    # Generic bearer tokens
+    (re.compile(r"(?i)\b(bearer)\s+[-_A-Za-z0-9\.=]{10,}\b"), r"\1 [REDACTED]"),
+]
+
+
+def _redact_secrets(text: str) -> str:
+    if text is None:
+        return ''
+    s = str(text)
+    for pattern, replacement in _REDACTION_PATTERNS:
+        s = pattern.sub(replacement, s)
+    return s
+
+
+def _is_greeting(message: str) -> bool:
+    words = re.findall(r"[A-Za-zÀ-ÿ']+", (message or '').lower())
+    if not words:
+        return False
+    if len(words) > 3:
+        return False
+    greetings = {
+        'hi', 'hello', 'hey', 'yo',
+        'salut', 'bonjour', 'bonsoir', 'coucou',
+        'salam', 'salamalekom', 'salamalikum', 'as-salam',
+    }
+    return words[0] in greetings
+
+
+def _is_smalltalk(message: str) -> bool:
+    msg = (message or '').strip().lower()
+    if not msg:
+        return False
+    # Keep it conservative: only catch clear small-talk.
+    patterns = [
+        'how are you', "how're you", 'hru',
+        'comment ca va', 'comment ça va', 'ca va', 'ça va',
+        'cv',
+    ]
+    return any(p in msg for p in patterns)
+
+
+def _smalltalk_reply(country: str, lang: str) -> str:
+    country_label = _country_label(country)
+    if lang == 'fr':
+        return (
+            "Je vais bien, merci ! Je suis là pour t’aider à organiser ton voyage au "
+            f"{country_label}. Tu cherches une ville (ex: Rabat) et des dates ?"
+        )
+    return (
+        "I’m doing well, thanks! I’m here to help you plan your "
+        f"{country_label} trip. Which city/destination and dates are you considering?"
+    )
+
+
+def _detect_list_tours_intent(message: str) -> bool:
+    msg = (message or '').strip().lower()
+    if not msg:
+        return False
+
+    # Do NOT trigger on generic words like "tour" alone.
+    # Only trigger when the user is clearly asking for a LIST / what EXISTS / what is AVAILABLE.
+    patterns = [
+        # Common EN/FR phrasings, incl. "what's"/"whats" and common misspellings like "availble".
+        r"\b(available|availability|avail\w*|disponible|disponibles|existe|existent|exist|exists|show|list|liste|quels?|quelles?|what|what's|whats|which)\b.*\b(tours?|excursions?|packages?)\b",
+        r"\b(tours?|excursions?|packages?)\b.*\b(available|availability|avail\w*|disponible|disponibles|existe|exist|exists|list|liste|quels?|quelles?|what|what's|whats|which)\b",
+        r"\bnos\s+(tours?|excursions?)\b",
+        r"\bliste\s+des\s+(tours?|excursions?)\b",
+        r"\btours?\s+disponibles?\b",
+    ]
+    return any(re.search(p, msg) for p in patterns)
+
+
+def _detect_list_cities_intent(message: str) -> bool:
+    msg = (message or '').strip().lower()
+    if not msg:
+        return False
+    patterns = [
+        r"\b(cities|city|destinations?|places)\b.*\b(available|availability|avail\w*|list|show|what|what's|whats|which)\b",
+        r"\b(available|availability|avail\w*|list|show|what|what's|whats|which)\b.*\b(cities|city|destinations?|places)\b",
+        r"\b(villes?|destinations?|lieux)\b.*\b(disponible|disponibles|dispo|liste|quels?|quelles?)\b",
+        r"\b(disponible|disponibles|dispo|liste|quels?|quelles?)\b.*\b(villes?|destinations?|lieux)\b",
+    ]
+    return any(re.search(p, msg) for p in patterns)
+
+
+def _list_cities_reply(country: str, lang: str, limit: int = 12) -> str:
+    country = _normalize_country(country)
+    country_label = _country_label(country)
+    try:
+        names = list(
+            Tour.objects.filter(country=country)
+            .select_related('destination')
+            .order_by('destination__name')
+            .values_list('destination__name', flat=True)
+            .distinct()
+        )
+    except (OperationalError, ProgrammingError):
+        names = []
+
+    names = [(n or '').strip() for n in names if (n or '').strip()]
+    names = names[: max(1, int(limit))]
+
+    if not names:
+        if lang == 'fr':
+            return f"Je n’ai pas trouvé de villes/destinations configurées sur le site {country_label} pour le moment."
+        return f"I couldn’t find any cities/destinations configured on the {country_label} site right now."
+
+    if lang == 'fr':
+        return (
+            f"Villes / destinations disponibles sur le site {country_label} : "
+            + ", ".join(names)
+            + "."
+        )
+    return (
+        f"Available cities/destinations on the {country_label} site: "
+        + ", ".join(names)
+        + "."
+    )
+
+
+def _detect_how_it_works_intent(message: str) -> bool:
+    msg = (message or '').strip().lower()
+    if not msg:
+        return False
+    patterns = [
+        r"\bhow\s+it\s+work\b",
+        r"\bhow\s+it\s+works\b",
+        r"\bhow\s+does\s+it\s+work\b",
+        r"\bcomment\s+ca\s+marche\b",
+        r"\bcomment\s+ça\s+marche\b",
+        r"\bcomment\s+cela\s+marche\b",
+    ]
+    return any(re.search(p, msg) for p in patterns)
+
+
+def _how_it_works_reply(country: str, lang: str) -> str:
+    country_label = _country_label(country)
+    if lang == 'fr':
+        return (
+            f"Comment ça marche sur le site {country_label} :\n"
+            "1) Tu choisis tes dates et ta ville d’arrivée (ex: Marrakech, Casablanca, Rabat).\n"
+            "2) On te propose un itinéraire + hébergements + expériences adaptés à ton rythme.\n"
+            "3) Tu profites — avec support et chauffeurs locaux de confiance.\n"
+            "Tu as déjà une ville + une période en tête ?"
+        )
+    return (
+        f"How it works on the {country_label} site:\n"
+        "1) You choose your dates and arrival city (e.g., Marrakech, Casablanca, Rabat).\n"
+        "2) We curate your route, stays, and local experiences to match your pace.\n"
+        "3) You enjoy — with trusted local drivers and end-to-end support.\n"
+        "Do you already have a city and date range in mind?"
+    )
+
+
+def _list_tours_reply(country: str, lang: str, limit: int = 6) -> str:
+    country = _normalize_country(country)
+    country_label = _country_label(country)
+    try:
+        tours = list(
+            Tour.objects.filter(country=country)
+            .select_related('destination')
+            .order_by('id')[: max(1, int(limit))]
+        )
+    except (OperationalError, ProgrammingError):
+        tours = []
+
+    if not tours:
+        if lang == 'fr':
+            return f"Je n’ai trouvé aucun tour sur le site {country_label} pour le moment."
+        return f"I couldn’t find any tours on the {country_label} site right now."
+
+    lines = []
+    if lang == 'fr':
+        lines.append(f"Voici les tours disponibles sur le site {country_label} :")
+    else:
+        lines.append(f"Here are the tours available on the {country_label} site:")
+
+    for t in tours:
+        dest_name = getattr(t.destination, 'name', '') or ''
+        header = f"{t.title} ({dest_name})" if dest_name else t.title
+        if lang == 'fr':
+            lines.append(f"- {header} — {t.price_per_night} par nuit.")
+        else:
+            lines.append(f"- {header} — {t.price_per_night} per night.")
+
+    if lang == 'fr':
+        lines.append("Dis-moi la ville + tes dates + le nombre de personnes, et je vérifie la disponibilité.")
+    else:
+        lines.append("Tell me the city + your dates + number of people and I’ll check availability.")
+
+    return "\n".join(lines)
+
+
+def _answer_from_site_content(country: str, message: str, lang: str) -> str:
+    """Try to answer using the site's editable content (sections + info)."""
+    country = _normalize_country(country)
+    msg = (message or '').strip()
+    if not msg:
+        return ''
+
+    candidates: list[tuple[int, str, str]] = []  # (score, title, snippet)
+    try:
+        cc = CountryContent.objects.filter(country=country).first()
+        if cc:
+            title = (getattr(cc, 'hero_title', '') or '').strip() or 'Hero'
+            content = (getattr(cc, 'hero_subtitle', '') or '').strip()
+            if content:
+                candidates.append((_score_doc_relevance(msg, title, content), title, content))
+    except (OperationalError, ProgrammingError):
+        pass
+
+    try:
+        for s in Section.objects.filter(country=country).order_by('order'):
+            title = (getattr(s, 'title', '') or '').strip() or 'Section'
+            content = (getattr(s, 'content', '') or '').strip()
+            if not content:
+                continue
+            candidates.append((_score_doc_relevance(msg, title, content), title, content))
+    except (OperationalError, ProgrammingError):
+        pass
+
+    try:
+        for d in Information.objects.filter(country=country):
+            title = (getattr(d, 'title', '') or '').strip() or 'Info'
+            content = (getattr(d, 'content', '') or '').strip()
+            if not content:
+                continue
+            candidates.append((_score_doc_relevance(msg, title, content), title, content))
+    except (OperationalError, ProgrammingError):
+        pass
+
+    if not candidates:
+        return ''
+
+    best = sorted(candidates, key=lambda x: x[0], reverse=True)[:2]
+    best = [b for b in best if b[0] > 0]
+    if not best:
+        return ''
+
+    lines = []
+    if lang == 'fr':
+        lines.append("Voici ce que j’ai trouvé sur le site :")
+    else:
+        lines.append("Here’s what I found on the site:")
+
+    for _, title, content in best:
+        snippet = content.replace('\n', ' ').strip()
+        lines.append(f"- {title}: {snippet[:420]}")
+
+    if lang == 'fr':
+        lines.append("Tu veux que je t’aide à réserver (dates + personnes) ou tu as une autre question ?")
+    else:
+        lines.append("Do you want help booking (dates + people), or do you have another question?")
+    return "\n".join(lines)
+
+
+def _greeting_reply(country: str, lang: str) -> str:
+    country_label = _country_label(country)
+    if lang == 'fr':
+        return (
+            f"Bonjour ! Je suis votre assistant virtuel pour {country_label}. "
+            "Demandez-moi des infos sur les tours, les prix, ou des dates disponibles (ex: ‘5 nuits en juin, 2 personnes’)."
+        )
+    return (
+        f"Hello! I’m your virtual assistant for {country_label}. "
+        "Ask about tours, pricing, or available dates (e.g., ‘5 nights in June for 2 people’)."
+    )
+
+
+def _is_seq2seq_hf_model(model_id: str) -> bool:
+    m = (model_id or '').lower()
+    # Common seq2seq families on HF (not compatible with HF Hub streaming text-generation API).
+    return any(k in m for k in ['t5', 'flan', 'mt0', 'bart', 'pegasus'])
+
+
+def _truncate_prompt_for_model(model_id: str, prompt: str) -> str:
+    """Keep prompts small for tiny seq2seq models (e.g., flan-t5-small)."""
+    if not prompt:
+        return ''
+    model_id = (model_id or '').lower()
+    # flan-t5-small has a small context; keep it tight.
+    if 'flan-t5-small' in model_id or model_id.endswith('/flan-t5-small'):
+        return prompt[-2500:]
+    if _is_seq2seq_hf_model(model_id):
+        return prompt[-4000:]
+    return prompt
+
+
+def _stream_chunks(text: str, chunk_size: int = 40):
+    """Yield human-friendly chunks to the client (SSE)."""
+    text = text or ''
+    if not text:
+        return
+    # Prefer splitting by spaces to avoid breaking words.
+    if ' ' in text:
+        words = text.split(' ')
+        buf = ''
+        for w in words:
+            if not w:
+                continue
+            nxt = (buf + (' ' if buf else '') + w)
+            if len(nxt) >= chunk_size:
+                yield (buf + (' ' if buf else '') + w) if not buf else nxt
+                buf = ''
+            else:
+                buf = nxt
+        if buf:
+            yield buf
+    else:
+        for i in range(0, len(text), chunk_size):
+            yield text[i:i + chunk_size]
+
+
+def _hf_normalize_router_model_id(model_id: str) -> str:
+    """Normalize HF model id for the router OpenAI-compatible endpoint.
+
+    If no routing policy is specified, default to ":fastest".
+    """
+    model_id = (model_id or '').strip()
+    if not model_id:
+        return model_id
+    if model_id.startswith('http://') or model_id.startswith('https://'):
+        return model_id
+    if ':' in model_id:
+        return model_id
+    return model_id + ':fastest'
+
+
+def _hf_router_chat_completion_full_text(
+    model_id: str,
+    token: str,
+    system_prompt: str,
+    user_message: str,
+    max_tokens: int,
+    temperature: float,
+    top_p: float,
+) -> str:
+    """Call HuggingFace Inference Providers via the OpenAI-compatible router endpoint."""
+    model_id = _hf_normalize_router_model_id(model_id)
+    url = 'https://router.huggingface.co/v1/chat/completions'
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+    payload = {
+        'model': model_id,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_message},
+        ],
+        'max_tokens': int(max_tokens),
+        'temperature': float(temperature),
+        'top_p': float(top_p),
+        'stream': False,
+    }
+    r = requests.post(url, headers=headers, json=payload, timeout=60)
+    if r.status_code >= 400:
+        try:
+            err = r.json()
+        except Exception:
+            err = {'error': r.text}
+        raise RuntimeError(f"HF router error {r.status_code}: {err}")
+    data = r.json() or {}
+    try:
+        return str(data['choices'][0]['message']['content'] or '').strip()
+    except Exception:
+        return str(data).strip()
+
+
+def _hf_router_chat_completion_stream(
+    model_id: str,
+    token: str,
+    system_prompt: str,
+    user_message: str,
+    max_tokens: int,
+    temperature: float,
+    top_p: float,
+):
+    """Yield delta tokens (strings) from HF router chat completion streaming."""
+    model_id = _hf_normalize_router_model_id(model_id)
+    url = 'https://router.huggingface.co/v1/chat/completions'
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'text/event-stream',
+        'Content-Type': 'application/json',
+    }
+    payload = {
+        'model': model_id,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_message},
+        ],
+        'max_tokens': int(max_tokens),
+        'temperature': float(temperature),
+        'top_p': float(top_p),
+        'stream': True,
+    }
+
+    with requests.post(url, headers=headers, json=payload, stream=True, timeout=(10, 120)) as r:
+        if r.status_code >= 400:
+            try:
+                err = r.json()
+            except Exception:
+                err = {'error': r.text}
+            raise RuntimeError(f"HF router error {r.status_code}: {err}")
+
+        for raw_line in r.iter_lines(decode_unicode=True):
+            if not raw_line:
+                continue
+            line = raw_line.strip()
+            if not line.startswith('data:'):
+                continue
+            data = line[5:].strip()
+            if not data:
+                continue
+            if data == '[DONE]':
+                break
+            try:
+                obj = json.loads(data)
+            except Exception:
+                continue
+            try:
+                delta = obj['choices'][0].get('delta') or {}
+                content = delta.get('content')
+            except Exception:
+                content = None
+            if content:
+                yield str(content)
+
+
+HF_ROUTER_DEFAULT_MODEL = 'Qwen/Qwen2.5-7B-Instruct:fastest'
 
 
 def _ensure_session_key(request):
@@ -34,11 +477,6 @@ from django.views.decorators.csrf import csrf_exempt
 import openai
 from django.db.utils import OperationalError, ProgrammingError
 
-try:
-    from huggingface_hub import InferenceClient
-except ImportError:
-    InferenceClient = None
-
 from .models import Tour, Reservation, BlogPost, Destination, ContactMessage, BlogComment, UserProfile, CountryContent, Section, Information, ChatMessage
 from .context_processors import get_country_from_site
 
@@ -47,15 +485,21 @@ def _sse_pack(obj: dict) -> str:
     return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
 
 
-def _build_llm_prompt(system_prompt: str, history) -> str:
-    # HF text generation endpoint is not a chat API; we build a chat-like prompt.
+def _build_llm_prompt(system_prompt: str, history, user_message: str | None = None) -> str:
+    """Build a chat-like prompt for text-generation models.
+
+    Note: We avoid persisting chat history in DB; `history` can be an empty list.
+    """
     lines = [system_prompt.strip(), "", "Conversation:"]
-    for msg in history:
-        role = msg.role
+    for msg in (history or []):
+        role = getattr(msg, 'role', 'user')
+        content = getattr(msg, 'message', '')
         if role in {'bot', 'assistant'}:
-            lines.append(f"Assistant: {msg.message}")
+            lines.append(f"Assistant: {content}")
         else:
-            lines.append(f"User: {msg.message}")
+            lines.append(f"User: {content}")
+    if user_message:
+        lines.append(f"User: {user_message}")
     lines.append("Assistant:")
     return "\n".join(lines).strip() + " "
 
@@ -76,46 +520,296 @@ def ai_chat_stream(request):
     except Exception:
         return JsonResponse({'error': 'Invalid JSON payload.'}, status=400)
 
-    message = (payload.get('message') or '').strip()
+    message = _redact_secrets((payload.get('message') or '').strip())
     if not message:
         return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
 
     country = _normalize_country(get_country_from_site(request) or 'morocco')
-    session_key = _ensure_session_key(request)
-    _reset_chat_if_server_restarted(request, session_key)
-    ChatMessage.objects.create(session_key=session_key, role='user', message=message)
+    # Privacy: do NOT store chat messages in DB.
 
-    lang = _detect_language(message)
-    history = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')[:20]
+    request_id = uuid.uuid4().hex
+    session_memory = bool(getattr(settings, 'CHAT_SESSION_MEMORY', False))
+    session_history_max = int(getattr(settings, 'CHAT_SESSION_HISTORY_MAX', 8) or 8)
+    session_history: list[dict] = []
+    if session_memory:
+        try:
+            session_history = request.session.get('chat_history') or []
+            if not isinstance(session_history, list):
+                session_history = []
+        except Exception:
+            session_history = []
+        session_history.append({'role': 'user', 'content': message})
+        request.session['chat_history'] = session_history[-session_history_max:]
+
+    lang = getattr(settings, 'CHAT_FORCE_LANGUAGE', '') or _detect_language(message)
+    history = []
     country_label = _country_label(country)
     site_context = _build_country_catalog_context(country, message)
+
+    language_instruction = (
+        "Respond in English only. " if lang == 'en' else (
+            "Respond in French only. " if lang == 'fr' else "Respond in the same language as the user (French or English). "
+        )
+    )
 
     system_prompt = (
         f"You are the official virtual assistant for the {country_label} travel website only. "
         f"You must ONLY answer using information relevant to {country_label}. "
         "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
-        "Respond in the same language as the user (French or English). "
+        + language_instruction +
         "Be conversational, natural, and helpful. Ask 1 short follow-up question when needed. "
+        "Do NOT repeat or dump the provided site context verbatim; never echo long blocks of text. "
+        "Only include booking navigation markers when the user explicitly asks to book AND provides a date range AND number of people, "
+        "AND the mentioned tour/destination exists on this site AND the dates are available. "
+        "When those conditions are met, include: [NAVIGATE: /tour/<id>/] and [PREFILL: start_date=YYYY-MM-DD,end_date=YYYY-MM-DD,persons=N]. "
         "Never invent tours, destinations, prices, or policies; use the provided catalog/context. "
         "If the user wants to book, ask for missing info (dates, people) and respect the booking rules in context.\n\n"
         f"{site_context}"
     )
+
+    if session_memory and session_history:
+        # Give the model short conversation memory without persisting to DB.
+        def _fmt_role(r: str) -> str:
+            return 'Assistant' if r in {'assistant', 'bot'} else 'User'
+
+        recent = session_history[-session_history_max:]
+        recent_lines = []
+        for item in recent:
+            role = _fmt_role(str(item.get('role') or 'user'))
+            content = str(item.get('content') or '').strip()
+            if not content:
+                continue
+            recent_lines.append(f"{role}: {content}")
+        if recent_lines:
+            system_prompt = system_prompt + "\n\nRecent conversation (context):\n" + "\n".join(recent_lines[-session_history_max:])
 
     # Deterministic action computation (optional) so the UI can still navigate/prefill.
     action = {}
     msg_lower = message.lower()
     booking_intent = any(k in msg_lower for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
     start_date_req, end_date_req, persons_req, parsed_dest = _extract_booking_details(message)
-    destination_hint = _resolve_destination_hint(country, message, parsed_dest) or request.session.get('chat_last_destination')
-    if destination_hint:
-        request.session['chat_last_destination'] = destination_hint
+    destination_hint = None
+    if not _is_greeting(message) and not _is_smalltalk(message):
+        destination_hint = _resolve_destination_hint(country, message, parsed_dest)
+
+
+    if session_memory:
+        if (not destination_hint) and (not parsed_dest):
+            destination_hint = request.session.get('chat_last_destination')
+        if not persons_req:
+            try:
+                persons_req = int(request.session.get('chat_last_persons') or 0) or None
+            except Exception:
+                persons_req = None
+        if destination_hint:
+            request.session['chat_last_destination'] = destination_hint
+        if persons_req:
+            request.session['chat_last_persons'] = int(persons_req)
+        if start_date_req:
+            request.session['chat_last_start_date'] = start_date_req.strftime('%Y-%m-%d')
+        if end_date_req:
+            request.session['chat_last_end_date'] = end_date_req.strftime('%Y-%m-%d')
+
+    booking_hint = (parsed_dest or destination_hint)
+    selected_tour_id: int | None = None
+
+    # Deterministic DB-backed reply first (works even when external LLM quota/config is missing).
+    deterministic_reply = ''
+    include_admin_hint = bool(getattr(request, 'user', None) and getattr(request.user, 'is_staff', False))
+
+    if _is_smalltalk(message):
+        deterministic_reply = _smalltalk_reply(country, lang)
+
+    if _detect_how_it_works_intent(message) and not deterministic_reply:
+        deterministic_reply = _how_it_works_reply(country, lang)
+
+    # If the user asked about a specific destination but there are no tours for it, be explicit.
+    if (not deterministic_reply) and parsed_dest and (not destination_hint) and _detect_list_tours_intent(message):
+        if not _tours_for_hint(country, parsed_dest):
+            asked = parsed_dest
+            deterministic_reply = (
+                f"Désolé — je n’ai pas encore de tour pour “{asked}” sur ce site."
+                if lang == 'fr' else
+                f"Sorry — we don’t have a tour for “{asked}” on this site yet."
+            )
+
+    if _detect_list_tours_intent(message) and not destination_hint and not deterministic_reply:
+        deterministic_reply = _list_tours_reply(country, lang, limit=6)
+
+    if _detect_list_cities_intent(message) and not deterministic_reply:
+        deterministic_reply = _list_cities_reply(country, lang, limit=12)
+
+    # If user already chose a destination + people but didn't provide dates yet, ask for dates.
+    if destination_hint and persons_req and not (start_date_req and end_date_req) and not deterministic_reply:
+        if lang == 'fr':
+            deterministic_reply = f"Parfait — pour {persons_req} personnes à {destination_hint}. Quelles sont tes dates (arrivée et départ) ?"
+        else:
+            deterministic_reply = f"Great — for {persons_req} people in {destination_hint}. What dates are you considering (check-in and check-out)?"
+
+    info_intents = _detect_info_intent(message)
+    if info_intents:
+        tours = _find_relevant_tours(country, destination_hint, limit=3) if destination_hint else []
+        deterministic_reply = _format_tour_info_reply(
+            country,
+            tours,
+            info_intents,
+            lang,
+            include_booking_tip=booking_intent,
+            include_admin_hint=include_admin_hint,
+        )
+
+    if booking_intent and not deterministic_reply:
+        if start_date_req and end_date_req:
+            requested_nights = max(0, (end_date_req - start_date_req).days)
+            if requested_nights > 11:
+                deterministic_reply = (
+                    "Désolé, la durée maximale est de 11 nuits. Peux-tu choisir une période plus courte ?"
+                    if lang == 'fr' else
+                    "Sorry — the maximum stay is 11 nights. Can you pick a shorter date range?"
+                )
+            else:
+                # If the user mentioned a specific tour/city, verify it exists before talking about date availability.
+                tour_check, status_check, candidates_check = _select_tour_for_booking(country, message, booking_hint)
+                explicit_id = _extract_explicit_tour_id(message)
+                if (explicit_id or booking_hint) and status_check != 'ok':
+                    if status_check == 'multiple' and candidates_check:
+                        titles = [f"{t.id}: {t.title}" for t in candidates_check[:5]]
+                        deterministic_reply = (
+                            "Plusieurs tours correspondent. Peux-tu me dire lequel (ID ou titre) ?\n- "
+                            + "\n- ".join(titles)
+                            if lang == 'fr' else
+                            "I found multiple matching tours. Which one do you want to book (ID or title)?\n- "
+                            + "\n- ".join(titles)
+                        )
+                    else:
+                        asked = (f"tour #{explicit_id}" if explicit_id else (booking_hint or 'that destination'))
+                        deterministic_reply = (
+                            f"Désolé — ce tour/destination (“{asked}”) n’est pas encore disponible sur ce site."
+                            if lang == 'fr' else
+                            f"Sorry — this tour/destination (“{asked}”) isn’t available on this site yet."
+                        )
+
+            if deterministic_reply:
+                pass
+            elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=3):
+                suggestions = _suggest_available_ranges(country, nights=min(max(requested_nights, 3), 11), limit=4)
+                if lang == 'fr':
+                    if suggestions:
+                        sug_txt = " ; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
+                        deterministic_reply = (
+                            "Ces dates semblent déjà bloquées sur ce site. Voici des alternatives disponibles : "
+                            + sug_txt
+                            + ". Tu préfères laquelle ?"
+                        )
+                    else:
+                        deterministic_reply = "Ces dates semblent indisponibles. Donne-moi une autre période (+ le nombre de personnes) et je propose des options."
+                else:
+                    if suggestions:
+                        sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
+                        deterministic_reply = (
+                            "Those dates look unavailable on this site. Here are available alternatives: "
+                            + sug_txt
+                            + ". Which one do you prefer?"
+                        )
+                    else:
+                        deterministic_reply = "Those dates look unavailable on this site. Share another date range (+ number of people) and I’ll suggest options."
+            else:
+                if not persons_req:
+                    deterministic_reply = (
+                        "Parfait — pour combien de personnes ?"
+                        if lang == 'fr' else
+                        "Great — for how many people?"
+                    )
+                else:
+                    tour, status, candidates = _select_tour_for_booking(country, message, booking_hint)
+                    if not tour:
+                        if status == 'multiple' and candidates:
+                            titles = [f"{t.id}: {t.title}" for t in candidates[:5]]
+                            deterministic_reply = (
+                                "Plusieurs tours correspondent. Peux-tu me dire lequel (ID ou titre) ?\n- "
+                                + "\n- ".join(titles)
+                                if lang == 'fr' else
+                                "I found multiple matching tours. Which one do you want to book (ID or title)?\n- "
+                                + "\n- ".join(titles)
+                            )
+                        else:
+                            explicit_id = _extract_explicit_tour_id(message)
+                            if (not booking_hint) and (not explicit_id):
+                                deterministic_reply = (
+                                    "Pour quel tour / quelle ville veux-tu réserver ? Donne le nom de la destination ou l’ID du tour."
+                                    if lang == 'fr' else
+                                    "Which tour/city do you want to book? Tell me the destination name or the tour ID."
+                                )
+                            else:
+                                asked = (f"tour #{explicit_id}" if explicit_id else (booking_hint or 'that destination'))
+                                deterministic_reply = (
+                                    f"Désolé — ce tour/destination (“{asked}”) n’est pas encore disponible sur ce site."
+                                    if lang == 'fr' else
+                                    f"Sorry — this tour/destination (“{asked}”) isn’t available on this site yet."
+                                )
+                    else:
+                        selected_tour_id = int(tour.id)
+                        action['navigate'] = reverse('tour_detail', args=[tour.id])
+                        action['prefill'] = {
+                            'start_date': start_date_req.strftime('%Y-%m-%d'),
+                            'end_date': end_date_req.strftime('%Y-%m-%d'),
+                            'persons': persons_req,
+                        }
+                        deterministic_reply = (
+                            f"Super — je t’ouvre la réservation pour {tour.title}."
+                            if lang == 'fr' else
+                            f"Great — I’m opening the booking for {tour.title}."
+                        )
+        else:
+            suggestions = _suggest_available_ranges(country, nights=5, limit=4)
+            if lang == 'fr':
+                if suggestions:
+                    sug_txt = " ; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
+                    deterministic_reply = (
+                        "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes (et la ville si tu veux). "
+                        "Exemples de périodes disponibles (5 nuits) : " + sug_txt + "."
+                    )
+                else:
+                    deterministic_reply = "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes, et je vérifie la disponibilité."
+            else:
+                if suggestions:
+                    sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
+                    deterministic_reply = (
+                        "Sure — tell me your dates and number of people (and the destination if you want). "
+                        "Examples of available windows (5 nights): " + sug_txt + "."
+                    )
+                else:
+                    deterministic_reply = "Sure — tell me your dates and number of people and I’ll check availability."
+
+    if not deterministic_reply and destination_hint:
+        tours = _find_relevant_tours(country, destination_hint, limit=2)
+        deterministic_reply = _format_tour_info_reply(
+            country,
+            tours,
+            {'price', 'activities'},
+            lang,
+            include_booking_tip=False,
+            include_admin_hint=include_admin_hint,
+        )
+
+    if not deterministic_reply:
+        deterministic_reply = _answer_from_site_content(country, message, lang)
+
+    if getattr(settings, 'CHAT_FORCE_LLM', False) and deterministic_reply:
+        # Give the model extra grounded hints without forcing the exact wording.
+        system_prompt = (
+            system_prompt
+            + "\n\nComputed hints (ground truth from the website/DB logic; do not contradict):\n"
+            + deterministic_reply
+        )
 
     # If booking details are complete and the range is available, prepare a navigation action.
     if booking_intent and start_date_req and end_date_req and persons_req:
         requested_nights = max(0, (end_date_req - start_date_req).days)
         if requested_nights <= 11 and _is_range_available(country, start_date_req, end_date_req, buffer_days=3):
-            tour = _pick_tour_for_booking(country, destination_hint)
+            tour, status, _candidates = _select_tour_for_booking(country, message, booking_hint)
             if tour:
+                selected_tour_id = int(tour.id)
                 action['navigate'] = reverse('tour_detail', args=[tour.id])
                 action['prefill'] = {
                     'start_date': start_date_req.strftime('%Y-%m-%d'),
@@ -126,49 +820,77 @@ def ai_chat_stream(request):
     def event_stream():
         full_text_parts: list[str] = []
 
+        if getattr(settings, 'CHAT_DEBUG', False):
+            yield _sse_pack({
+                'type': 'debug',
+                'request_id': request_id,
+                'forced_llm': bool(getattr(settings, 'CHAT_FORCE_LLM', False)),
+                'provider': 'huggingface' if getattr(settings, 'HF_API_TOKEN', '') else ('openai' if getattr(settings, 'OPENAI_API_KEY', '') else None),
+                'model_config': getattr(settings, 'HF_MODEL', None) or None,
+                'session_memory': session_memory,
+            })
+
+        # Avoid hitting external LLM providers for simple greetings.
+        if _is_greeting(message) and not getattr(settings, 'CHAT_FORCE_LLM', False):
+            greet = _greeting_reply(country, lang)
+            greet = _redact_secrets(greet)
+            yield _sse_pack({'type': 'delta', 'text': greet})
+            yield _sse_pack({'type': 'final', 'text': greet, 'action': action or {}, 'model': None})
+            return
+
+        if deterministic_reply and not getattr(settings, 'CHAT_FORCE_LLM', False):
+            reply = _redact_secrets(deterministic_reply)
+            yield _sse_pack({'type': 'delta', 'text': reply})
+            yield _sse_pack({'type': 'final', 'text': reply, 'action': action or {}, 'model': None})
+            return
+
         # Prefer HuggingFace streaming when configured.
         used_model = None
         try:
-            if settings.HF_API_TOKEN and InferenceClient:
-                hf_model = getattr(settings, 'HF_MODEL', None) or 'mistralai/Mistral-7B-Instruct-v0.3'
+            if settings.HF_API_TOKEN:
+                hf_model = getattr(settings, 'HF_MODEL', None) or 'Qwen/Qwen2.5-7B-Instruct:fastest'
+                hf_fallback = getattr(settings, 'HF_FALLBACK_MODEL', None) or ''
+                max_tokens = int(getattr(settings, 'HF_MAX_NEW_TOKENS', 300) or 300)
+                temperature = float(getattr(settings, 'HF_TEMPERATURE', 0.7) or 0.7)
+                top_p = float(getattr(settings, 'HF_TOP_P', 0.95) or 0.95)
+
+                def _run_stream(model_to_use: str):
+                    for token_text in _hf_router_chat_completion_stream(
+                        model_to_use,
+                        settings.HF_API_TOKEN,
+                        system_prompt,
+                        message,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        top_p=top_p,
+                    ):
+                        token_text = _redact_secrets(token_text)
+                        if not token_text:
+                            continue
+                        full_text_parts.append(token_text)
+                        yield _sse_pack({'type': 'delta', 'text': token_text})
+
                 used_model = hf_model
-                hf_client = InferenceClient(model=hf_model, token=settings.HF_API_TOKEN)
-                prompt = _build_llm_prompt(system_prompt, history)
-
-                # huggingface_hub can stream tokens for text_generation.
-                stream = hf_client.text_generation(
-                    prompt,
-                    max_new_tokens=int(getattr(settings, 'HF_MAX_NEW_TOKENS', 300) or 300),
-                    temperature=float(getattr(settings, 'HF_TEMPERATURE', 0.7) or 0.7),
-                    top_p=float(getattr(settings, 'HF_TOP_P', 0.95) or 0.95),
-                    stream=True,
-                    return_full_text=False,
-                )
-
-                for chunk in stream:
-                    # chunk can be a str or an object with `.token.text`
-                    token_text = None
-                    if isinstance(chunk, str):
-                        token_text = chunk
+                try:
+                    yield from _run_stream(hf_model)
+                except Exception as e:
+                    msg = str(e or '').lower()
+                    if (not hf_fallback) and ('model_not_supported' in msg) and (HF_ROUTER_DEFAULT_MODEL != hf_model):
+                        used_model = HF_ROUTER_DEFAULT_MODEL
+                        yield from _run_stream(HF_ROUTER_DEFAULT_MODEL)
+                    elif hf_fallback and hf_fallback != hf_model:
+                        used_model = hf_fallback
+                        yield from _run_stream(hf_fallback)
                     else:
-                        token = getattr(chunk, 'token', None)
-                        token_text = getattr(token, 'text', None) if token is not None else None
-                    if not token_text:
-                        continue
-                    full_text_parts.append(token_text)
-                    yield _sse_pack({'type': 'delta', 'text': token_text})
+                        raise
 
-            elif settings.OPENAI_API_KEY:
+            elif (not settings.HF_API_TOKEN) and settings.OPENAI_API_KEY:
                 used_model = getattr(settings, 'OPENAI_MODEL', None) or 'gpt-4o'
                 client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-                messages = [{"role": "system", "content": system_prompt}]
-                for msg in history:
-                    role = msg.role
-                    if role in {'bot', 'assistant'}:
-                        role = 'assistant'
-                    elif role != 'user':
-                        role = 'user'
-                    messages.append({"role": role, "content": msg.message})
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": message},
+                ]
 
                 response = client.chat.completions.create(
                     model=used_model,
@@ -199,6 +921,18 @@ def ai_chat_stream(request):
         except Exception as e:
             logging.exception('[ai_chat_stream] streaming exception')
 
+            # If we forced the LLM but it failed, fall back to the grounded deterministic reply.
+            if getattr(settings, 'CHAT_FORCE_LLM', False) and deterministic_reply:
+                reply = _redact_secrets(deterministic_reply)
+                full_text_parts = [reply]
+                yield _sse_pack({'type': 'delta', 'text': reply})
+                final_text = reply
+                parsed_action, cleaned = parse_actions_from_response(final_text, country)
+                final_action = action or parsed_action or {}
+                final_text = cleaned.strip() if cleaned else final_text
+                yield _sse_pack({'type': 'final', 'text': final_text, 'action': final_action, 'model': None})
+                return
+
             err = None
             # Common case in this project: OpenAI key present but quota exhausted.
             try:
@@ -219,24 +953,47 @@ def ai_chat_stream(request):
                     )
 
             if not err:
+                # Provide a useful non-LLM fallback instead of a generic error.
+                try:
+                    err = (generate_fallback_reply(message, country, lang=lang) or '').strip()
+                except Exception:
+                    err = None
+
+            if not err:
                 if lang == 'fr':
                     err = "Désolé — le modèle IA a eu un problème. Réessaie dans un instant."
                 else:
                     err = "Sorry — the AI model had an issue. Please try again in a moment."
 
+            err = _redact_secrets(err)
+
             full_text_parts = [err]
             yield _sse_pack({'type': 'delta', 'text': err})
 
-        final_text = ''.join(full_text_parts).strip()
+        final_text = _redact_secrets(''.join(full_text_parts).strip())
         # Remove any action markers if the model emits them.
         parsed_action, cleaned = parse_actions_from_response(final_text, country)
+        parsed_action = _filter_navigation_action(
+            parsed_action,
+            country=country,
+            booking_intent=booking_intent,
+            start_date_req=start_date_req,
+            end_date_req=end_date_req,
+            persons_req=persons_req,
+            allowed_tour_id=selected_tour_id,
+        )
         final_action = action or parsed_action or {}
         final_text = cleaned.strip() if cleaned else final_text
 
-        try:
-            ChatMessage.objects.create(session_key=session_key, role='bot', message=final_text)
-        except Exception:
-            logging.exception('[ai_chat_stream] failed to store bot message')
+        if session_memory:
+            try:
+                session_history = request.session.get('chat_history') or []
+                if not isinstance(session_history, list):
+                    session_history = []
+                session_history.append({'role': 'assistant', 'content': final_text})
+                request.session['chat_history'] = session_history[-session_history_max:]
+            except Exception:
+                pass
 
         yield _sse_pack({'type': 'final', 'text': final_text, 'action': final_action, 'model': used_model})
 
@@ -280,7 +1037,6 @@ def _detect_language(message: str) -> str:
 def _extract_booking_details(message: str):
     """Extract (start_date, end_date, persons, destination_hint) from FR/EN/ISO-ish messages."""
     msg_lower = (message or '').lower()
-    import re
 
     months = {
         'january': 1, 'jan': 1, 'janvier': 1,
@@ -334,6 +1090,25 @@ def _extract_booking_details(message: str):
             except Exception:
                 start_date = end_date = None
 
+    # English: from 25 to 28 april (month at end)
+    if not (start_date and end_date):
+        m = re.search(
+            r'(?:from\s*)?(\d{1,2})\s*(?:st|nd|rd|th)?\s*(?:to|until|\-|–|—)\s*'
+            r'(\d{1,2})\s*(?:st|nd|rd|th)?\s*'
+            r'(january|jan|janvier|february|feb|février|fevrier|march|mar|mars|april|apr|avril|may|mai|june|jun|juin|july|jul|juillet|august|aug|août|aout|september|sep|sept|septembre|october|oct|octobre|november|nov|novembre|december|dec|décembre|decembre)'
+            r'(?:\s*(\d{4}))?',
+            msg_lower,
+        )
+        if m:
+            try:
+                sday, eday, mon, year = m.groups()
+                y = int(year) if year else date.today().year
+                mm = parse_month(mon) or 1
+                start_date = date(y, mm, int(sday))
+                end_date = date(y, mm, int(eday))
+            except Exception:
+                start_date = end_date = None
+
     # French: du 20 avril au 25 avril
     if not (start_date and end_date):
         m = re.search(
@@ -352,6 +1127,24 @@ def _extract_booking_details(message: str):
                 # If end month omitted, assume same month
                 em = parse_month(emonth) if emonth else (parse_month(smonth) or 1)
                 end_date = date(y, em, int(eday))
+            except Exception:
+                start_date = end_date = None
+
+    # French: du 25 au 28 avril (month at end)
+    if not (start_date and end_date):
+        m = re.search(
+            r'(?:du\s*)?(\d{1,2})\s*(?:au|à|a|\-|–|—)\s*(\d{1,2})\s*'
+            r'(january|jan|janvier|february|feb|février|fevrier|march|mar|mars|april|apr|avril|may|mai|june|jun|juin|july|jul|juillet|august|aug|août|aout|september|sep|sept|septembre|october|oct|octobre|november|nov|novembre|december|dec|décembre|decembre)'
+            r'(?:\s*(\d{4}))?',
+            msg_lower,
+        )
+        if m:
+            try:
+                sday, eday, mon, year = m.groups()
+                y = int(year) if year else date.today().year
+                mm = parse_month(mon) or 1
+                start_date = date(y, mm, int(sday))
+                end_date = date(y, mm, int(eday))
             except Exception:
                 start_date = end_date = None
 
@@ -527,6 +1320,12 @@ def _build_country_catalog_context(country: str, user_message: str) -> str:
                 line += f" Transport: {t.transport}."
             if t.hotel:
                 line += f" Hotel: {t.hotel}."
+            included_compact = _compact_items_list(getattr(t, 'included', ''), max_items=6)
+            if included_compact:
+                line += f" Included: {included_compact}."
+            not_included_compact = _compact_items_list(getattr(t, 'not_included', ''), max_items=6)
+            if not_included_compact:
+                line += f" Not included: {not_included_compact}."
             if t.activities:
                 activities = [a.strip() for a in t.activities.replace('\n', ',').split(',') if a.strip()]
                 if activities:
@@ -578,9 +1377,130 @@ def _pick_tour_for_booking(country: str, destination_hint: str | None = None):
             ).select_related('destination').first()
             if tour:
                 return tour
-        return qs.select_related('destination').first()
+        # Never pick a random tour; require an explicit match.
+        return None
     except (OperationalError, ProgrammingError):
         return None
+
+
+def _extract_explicit_tour_id(message: str) -> int | None:
+    msg = (message or '').strip()
+    if not msg:
+        return None
+
+    patterns = [
+        r"/tour/(\d+)/?",            # /tour/12/
+        r"\btour\s*#?\s*(\d+)\b",  # tour 12 / tour #12
+        r"\bid\s*#?\s*(\d+)\b",    # id 12
+    ]
+    for p in patterns:
+        m = re.search(p, msg, flags=re.IGNORECASE)
+        if not m:
+            continue
+        try:
+            return int(m.group(1))
+        except Exception:
+            return None
+    return None
+
+
+def _tours_for_hint(country: str, hint: str):
+    country = _normalize_country(country)
+    hint = (hint or '').strip()
+    if not hint:
+        return []
+    try:
+        return list(
+            Tour.objects.filter(country=country)
+            .select_related('destination')
+            .filter(Q(destination__name__icontains=hint) | Q(title__icontains=hint))
+            .order_by('id')
+        )
+    except (OperationalError, ProgrammingError):
+        return []
+
+
+def _select_tour_for_booking(country: str, message: str, destination_hint: str | None):
+    """Return (tour, status, candidates).
+
+    status: 'ok' | 'unknown_tour' | 'no_match' | 'multiple'
+    """
+    country = _normalize_country(country)
+    explicit_id = _extract_explicit_tour_id(message)
+    if explicit_id:
+        try:
+            t = Tour.objects.filter(country=country).select_related('destination').filter(id=explicit_id).first()
+        except (OperationalError, ProgrammingError):
+            t = None
+        if not t:
+            return None, 'unknown_tour', []
+        return t, 'ok', [t]
+
+    hint = (destination_hint or '').strip()
+    if not hint:
+        return None, 'no_match', []
+
+    candidates = _tours_for_hint(country, hint)
+    if not candidates:
+        return None, 'no_match', []
+    if len(candidates) == 1:
+        return candidates[0], 'ok', candidates
+    return None, 'multiple', candidates
+
+
+def _filter_navigation_action(
+    action: dict,
+    *,
+    country: str,
+    booking_intent: bool,
+    start_date_req,
+    end_date_req,
+    persons_req,
+    allowed_tour_id: int | None,
+) -> dict:
+    if not action or not isinstance(action, dict):
+        return {}
+    nav = action.get('navigate')
+    if not nav:
+        return action
+
+    m = re.match(r'^/tour/(\d+)/?$', str(nav).strip())
+    if not m:
+        action.pop('navigate', None)
+        action.pop('prefill', None)
+        return action
+
+    try:
+        nav_id = int(m.group(1))
+    except Exception:
+        action.pop('navigate', None)
+        action.pop('prefill', None)
+        return action
+
+    if not booking_intent or not (start_date_req and end_date_req and persons_req):
+        action.pop('navigate', None)
+        action.pop('prefill', None)
+        return action
+
+    requested_nights = max(0, (end_date_req - start_date_req).days)
+    if requested_nights > 11 or (not _is_range_available(country, start_date_req, end_date_req, buffer_days=3)):
+        action.pop('navigate', None)
+        action.pop('prefill', None)
+        return action
+
+    if not allowed_tour_id or nav_id != int(allowed_tour_id):
+        action.pop('navigate', None)
+        action.pop('prefill', None)
+        return action
+
+    # Ensure prefill exists and is consistent.
+    action['navigate'] = f"/tour/{nav_id}/"
+    action['prefill'] = {
+        'start_date': start_date_req.strftime('%Y-%m-%d'),
+        'end_date': end_date_req.strftime('%Y-%m-%d'),
+        'persons': int(persons_req),
+    }
+    return action
 
 
 def _find_relevant_tours(country: str, destination_hint: str | None, limit: int = 3):
@@ -608,12 +1528,19 @@ def _resolve_destination_hint(country: str, message: str, parsed_hint: str | Non
     country = _normalize_country(country)
     msg = (message or '').strip()
     if parsed_hint:
-        return parsed_hint
+        hint = (parsed_hint or '').strip()
+        # Only accept parsed hints if they actually map to a tour/destination on this site.
+        if hint and _tours_for_hint(country, hint):
+            return hint
+        return None
     if not msg:
         return None
 
     # If user replies with a single word/city like "Rabat"
     if len(msg) <= 40 and ' ' not in msg:
+        # Avoid poisoning the session with greetings / smalltalk.
+        if _is_greeting(msg) or _is_smalltalk(msg):
+            return None
         try:
             # Prefer destinations that actually have tours in this country.
             dest = (
@@ -624,38 +1551,75 @@ def _resolve_destination_hint(country: str, message: str, parsed_hint: str | Non
             )
             if dest:
                 return dest.name
+
+            # Fallback: a tour title might match even if destination table isn't perfect.
+            has_tour = Tour.objects.filter(country=country).filter(
+                Q(destination__name__icontains=msg) | Q(title__icontains=msg)
+            ).exists()
+            return msg if has_tour else None
         except (OperationalError, ProgrammingError):
-            return msg
-        return msg
+            return None
 
     # Otherwise try to match any destination name contained in the message.
     try:
-        dest = (
+        msg_lower = msg.lower()
+        destinations = list(
             Destination.objects.filter(tours__country=country)
             .distinct()
-            .filter(name__icontains=msg)
             .order_by('name')
-            .first()
         )
-        if dest:
-            return dest.name
+        for d in destinations:
+            name = (d.name or '').strip()
+            if name and name.lower() in msg_lower:
+                return d.name
     except (OperationalError, ProgrammingError):
         pass
     return None
 
 
 def _detect_info_intent(message: str):
-    """Return set like {'price','activities','included'} based on the message."""
+    """Return set like {'price','activities','included','excluded'} based on the message."""
     msg = (message or '').lower()
     intents = set()
     if any(w in msg for w in ['price', 'cost', 'prix', 'tarif', 'per night', 'par nuit', 'night', 'nuit']):
         intents.add('price')
+    if any(w in msg for w in [
+        'not included', 'not include', "isn't included", "is not included",
+        'excluded', 'excludes', 'exclude', 'what is not included', "what's not included", 'whats not included',
+        'non inclus', 'non incluse', 'non incluses', 'pas inclus', "n'est pas inclus",
+    ]):
+        intents.add('excluded')
     if any(w in msg for w in ['activity', 'activities', 'activités', 'activites', 'included', 'includes', 'inclus', 'comprend', 'what is included', 'inclusions', 'include']):
         intents.add('activities')
         intents.add('included')
     if any(w in msg for w in ['transport', 'hotel', 'hébergement', 'hebergement']):
         intents.add('included')
     return intents
+
+
+def _compact_items_list(text: str, max_items: int = 6) -> str:
+    raw = (text or '').strip()
+    if not raw:
+        return ''
+
+    # Prefer line-separated items; fall back to comma-separated.
+    parts = [p.strip() for p in re.split(r"[\r\n]+", raw) if p.strip()]
+    if len(parts) == 1 and ',' in parts[0]:
+        parts = [p.strip() for p in parts[0].split(',') if p.strip()]
+
+    cleaned = []
+    for p in parts:
+        p = p.strip().lstrip('-•*\t ').strip()
+        if p:
+            cleaned.append(re.sub(r"\s+", " ", p))
+    if not cleaned:
+        return ''
+
+    shown = cleaned[:max_items]
+    s = ", ".join(shown)
+    if len(cleaned) > max_items:
+        s += ", …"
+    return s
 
 
 def _format_tour_info_reply(
@@ -693,11 +1657,13 @@ def _format_tour_info_reply(
                     line += f" Promo: -{t.discount_percent}%."
             lines.append(line)
 
-        if 'activities' in intents or 'included' in intents:
+        if 'activities' in intents or 'included' in intents or 'excluded' in intents:
             details = []
             transport_val = (getattr(t, 'transport', '') or '').strip()
             hotel_val = (getattr(t, 'hotel', '') or '').strip()
             activities_val = (getattr(t, 'activities', '') or '').strip()
+            included_val = (getattr(t, 'included', '') or '').strip()
+            not_included_val = (getattr(t, 'not_included', '') or '').strip()
 
             if transport_val:
                 details.append(("Transport" if lang == 'en' else "Transport") + f": {transport_val}")
@@ -710,6 +1676,18 @@ def _format_tour_info_reply(
                         details.append("Activités: " + ", ".join(activities[:10]) + ("" if len(activities) <= 10 else ", …"))
                     else:
                         details.append("Activities: " + ", ".join(activities[:10]) + ("" if len(activities) <= 10 else ", …"))
+
+            # Include structured inclusions/exclusions if available.
+            if included_val and ('included' in intents or 'activities' in intents):
+                label = "Included" if lang == 'en' else "Inclus"
+                compact = _compact_items_list(included_val, max_items=8)
+                if compact:
+                    details.append(f"{label}: {compact}")
+            if not_included_val:
+                label = "Not included" if lang == 'en' else "Non inclus"
+                compact = _compact_items_list(not_included_val, max_items=8)
+                if compact:
+                    details.append(f"{label}: {compact}")
 
             if details:
                 lines.append(f"- {header}: " + " | ".join(details))
@@ -838,7 +1816,7 @@ def home(request):
                 tour.user_reservation = Reservation.objects.filter(
                     user=request.user,
                     tour=tour
-                ).exclude(status__in=["rejected", "cancelled"]).order_by("-created_at").first()
+                ).exclude(status__in=["rejected", "cancelled", "completed"]).order_by("-created_at").first()
             except (OperationalError, ProgrammingError):
                 tour.user_reservation = None
 
@@ -871,19 +1849,9 @@ def ai_chat_history(request):
     if request.method != 'GET':
         return JsonResponse({'error': 'Invalid method'}, status=405)
 
-    session_key = _ensure_session_key(request)
     try:
-        _reset_chat_if_server_restarted(request, session_key)
-        messages_qs = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')
-
-        history = []
-        for m in messages_qs:
-            role = m.role
-            # Backward compatibility: older rows used role='assistant'
-            if role == 'assistant':
-                role = 'bot'
-            history.append({'role': role, 'message': m.message, 'created_at': m.created_at.isoformat()})
-        return JsonResponse({'history': history})
+        # Privacy: do not persist or return chat history.
+        return JsonResponse({'history': []})
     except (OperationalError, ProgrammingError):
         return JsonResponse({'history': []})
 def tour_detail(request, tour_id):
@@ -895,7 +1863,7 @@ def tour_detail(request, tour_id):
         reservation = Reservation.objects.filter(
             user=request.user,
             tour=tour
-        ).exclude(status__in=["rejected", "cancelled"]).order_by("-created_at").first()
+        ).exclude(status__in=["rejected", "cancelled", "completed"]).order_by("-created_at").first()
 
     # Single group booking rules:
     # - block any already reserved dates across ALL tours in the same country
@@ -930,6 +1898,7 @@ def tour_detail(request, tour_id):
         "today": date.today(),  # ✅ IMPORTANT
         "STRIPE_PUBLIC_KEY": settings.STRIPE_PUBLIC_KEY,
         "activities_list": [a.strip() for a in (tour.activities or '').replace('\n', ',').split(',') if a.strip()],
+        "extra_activities": list(tour.extra_activities.filter(is_active=True).order_by('id')),
         "booking_max_nights": 11,
         "booking_buffer_days": buffer_days,
     })
@@ -983,30 +1952,82 @@ def ai_chat(request):
     except Exception:
         return JsonResponse({'error': 'Invalid JSON payload.'}, status=400)
 
-    message = payload.get('message', '').strip()
+    message = _redact_secrets(payload.get('message', '').strip())
     if not message:
         return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
 
     country = _normalize_country(get_country_from_site(request) or 'morocco')
-    session_key = _ensure_session_key(request)
-    _reset_chat_if_server_restarted(request, session_key)
+    # Privacy: do NOT store chat messages in DB.
 
-    ChatMessage.objects.create(session_key=session_key, role='user', message=message)
+    request_id = uuid.uuid4().hex
+    session_memory = bool(getattr(settings, 'CHAT_SESSION_MEMORY', False))
+    session_history_max = int(getattr(settings, 'CHAT_SESSION_HISTORY_MAX', 8) or 8)
+    session_history: list[dict] = []
+    if session_memory:
+        try:
+            session_history = request.session.get('chat_history') or []
+            if not isinstance(session_history, list):
+                session_history = []
+        except Exception:
+            session_history = []
+        session_history.append({'role': 'user', 'content': message})
+        request.session['chat_history'] = session_history[-session_history_max:]
 
     bot_reply = ''
     action = {}
-    lang = _detect_language(message)
+    used_model = None
+    lang = getattr(settings, 'CHAT_FORCE_LANGUAGE', '') or _detect_language(message)
+
+    if _is_greeting(message):
+        bot_reply = _greeting_reply(country, lang)
+    elif _is_smalltalk(message):
+        bot_reply = _smalltalk_reply(country, lang)
+
+    if _detect_how_it_works_intent(message) and not bot_reply:
+        bot_reply = _how_it_works_reply(country, lang)
+
+    if _detect_list_cities_intent(message) and not bot_reply:
+        bot_reply = _list_cities_reply(country, lang, limit=12)
 
     booking_intent = any(k in message.lower() for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
     include_admin_hint = bool(getattr(request, 'user', None) and getattr(request.user, 'is_staff', False))
 
     # Parse once, reuse everywhere
     start_date_req, end_date_req, persons_req, parsed_dest = _extract_booking_details(message)
-    destination_hint = _resolve_destination_hint(country, message, parsed_dest)
-    if destination_hint:
-        request.session['chat_last_destination'] = destination_hint
-    else:
-        destination_hint = request.session.get('chat_last_destination')
+    destination_hint = None
+    if not _is_greeting(message) and not _is_smalltalk(message):
+        destination_hint = _resolve_destination_hint(country, message, parsed_dest)
+
+
+    # If the user asked about a specific destination but there are no tours for it, be explicit.
+    if (not bot_reply) and parsed_dest and (not destination_hint) and _detect_list_tours_intent(message):
+        if not _tours_for_hint(country, parsed_dest):
+            asked = parsed_dest
+            bot_reply = (
+                f"Désolé — je n’ai pas encore de tour pour “{asked}” sur ce site."
+                if lang == 'fr' else
+                f"Sorry — we don’t have a tour for “{asked}” on this site yet."
+            )
+
+    if session_memory:
+        if (not destination_hint) and (not parsed_dest):
+            destination_hint = request.session.get('chat_last_destination')
+        if not persons_req:
+            try:
+                persons_req = int(request.session.get('chat_last_persons') or 0) or None
+            except Exception:
+                persons_req = None
+        if destination_hint:
+            request.session['chat_last_destination'] = destination_hint
+        if persons_req:
+            request.session['chat_last_persons'] = int(persons_req)
+        if start_date_req:
+            request.session['chat_last_start_date'] = start_date_req.strftime('%Y-%m-%d')
+        if end_date_req:
+            request.session['chat_last_end_date'] = end_date_req.strftime('%Y-%m-%d')
+
+    booking_hint = (parsed_dest or destination_hint)
+    selected_tour_id: int | None = None
 
     # DB-backed informational Q&A (price / activities / what's included) — highest priority
     info_intents = _detect_info_intent(message)
@@ -1021,6 +2042,15 @@ def ai_chat(request):
             include_admin_hint=include_admin_hint,
         )
 
+    if _detect_list_tours_intent(message) and not destination_hint and not bot_reply:
+        bot_reply = _list_tours_reply(country, lang, limit=6)
+
+    if destination_hint and persons_req and not (start_date_req and end_date_req) and not bot_reply:
+        if lang == 'fr':
+            bot_reply = f"Parfait — pour {persons_req} personnes à {destination_hint}. Quelles sont tes dates (arrivée et départ) ?"
+        else:
+            bot_reply = f"Great — for {persons_req} people in {destination_hint}. What dates are you considering (check-in and check-out)?"
+
     # Booking intelligence (works even without OpenAI credits)
     if booking_intent and not bot_reply:
         # If dates provided, validate rules + availability first.
@@ -1032,6 +2062,30 @@ def ai_chat(request):
                     if lang == 'fr' else
                     "Sorry — the maximum stay is 11 nights. Can you pick a shorter date range?"
                 )
+            else:
+                # If the user mentioned a specific tour/city, verify it exists before talking about date availability.
+                tour_check, status_check, candidates_check = _select_tour_for_booking(country, message, booking_hint)
+                explicit_id = _extract_explicit_tour_id(message)
+                if (explicit_id or booking_hint) and status_check != 'ok':
+                    if status_check == 'multiple' and candidates_check:
+                        titles = [f"{t.id}: {t.title}" for t in candidates_check[:5]]
+                        bot_reply = (
+                            "Plusieurs tours correspondent. Lequel veux-tu réserver (ID ou titre) ?\n- "
+                            + "\n- ".join(titles)
+                            if lang == 'fr' else
+                            "I found multiple matching tours. Which one do you want to book (ID or title)?\n- "
+                            + "\n- ".join(titles)
+                        )
+                    else:
+                        asked = (f"tour #{explicit_id}" if explicit_id else (booking_hint or 'that destination'))
+                        bot_reply = (
+                            f"Désolé — ce tour/destination (“{asked}”) n’est pas encore disponible sur ce site."
+                            if lang == 'fr' else
+                            f"Sorry — this tour/destination (“{asked}”) isn’t available on this site yet."
+                        )
+
+            if bot_reply:
+                pass
             elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=3):
                 suggestions = _suggest_available_ranges(country, nights=min(max(requested_nights, 3), 11), limit=4)
                 if lang == 'fr':
@@ -1063,8 +2117,34 @@ def ai_chat(request):
                         "Great — for how many people?"
                     )
                 else:
-                    tour = _pick_tour_for_booking(country, destination_hint)
-                    if tour:
+                    tour, status, candidates = _select_tour_for_booking(country, message, booking_hint)
+                    if not tour:
+                        if status == 'multiple' and candidates:
+                            titles = [f"{t.id}: {t.title}" for t in candidates[:5]]
+                            bot_reply = (
+                                "Plusieurs tours correspondent. Lequel veux-tu réserver (ID ou titre) ?\n- "
+                                + "\n- ".join(titles)
+                                if lang == 'fr' else
+                                "I found multiple matching tours. Which one do you want to book (ID or title)?\n- "
+                                + "\n- ".join(titles)
+                            )
+                        else:
+                            explicit_id = _extract_explicit_tour_id(message)
+                            if (not booking_hint) and (not explicit_id):
+                                bot_reply = (
+                                    "Pour quel tour / quelle ville veux-tu réserver ? Donne le nom de la destination ou l’ID du tour."
+                                    if lang == 'fr' else
+                                    "Which tour/city do you want to book? Tell me the destination name or the tour ID."
+                                )
+                            else:
+                                asked = (f"tour #{explicit_id}" if explicit_id else (booking_hint or 'that destination'))
+                                bot_reply = (
+                                    f"Désolé — ce tour/destination (“{asked}”) n’est pas encore disponible sur ce site."
+                                    if lang == 'fr' else
+                                    f"Sorry — this tour/destination (“{asked}”) isn’t available on this site yet."
+                                )
+                    else:
+                        selected_tour_id = int(tour.id)
                         action['navigate'] = reverse('tour_detail', args=[tour.id])
                         action['prefill'] = {
                             'start_date': start_date_req.strftime('%Y-%m-%d'),
@@ -1109,36 +2189,119 @@ def ai_chat(request):
             include_admin_hint=include_admin_hint,
         )
 
-    try:
-        history = ChatMessage.objects.filter(session_key=session_key).order_by('created_at')[:20]
+    if not bot_reply:
+        bot_reply = _answer_from_site_content(country, message, lang)
 
+    # If the user wants the HuggingFace model to always respond, keep the computed reply as hints.
+    computed_hints = ''
+    if getattr(settings, 'CHAT_FORCE_LLM', False) and bot_reply:
+        computed_hints = bot_reply
+        bot_reply = ''
+
+    site_context = ''
+    system_prompt = ''
+
+    try:
         country_label = _country_label(country)
         site_context = _build_country_catalog_context(country, message)
+
+        language_instruction = (
+            "Respond in English only. " if lang == 'en' else (
+                "Respond in French only. " if lang == 'fr' else "Respond in the same language as the user (French or English). "
+            )
+        )
 
         system_prompt = (
             f"You are the official virtual assistant for the {country_label} travel website only. "
             f"You must ONLY answer using information relevant to {country_label}. "
             "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
-            "Respond in the same language as the user (French or English). "
+            + language_instruction +
             "Be conversational, concise, and helpful. Ask 1 short follow-up question when needed. "
+            "Do NOT repeat or dump the provided site context verbatim; never echo long blocks of text. "
             "Do NOT tell the user to type a specific magic command like 'book ...'. Instead, understand natural language and ask for missing info. "
-            "If the user wants to book, select the most relevant tour from the catalog and include: "
-            "[NAVIGATE: /tour/<id>/] and optionally [PREFILL: start_date=YYYY-MM-DD,end_date=YYYY-MM-DD,persons=N]. "
+            "Only include booking navigation markers when the user explicitly asks to book AND provides a date range AND number of people, "
+            "AND the mentioned tour/destination exists on this site AND the dates are available. "
+            "When those conditions are met, include: [NAVIGATE: /tour/<id>/] and [PREFILL: start_date=YYYY-MM-DD,end_date=YYYY-MM-DD,persons=N]. "
             "Never invent tours, destinations, or prices; use the provided catalog/context.\n\n"
             f"{site_context}"
         )
 
-        if settings.OPENAI_API_KEY and not bot_reply:
+        if session_memory and session_history:
+            def _fmt_role(r: str) -> str:
+                return 'Assistant' if r in {'assistant', 'bot'} else 'User'
+
+            recent = session_history[-session_history_max:]
+            recent_lines = []
+            for item in recent:
+                role = _fmt_role(str(item.get('role') or 'user'))
+                content = str(item.get('content') or '').strip()
+                if not content:
+                    continue
+                recent_lines.append(f"{role}: {content}")
+            if recent_lines:
+                system_prompt = system_prompt + "\n\nRecent conversation (context):\n" + "\n".join(recent_lines[-session_history_max:])
+
+        # Prefer HuggingFace over OpenAI when configured.
+        if settings.HF_API_TOKEN and not bot_reply:
+            try:
+                hf_model = getattr(settings, 'HF_MODEL', None) or 'Qwen/Qwen2.5-7B-Instruct:fastest'
+                hf_fallback = getattr(settings, 'HF_FALLBACK_MODEL', None) or ''
+                if computed_hints:
+                    system_prompt = (
+                        system_prompt
+                        + "\n\nComputed hints (ground truth from the website/DB logic; do not contradict):\n"
+                        + computed_hints
+                    )
+
+                def _run_full(model_to_use: str) -> str:
+                    return _hf_router_chat_completion_full_text(
+                        model_to_use,
+                        settings.HF_API_TOKEN,
+                        system_prompt,
+                        message,
+                        max_tokens=int(getattr(settings, 'HF_MAX_NEW_TOKENS', 250) or 250),
+                        temperature=float(getattr(settings, 'HF_TEMPERATURE', 0.7) or 0.7),
+                        top_p=float(getattr(settings, 'HF_TOP_P', 0.95) or 0.95),
+                    )
+
+                try:
+                    bot_reply = _run_full(hf_model)
+                    used_model = hf_model
+                except Exception as e:
+                    msg = str(e or '').lower()
+                    if (not hf_fallback) and ('model_not_supported' in msg) and (HF_ROUTER_DEFAULT_MODEL != hf_model):
+                        bot_reply = _run_full(HF_ROUTER_DEFAULT_MODEL)
+                        used_model = HF_ROUTER_DEFAULT_MODEL
+                    elif hf_fallback and hf_fallback != hf_model:
+                        bot_reply = _run_full(hf_fallback)
+                        used_model = hf_fallback
+                    else:
+                        raise
+
+                bot_reply = _redact_secrets(str(bot_reply or '').strip())
+                parsed_action, bot_reply = parse_actions_from_response(bot_reply, country)
+                parsed_action = _filter_navigation_action(
+                    parsed_action,
+                    country=country,
+                    booking_intent=booking_intent,
+                    start_date_req=start_date_req,
+                    end_date_req=end_date_req,
+                    persons_req=persons_req,
+                    allowed_tour_id=selected_tour_id,
+                )
+                action = action or parsed_action or {}
+            except Exception:
+                logging.exception('[ai_chat] HF exception')
+                bot_reply = computed_hints or ''
+                action = {}
+
+        if (not settings.HF_API_TOKEN) and settings.OPENAI_API_KEY and not bot_reply:
             try:
                 client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-                messages = [{"role": "system", "content": system_prompt}]
-                for msg in history:
-                    role = msg.role
-                    if role in {'bot', 'assistant'}:
-                        role = 'assistant'
-                    elif role != 'user':
-                        role = 'user'
-                    messages.append({"role": role, "content": msg.message})
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": message},
+                ]
 
                 response = client.chat.completions.create(
                     model=getattr(settings, 'OPENAI_MODEL', None) or "gpt-4o",
@@ -1148,7 +2311,17 @@ def ai_chat(request):
                 )
 
                 bot_reply = response.choices[0].message.content.strip()
-                action, bot_reply = parse_actions_from_response(bot_reply, country)
+                parsed_action, bot_reply = parse_actions_from_response(bot_reply, country)
+                parsed_action = _filter_navigation_action(
+                    parsed_action,
+                    country=country,
+                    booking_intent=booking_intent,
+                    start_date_req=start_date_req,
+                    end_date_req=end_date_req,
+                    persons_req=persons_req,
+                    allowed_tour_id=selected_tour_id,
+                )
+                action = action or parsed_action or {}
 
             except Exception:
                 logging.exception('[ai_chat] OpenAI exception')
@@ -1156,55 +2329,63 @@ def ai_chat(request):
                 bot_reply = bot_reply or ''
                 action = action or {}
 
-        if not bot_reply and settings.HF_API_TOKEN and InferenceClient:
-            try:
-                hf_client = InferenceClient(token=settings.HF_API_TOKEN)
-                hf_prompt = system_prompt + "\nUser: " + message + "\nAssistant:"
-                hf_result = hf_client.text_generation(
-                    model="mistralai/mistral-7b-instruct",
-                    inputs=hf_prompt,
-                    max_new_tokens=250,
-                    temperature=0.7
-                )
-
-                if isinstance(hf_result, dict):
-                    bot_reply = hf_result.get('generated_text', '').strip()
-                elif isinstance(hf_result, list) and hf_result:
-                    bot_reply = hf_result[0].get('generated_text', '').strip() if isinstance(hf_result[0], dict) else str(hf_result[0])
-                else:
-                    bot_reply = str(hf_result).strip()
-
-                action, bot_reply = parse_actions_from_response(bot_reply, country)
-
-            except Exception:
-                logging.exception('[ai_chat] HF exception')
-                bot_reply = ''
-                action = {}
-
         if not bot_reply:
-            bot_reply = generate_fallback_reply(message, country)
+            bot_reply = generate_fallback_reply(message, country, lang=lang)
             action = parse_actions(message, country)
 
     except Exception:
         logging.exception('[ai_chat] Unhandled exception')
-        bot_reply = 'Désolé, une erreur est survenue. Veuillez réessayer dans quelques instants.'
+        bot_reply = (
+            'Désolé, une erreur est survenue. Veuillez réessayer dans quelques instants.'
+            if lang == 'fr' else
+            'Sorry — an error occurred. Please try again in a moment.'
+        )
         action = parse_actions(message, country)
 
     if not action:
         action = parse_actions(message, country)
 
-    ChatMessage.objects.create(session_key=session_key, role='bot', message=bot_reply)
+    bot_reply = _redact_secrets(bot_reply)
 
-    result = {'reply': bot_reply}
+    if session_memory:
+        try:
+            session_history = request.session.get('chat_history') or []
+            if not isinstance(session_history, list):
+                session_history = []
+            if bot_reply:
+                session_history.append({'role': 'assistant', 'content': bot_reply})
+            request.session['chat_history'] = session_history[-session_history_max:]
+        except Exception:
+            pass
+
+    result = {'reply': bot_reply, 'model': used_model}
+    if getattr(settings, 'CHAT_DEBUG', False):
+        result['debug'] = {
+            'request_id': request_id,
+            'provider': 'huggingface' if getattr(settings, 'HF_API_TOKEN', '') else ('openai' if getattr(settings, 'OPENAI_API_KEY', '') else None),
+            'forced_llm': bool(getattr(settings, 'CHAT_FORCE_LLM', False)),
+            'session_memory': session_memory,
+            'country': country,
+            'lang': lang,
+            'model_used': used_model,
+            'message_chars': len(message or ''),
+            'site_context_chars': len(site_context or ''),
+            'system_prompt_chars': len(system_prompt or ''),
+            'computed_hints_chars': len(computed_hints or ''),
+        }
     result.update(action)
     return JsonResponse(result)
 
 
-def generate_fallback_reply(message, country):
+def generate_fallback_reply(message, country, lang: str | None = None):
     country = _normalize_country(country)
     country_label = _country_label(country)
     msg_lower = message.lower()
-    lang = _detect_language(message)
+
+    forced_lang = (getattr(settings, 'CHAT_FORCE_LANGUAGE', '') or '').strip().lower()
+    lang = (lang or forced_lang or _detect_language(message) or '').strip().lower()
+    if lang not in {'en', 'fr'}:
+        lang = 'en'
 
     if any(w in msg_lower for w in ['price', 'cost', 'prix', 'tarif']):
         if lang == 'fr':
@@ -1291,16 +2472,16 @@ def parse_actions(message, country):
     elif 'blog' in msg_lower:
         action['navigate'] = reverse('blog_list')
 
-    # Parse dates/persons from natural language and only prefill when the range is actually available.
+    # Booking navigation is intentionally strict: only when user mentioned a valid tour.
     booking_intent = any(k in msg_lower for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
     if booking_intent:
-        start_date, end_date, persons, destination_hint = _extract_booking_details(message)
+        start_date, end_date, persons, parsed_dest = _extract_booking_details(message)
         if start_date and end_date and persons:
             requested_nights = max(0, (end_date - start_date).days)
             if requested_nights <= 11 and _is_range_available(country, start_date, end_date, buffer_days=3):
-                target_tour = _pick_tour_for_booking(country, destination_hint)
-                if target_tour:
-                    action['navigate'] = reverse('tour_detail', args=[target_tour.id])
+                tour, status, _candidates = _select_tour_for_booking(country, message, parsed_dest)
+                if tour and status == 'ok':
+                    action['navigate'] = reverse('tour_detail', args=[tour.id])
                     action['prefill'] = {
                         'start_date': start_date.strftime('%Y-%m-%d'),
                         'end_date': end_date.strftime('%Y-%m-%d'),

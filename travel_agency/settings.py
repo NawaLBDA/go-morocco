@@ -76,10 +76,27 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 
 # HuggingFace Mistral (laissez vide si pas de clé)
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN", "")
-HF_MODEL = os.environ.get("HF_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
+# Default to a chat/instruct model compatible with HuggingFace's router (OpenAI-compatible chat completions).
+# Override with HF_MODEL in the environment.
+HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen2.5-7B-Instruct:fastest")
+# Optional fallback if the primary model is unavailable.
+HF_FALLBACK_MODEL = os.environ.get("HF_FALLBACK_MODEL", "")
 HF_MAX_NEW_TOKENS = int(os.environ.get("HF_MAX_NEW_TOKENS", "300"))
 HF_TEMPERATURE = float(os.environ.get("HF_TEMPERATURE", "0.7"))
 HF_TOP_P = float(os.environ.get("HF_TOP_P", "0.95"))
+
+# Chat behavior
+CHAT_FORCE_LLM = os.environ.get("CHAT_FORCE_LLM", "False") == "True"
+
+# Chat debugging / session memory (safe metadata only; never logs secrets)
+CHAT_DEBUG = os.environ.get("CHAT_DEBUG", "False") == "True"
+CHAT_SESSION_MEMORY = os.environ.get("CHAT_SESSION_MEMORY", "False") == "True"
+CHAT_SESSION_HISTORY_MAX = int(os.environ.get("CHAT_SESSION_HISTORY_MAX", "8"))
+
+# Force assistant language. Supported: 'en' or 'fr'. Empty => auto-detect.
+CHAT_FORCE_LANGUAGE = (os.environ.get("CHAT_FORCE_LANGUAGE") or "").strip().lower()
+if CHAT_FORCE_LANGUAGE not in {"", "en", "fr"}:
+    CHAT_FORCE_LANGUAGE = ""
 
 # ==============================
 # APPLICATIONS
@@ -121,6 +138,7 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "travel_agency.middleware.CountryPrefixMiddleware",
+    "travel_agency.middleware.ReservationAutoCompleteMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",

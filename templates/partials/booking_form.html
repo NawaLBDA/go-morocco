@@ -29,23 +29,34 @@
   <input type="number" id="persons" name="persons" value="1" min="1"
          class="form-control mb-3">
 
-  <label class="fw-bold mb-2 d-block">Booking for</label>
-  <div class="booking-for-options mb-3">
-    <div class="form-check">
-      <input class="form-check-input" type="radio" name="booking_for" id="booking_me" value="me" checked>
-      <label class="form-check-label" for="booking_me">Myself</label>
+  <input type="hidden" id="transport-price" value="{{ tour.transport_price_per_night|default_if_none:'0' }}">
+  <input type="hidden" id="hotel-price" value="{{ tour.hotel_price_per_night|default_if_none:'0' }}">
+
+  <label class="fw-bold mb-2 d-block">Options</label>
+  <div class="border rounded p-3 bg-light mb-3">
+    <div class="form-check form-switch">
+      <input class="form-check-input" type="checkbox" id="full_package" name="full_package" value="1">
+      <label class="form-check-label" for="full_package">
+        Full package (Transport + Hotel)
+      </label>
     </div>
 
-    <div class="form-check">
-      <input class="form-check-input" type="radio" name="booking_for" id="booking_other" value="other">
-      <label class="form-check-label" for="booking_other">Someone else</label>
+    <div class="form-check form-switch mt-2">
+      <input class="form-check-input" type="checkbox" id="include_transport" name="include_transport" value="1">
+      <label class="form-check-label" for="include_transport">
+        Transport{% if tour.transport_price_per_night %} (+{{ tour.transport_price_per_night }} $ / day){% endif %}
+      </label>
+    </div>
+
+    <div class="form-check form-switch mt-2">
+      <input class="form-check-input" type="checkbox" id="include_hotel" name="include_hotel" value="1">
+      <label class="form-check-label" for="include_hotel">
+        Hotel{% if tour.hotel_price_per_night %} (+{{ tour.hotel_price_per_night }} $ / day){% endif %}
+      </label>
     </div>
   </div>
 
-  <div id="guestFields" style="display:none">
-    <input name="guest_full_name" class="form-control mb-2" placeholder="Full name">
-    <input name="guest_phone" class="form-control mb-2" placeholder="Phone number">
-  </div>
+  <div class="text-muted small mb-3">All add-on prices are per person per day.</div>
 
   <p class="text-muted small mt-2">
     🛈 Booking will be confirmed after admin validation.
