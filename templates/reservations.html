@@ -178,7 +178,7 @@
 </section>
 
 <script>
-  // Improve UX: set min dates and default start date = today when empty.
+  // Improve UX: set min dates and keep end date >= start date.
   document.addEventListener('DOMContentLoaded', function () {
     const today = new Date();
     const pad = (n) => String(n).padStart(2, '0');
@@ -189,10 +189,9 @@
 
     if (start) {
       start.min = iso;
-      if (!start.value) start.value = iso;
     }
     if (end) {
-      end.min = iso;
+      end.min = start && start.value ? start.value : iso;
     }
 
     if (start && end) {
