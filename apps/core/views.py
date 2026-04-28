@@ -58,6 +58,27 @@ def _is_smalltalk(message: str) -> bool:
     return any(p in msg for p in patterns)
 
 
+def _is_affirmative(message: str) -> bool:
+    msg = (message or '').strip().lower()
+    if not msg:
+        return False
+    # Keep it strict: only clear affirmations.
+    patterns = [
+        r"^y(?:es)?\b",
+        r"^yep\b",
+        r"^yeah\b",
+        r"^ok(?:ay)?\b",
+        r"^okey\b",
+        r"^oui\b",
+        r"^d['’]?accord\b",
+        r"^bien\b",
+        r"^vas[-\s]?y\b",
+        r"^go\b",
+        r"^proceed\b",
+    ]
+    return any(re.search(p, msg) for p in patterns)
+
+
 def _smalltalk_reply(country: str, lang: str) -> str:
     country_label = _country_label(country)
     if lang == 'fr':
@@ -150,6 +171,42 @@ def _detect_how_it_works_intent(message: str) -> bool:
         r"\bcomment\s+cela\s+marche\b",
     ]
     return any(re.search(p, msg) for p in patterns)
+
+
+def _detect_private_tour_intent(message: str) -> bool:
+    msg = (message or '').strip().lower()
+    if not msg:
+        return False
+    # Private / tailor-made tours.
+    patterns = [
+        r"\bprivate\s+tours?\b",
+        r"\btours?\s+priv[ée]s?\b",
+        r"\bprivatis(?:er|ation|e|é)\b",
+        r"\bsur\s*-?\s*mesure\b",
+        r"\btailor(?:ed)?\b",
+        r"\bcustom(?:ized)?\b",
+        r"\bpersonal(?:ized)?\b.*\btours?\b",
+        r"\bchauffeur\s+priv[ée]\b",
+        r"\bguide\s+priv[ée]\b",
+    ]
+    return any(re.search(p, msg) for p in patterns)
+
+
+def _private_tour_reply(country: str, lang: str) -> str:
+    country_label = _country_label(country)
+    if lang == 'fr':
+        return (
+            f"Oui — on peut organiser des tours privés / sur‑mesure au {country_label}. "
+            "On adapte l’itinéraire, le rythme, le chauffeur/guide, et le niveau d’hébergement selon ton style. "
+            "Pour te proposer une idée + un prix, dis-moi juste : 1) ville(s) ou circuit souhaité, 2) dates, 3) nombre de personnes, 4) budget (éco / standard / premium). "
+            "Tu peux aussi nous écrire via le bouton WhatsApp ou la page Contact." 
+        )
+    return (
+        f"Yes — we can arrange private / tailor‑made tours in {country_label}. "
+        "We can adapt the itinerary, pace, driver/guide, and hotel level to your preferences. "
+        "To suggest options + a price, tell me: 1) city/route, 2) dates, 3) number of people, 4) budget level (economy / standard / premium). "
+        "You can also reach us via the WhatsApp button or the Contact page."
+    )
 
 
 def _how_it_works_reply(country: str, lang: str) -> str:
@@ -465,6 +522,7 @@ def _reset_chat_if_server_restarted(request, session_key: str) -> None:
         ChatMessage.objects.filter(session_key=session_key).delete()
         request.session['chat_boot_id'] = CHAT_BOOT_ID
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponsePermanentRedirect
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.forms import UserCreationForm
@@ -524,6 +582,19 @@ def ai_chat_stream(request):
     if not message:
         return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
 
+    # Require login for chat so we can safely check per-user booking overlaps.
+    if not getattr(request, 'user', None) or not request.user.is_authenticated:
+        login_url = reverse('login')
+
+        def _gen_login_required():
+            yield _sse_pack({
+                'type': 'final',
+                'text': 'Please log in to use the chat and to book. Redirecting to the login page…',
+                'action': {'navigate': login_url},
+            })
+
+        return StreamingHttpResponse(_gen_login_required(), content_type='text/event-stream')
+
     country = _normalize_country(get_country_from_site(request) or 'morocco')
     country_label = _country_label(country)
     # Privacy: do NOT store chat messages in DB.
@@ -559,26 +630,25 @@ def ai_chat_stream(request):
         )
     )
 
-    welcome_rule = (
-        f"Welcome line (use only if welcome_enabled=YES and only once per session): {_welcome_line(country_label)} "
-        f"welcome_enabled={'YES' if welcome_enabled else 'NO'}. "
-        "If welcome_enabled=YES, start your reply with exactly the welcome line. "
-        "If welcome_enabled=NO, do NOT include or repeat that welcome line."
-    )
-
     system_prompt = (
-        f"You are the official virtual assistant for the {country_label} travel website only. "
-        f"You must ONLY answer using information relevant to {country_label}. "
+        f"You are the official virtual assistant for the {country_label} travel website. "
+        "You can answer general travel questions about this country and its cities (explain what a city is like, what to choose, tips). "
         "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
         + language_instruction +
-        "Be conversational, natural, and helpful. Ask 1 short follow-up question when needed. "
-        + welcome_rule + " "
+        "Sound natural and human (not robotic). Be concise and helpful. "
+        "Ask at most 1 short follow-up question, only when needed. "
+        "Do not repeat the same question if the user already answered it. "
+        "Avoid re-confirmation loops: if the user says yes/correct, do not ask to confirm again; move to the next missing detail. "
+        "Never ask the user to confirm details (no 'Let's confirm...'); assume provided details are correct unless the user changes them. "
+        "Never ask for card/payment details (numbers, CVV, etc). This site only needs a payment method: cash or card. "
+        "Do not restate all booking details unless the user asks. "
+        + ("This is the first user message in this session: start with a brief friendly greeting (one short sentence). " if welcome_enabled else "Do not add a repetitive greeting if the conversation is already ongoing. ")
+        +
         "Do NOT repeat or dump the provided site context verbatim; never echo long blocks of text. "
-        "Only include booking navigation markers when the user explicitly asks to book AND provides a date range AND number of people, "
-        "AND the mentioned tour/destination exists on this site AND the dates are available. "
-        "When those conditions are met, include: [NAVIGATE: /tour/<id>/] and [PREFILL: start_date=YYYY-MM-DD,end_date=YYYY-MM-DD,persons=N]. "
-        "Never invent tours, destinations, prices, or policies; use the provided catalog/context. "
-        "If the user wants to book, ask for missing info (dates, people) and respect the booking rules in context.\n\n"
+        "Do NOT output special navigation markers like [NAVIGATE] or [PREFILL]. The backend/UI handles navigation. "
+        "Currency rule: always present prices in USD only; do NOT mention MAD or Moroccan dirhams. "
+        "Never invent site inventory (tours IDs, prices, availability) beyond the provided catalog/context. "
+        "For booking, ask only for missing fields and follow the booking rules.\n\n"
         f"{booking_rules_context}\n\n"
         f"{site_context}"
     )
@@ -601,12 +671,56 @@ def ai_chat_stream(request):
 
     # Deterministic action computation (optional) so the UI can still navigate/prefill.
     action = {}
+    deterministic_text: str | None = None
     msg_lower = message.lower()
-    booking_intent = any(k in msg_lower for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
+    keyword_booking_intent = any(k in msg_lower for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
     start_date_req, end_date_req, persons_req, parsed_dest = _extract_booking_details(message)
+    payment_method_req = _extract_payment_method(message)
+    addons_req = _extract_booking_addons(message)
     destination_hint = None
     if not _is_greeting(message) and not _is_smalltalk(message):
         destination_hint = _resolve_destination_hint(country, message, parsed_dest)
+
+    # Pending booking continuation (ask only missing fields, especially payment method)
+    pending = _get_pending_booking(request)
+    pending_extra_ids: list[str] = []
+    if pending:
+        # Follow-up date updates like "from 8th to 11th" may omit the month/year.
+        # Infer them from the pending booking month to keep the flow deterministic.
+        if not (start_date_req and end_date_req):
+            ref = _date_from_iso(pending.get('start_date')) or _date_from_iso(pending.get('end_date'))
+            sd2, ed2 = _extract_day_range_without_month(message, ref)
+            if sd2 and ed2:
+                start_date_req, end_date_req = sd2, ed2
+
+        # Merge missing details from pending (but allow current message to override)
+        if not destination_hint:
+            destination_hint = (pending.get('destination') or None)
+        if not persons_req:
+            try:
+                persons_req = int(pending.get('persons') or 0) or None
+            except Exception:
+                persons_req = None
+        if not start_date_req:
+            start_date_req = _date_from_iso(pending.get('start_date'))
+        if not end_date_req:
+            end_date_req = _date_from_iso(pending.get('end_date'))
+        if not payment_method_req:
+            pm = (pending.get('payment_method') or '').strip().lower()
+            payment_method_req = pm if pm in {'cash', 'card'} else None
+
+        # Merge add-ons from pending unless explicitly provided in current message.
+        for key in ['full_package', 'include_transport', 'include_hotel', 'extras']:
+            if addons_req.get(key) is None and isinstance(pending.get(key), (bool, type(None))):
+                addons_req[key] = pending.get(key)
+
+        _pei = pending.get('extra_activity_ids')
+        if isinstance(_pei, list):
+            pending_extra_ids = [str(x).strip() for x in _pei if str(x).strip()]
+
+    has_core_booking_fields = bool((parsed_dest or destination_hint) and start_date_req and end_date_req and persons_req)
+    # If we already have pending booking context, stay in booking flow even if the user reply only contains (e.g.) new dates.
+    booking_intent = bool(keyword_booking_intent or has_core_booking_fields or pending)
 
 
     if session_memory:
@@ -629,214 +743,336 @@ def ai_chat_stream(request):
     booking_hint = (parsed_dest or destination_hint)
     selected_tour_id: int | None = None
 
-    # Deterministic DB-backed reply first (works even when external LLM quota/config is missing).
-    deterministic_reply = ''
-    include_admin_hint = bool(getattr(request, 'user', None) and getattr(request.user, 'is_staff', False))
+    # Handle explicit reservation management (cancel / change) without re-asking for already known details.
+    # This avoids “booking reference” loops when the site enforces a single active reservation per country.
+    manage_intent = _detect_reservation_manage_intent(message)
+    tour_id_hint = None
+    try:
+        if pending and pending.get('tour_id'):
+            tour_id_hint = int(pending.get('tour_id'))
+        elif session_memory:
+            tour_id_hint = int(request.session.get('chat_last_tour_id') or 0) or None
+    except Exception:
+        tour_id_hint = None
 
-    if _is_smalltalk(message):
-        deterministic_reply = _smalltalk_reply(country, lang)
-
-    if _detect_how_it_works_intent(message) and not deterministic_reply:
-        deterministic_reply = _how_it_works_reply(country, lang)
-
-    # If the user asked about a specific destination but there are no tours for it, be explicit.
-    if (not deterministic_reply) and parsed_dest and (not destination_hint) and _detect_list_tours_intent(message):
-        if not _tours_for_hint(country, parsed_dest):
-            asked = parsed_dest
-            deterministic_reply = (
-                f"Désolé — je n’ai pas encore de tour pour “{asked}” sur ce site."
-                if lang == 'fr' else
-                f"Sorry — we don’t have a tour for “{asked}” on this site yet."
-            )
-
-    if _detect_list_tours_intent(message) and not destination_hint and not deterministic_reply:
-        deterministic_reply = _list_tours_reply(country, lang, limit=6)
-
-    if _detect_list_cities_intent(message) and not deterministic_reply:
-        deterministic_reply = _list_cities_reply(country, lang, limit=12)
-
-    # If user already chose a destination + people but didn't provide dates yet, ask for dates.
-    if destination_hint and persons_req and not (start_date_req and end_date_req) and not deterministic_reply:
-        if lang == 'fr':
-            deterministic_reply = f"Parfait — pour {persons_req} personnes à {destination_hint}. Quelles sont tes dates (arrivée et départ) ?"
-        else:
-            deterministic_reply = f"Great — for {persons_req} people in {destination_hint}. What dates are you considering (check-in and check-out)?"
-
-    info_intents = _detect_info_intent(message)
-    if info_intents:
-        tours = _find_relevant_tours(country, destination_hint, limit=3) if destination_hint else []
-        deterministic_reply = _format_tour_info_reply(
-            country,
-            tours,
-            info_intents,
-            lang,
-            include_booking_tip=booking_intent,
-            include_admin_hint=include_admin_hint,
+    if manage_intent == 'cancel':
+        r, st = _cancel_matching_user_reservation(
+            user=request.user,
+            country=country,
+            start_date=start_date_req,
+            end_date=end_date_req,
+            destination_hint=booking_hint,
+            tour_id_hint=tour_id_hint,
         )
+        _set_pending_booking(request, None)
+        if st == 'cancelled' and r:
+            tour_title = getattr(getattr(r, 'tour', None), 'title', '') or 'your tour'
+            if lang == 'fr':
+                deterministic_text = f"✅ C’est fait — j’ai annulé ta réservation pour “{tour_title}”."
+            else:
+                deterministic_text = f"✅ Done — I cancelled your reservation for “{tour_title}”."
+        elif st == 'ambiguous':
+            if lang == 'fr':
+                deterministic_text = "J’ai trouvé plusieurs réservations actives. Tu veux annuler laquelle (ville ou dates) ?"
+            else:
+                deterministic_text = "I found multiple active reservations. Which one should I cancel (city or dates)?"
+        else:
+            if lang == 'fr':
+                deterministic_text = "Je ne trouve aucune réservation active à annuler pour le moment."
+            else:
+                deterministic_text = "I can’t find an active reservation to cancel right now."
 
-    if booking_intent and not deterministic_reply:
-        if start_date_req and end_date_req:
+    # Private tours info (only when user is not already providing a full booking payload).
+    if (not deterministic_text) and _detect_private_tour_intent(message) and (not has_core_booking_fields):
+        deterministic_text = _private_tour_reply(country, lang)
+
+    # Private tours info (only when user is not already providing a full booking payload).
+    if (not deterministic_text) and _detect_private_tour_intent(message) and (not has_core_booking_fields):
+        deterministic_text = _private_tour_reply(country, lang)
+
+    # Structured booking state for the model (no canned replies).
+    computed_hints_lines: list[str] = []
+    if (not deterministic_text) and booking_intent:
+        missing = []
+        if not booking_hint:
+            missing.append('destination/tour')
+        if not (start_date_req and end_date_req):
+            missing.append('dates')
+        if not persons_req:
+            missing.append('number_of_people')
+
+        if missing:
+            computed_hints_lines.append(
+                "Booking intent detected. Missing fields: " + ", ".join(missing) + ". Ask ONLY for the most important missing field (one question)."
+            )
+            # Deterministic: ask only for the top missing field.
+            if lang == 'fr':
+                if 'destination/tour' in missing:
+                    deterministic_text = "Pour quelle ville/destination veux-tu réserver ?"
+                elif 'dates' in missing:
+                    deterministic_text = "Quelles dates (du … au …) ?"
+                else:
+                    deterministic_text = "C’est pour combien de personnes ?"
+            else:
+                if 'destination/tour' in missing:
+                    deterministic_text = "Which city/destination is the tour for?"
+                elif 'dates' in missing:
+                    deterministic_text = "What dates (from … to …)?"
+                else:
+                    deterministic_text = "How many people is it for?"
+        else:
             requested_nights = max(0, (end_date_req - start_date_req).days)
-            if requested_nights > 11:
-                deterministic_reply = (
-                    "Désolé, la durée maximale est de 11 nuits. Peux-tu choisir une période plus courte ?"
+            if requested_nights <= 0:
+                computed_hints_lines.append("Invalid date range: end_date must be after start_date. Ask the user to correct dates.")
+                deterministic_text = (
+                    "La date de fin doit être après la date de début. Tu peux me redonner les dates (du … au …) ?"
                     if lang == 'fr' else
-                    "Sorry — the maximum stay is 11 nights. Can you pick a shorter date range?"
+                    "End date must be after start date. Can you resend the dates (from … to …)?"
+                )
+            elif requested_nights > 11:
+                computed_hints_lines.append("Booking rule: maximum stay is 11 nights. Ask for a shorter date range.")
+                deterministic_text = (
+                    "La durée maximale est de 11 nuits. Peux-tu choisir des dates plus courtes ?"
+                    if lang == 'fr' else
+                    "Maximum stay is 11 nights. Can you choose a shorter date range?"
                 )
             else:
-                # If the user mentioned a specific tour/city, verify it exists before talking about date availability.
-                tour_check, status_check, candidates_check = _select_tour_for_booking(country, message, booking_hint)
-                explicit_id = _extract_explicit_tour_id(message)
-                if (explicit_id or booking_hint) and status_check != 'ok':
-                    if status_check == 'multiple' and candidates_check:
-                        titles = [f"{t.id}: {t.title}" for t in candidates_check[:5]]
-                        deterministic_reply = (
-                            "Plusieurs tours correspondent. Peux-tu me dire lequel (ID ou titre) ?\n- "
-                            + "\n- ".join(titles)
-                            if lang == 'fr' else
-                            "I found multiple matching tours. Which one do you want to book (ID or title)?\n- "
-                            + "\n- ".join(titles)
-                        )
-                    else:
-                        asked = (f"tour #{explicit_id}" if explicit_id else (booking_hint or 'that destination'))
-                        deterministic_reply = (
-                            f"Désolé — ce tour/destination (“{asked}”) n’est pas encore disponible sur ce site."
-                            if lang == 'fr' else
-                            f"Sorry — this tour/destination (“{asked}”) isn’t available on this site yet."
-                        )
+                will_replace_existing = _user_has_overlapping_reservation(request.user, country, start_date_req, end_date_req)
+                tour, status, candidates = _select_tour_for_booking(country, message, booking_hint)
 
-            if deterministic_reply:
-                pass
-            elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=3):
-                suggestions = _suggest_available_ranges(country, nights=min(max(requested_nights, 3), 11), limit=4)
-                if lang == 'fr':
-                    if suggestions:
-                        sug_txt = " ; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
-                        deterministic_reply = (
-                            "Ces dates semblent déjà bloquées sur ce site. Voici des alternatives disponibles : "
-                            + sug_txt
-                            + ". Tu préfères laquelle ?"
+                if not tour:
+                    if status == 'multiple' and candidates:
+                        titles = [f"{t.id}: {t.title}" for t in candidates[:6]]
+                        computed_hints_lines.append("Multiple tours match. Ask user to choose one (ID or title). Options: " + " | ".join(titles))
+                        deterministic_text = (
+                            "Plusieurs tours correspondent. Lequel choisis-tu (ID ou titre) ? Options: " + " | ".join(titles)
+                            if lang == 'fr' else
+                            "Multiple tours match. Which one do you want (ID or title)? Options: " + " | ".join(titles)
                         )
                     else:
-                        deterministic_reply = "Ces dates semblent indisponibles. Donne-moi une autre période (+ le nombre de personnes) et je propose des options."
-                else:
-                    if suggestions:
-                        sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
-                        deterministic_reply = (
-                            "Those dates look unavailable on this site. Here are available alternatives: "
-                            + sug_txt
-                            + ". Which one do you prefer?"
+                        computed_hints_lines.append("No matching tour exists for the requested destination on this site. Ask user to choose a destination/tour from the site catalog.")
+                        deterministic_text = (
+                            "Je ne trouve pas ce tour sur le site. Tu peux me donner la ville/destination exacte (ex: Rabat, Marrakech…) ?"
+                            if lang == 'fr' else
+                            "I can’t find that tour on this site. What exact city/destination is it (e.g., Rabat, Marrakech…)?"
                         )
-                    else:
-                        deterministic_reply = "Those dates look unavailable on this site. Share another date range (+ number of people) and I’ll suggest options."
-            else:
-                if not persons_req:
-                    deterministic_reply = (
-                        "Parfait — pour combien de personnes ?"
-                        if lang == 'fr' else
-                        "Great — for how many people?"
-                    )
                 else:
-                    tour, status, candidates = _select_tour_for_booking(country, message, booking_hint)
-                    if not tour:
-                        if status == 'multiple' and candidates:
-                            titles = [f"{t.id}: {t.title}" for t in candidates[:5]]
-                            deterministic_reply = (
-                                "Plusieurs tours correspondent. Peux-tu me dire lequel (ID ou titre) ?\n- "
-                                + "\n- ".join(titles)
+                    selected_tour_id = int(tour.id)
+
+                    # Optional extra activity selection (single).
+                    chosen_extra_id = _select_single_extra_activity_id(tour, message)
+                    if chosen_extra_id:
+                        addons_req['extras'] = True
+                        pending_extra_ids = [str(chosen_extra_id)]
+                    if addons_req.get('extras') is False:
+                        pending_extra_ids = []
+                        computed_hints_lines.append("User explicitly does NOT want extra activities. Do not ask about extras.")
+
+                    if addons_req.get('extras') is True and not pending_extra_ids:
+                        # If the user replies with a bare "yes" and there is only ONE extra option,
+                        # auto-select it to avoid looping on the same question.
+                        if _is_affirmative(message):
+                            try:
+                                only_extra = list(tour.extra_activities.filter(is_active=True).only('id').order_by('id')[:2])
+                            except Exception:
+                                only_extra = []
+                            if len(only_extra) == 1:
+                                pending_extra_ids = [str(getattr(only_extra[0], 'id'))]
+
+                        options_txt = _format_tour_extra_activities(tour)
+                        if options_txt:
+                            _set_pending_booking(request, {
+                                'tour_id': int(tour.id),
+                                'destination': booking_hint or '',
+                                'start_date': start_date_req.strftime('%Y-%m-%d'),
+                                'end_date': end_date_req.strftime('%Y-%m-%d'),
+                                'persons': int(persons_req),
+                                'payment_method': payment_method_req,
+                                'full_package': bool(addons_req.get('full_package')),
+                                'include_transport': bool(addons_req.get('include_transport') or bool(addons_req.get('full_package'))),
+                                'include_hotel': bool(addons_req.get('include_hotel') or bool(addons_req.get('full_package'))),
+                                'extras': True,
+                                'extra_activity_ids': [],
+                            })
+                            computed_hints_lines.append(
+                                "User wants extra activities. Ask them to choose exactly ONE extra activity from these options: " + options_txt + "."
+                            )
+                            deterministic_text = (
+                                "Tu veux une activité extra. Choisis-en UNE: " + options_txt
                                 if lang == 'fr' else
-                                "I found multiple matching tours. Which one do you want to book (ID or title)?\n- "
-                                + "\n- ".join(titles)
+                                "You want an extra activity. Pick EXACTLY ONE: " + options_txt
                             )
                         else:
-                            explicit_id = _extract_explicit_tour_id(message)
-                            if (not booking_hint) and (not explicit_id):
-                                deterministic_reply = (
-                                    "Pour quel tour / quelle ville veux-tu réserver ? Donne le nom de la destination ou l’ID du tour."
+                            addons_req['extras'] = False
+                            pending_extra_ids = []
+                    else:
+                        if not _user_break_buffer_ok(request.user, country, start_date_req, buffer_days=3):
+                            computed_hints_lines.append("User must respect a 3-day break after their last reservation end date. Ask them to choose a later start date.")
+                            # Preserve booking context so user can reply with only new dates.
+                            _set_pending_booking(request, {
+                                'tour_id': int(tour.id),
+                                'destination': booking_hint or '',
+                                'start_date': start_date_req.strftime('%Y-%m-%d'),
+                                'end_date': end_date_req.strftime('%Y-%m-%d'),
+                                'persons': int(persons_req),
+                                'payment_method': payment_method_req,
+                                'full_package': bool(addons_req.get('full_package')),
+                                'include_transport': bool(addons_req.get('include_transport') or bool(addons_req.get('full_package'))),
+                                'include_hotel': bool(addons_req.get('include_hotel') or bool(addons_req.get('full_package'))),
+                                'extras': addons_req.get('extras'),
+                                'extra_activity_ids': pending_extra_ids,
+                            })
+                            deterministic_text = (
+                                "Tu dois laisser 3 jours de pause après ta dernière réservation. Peux-tu choisir une date de début plus tardive ?"
+                                if lang == 'fr' else
+                                "You need a 3-day break after your last reservation. Can you choose a later start date?"
+                            )
+                        elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=3, exclude_user=request.user):
+                            # Preserve booking context so the user can reply with only a new date range.
+                            _set_pending_booking(request, {
+                                'tour_id': int(tour.id),
+                                'destination': booking_hint or '',
+                                'start_date': start_date_req.strftime('%Y-%m-%d'),
+                                'end_date': end_date_req.strftime('%Y-%m-%d'),
+                                'persons': int(persons_req),
+                                'payment_method': payment_method_req,
+                                'full_package': bool(addons_req.get('full_package')),
+                                'include_transport': bool(addons_req.get('include_transport') or bool(addons_req.get('full_package'))),
+                                'include_hotel': bool(addons_req.get('include_hotel') or bool(addons_req.get('full_package'))),
+                                'extras': addons_req.get('extras'),
+                                'extra_activity_ids': pending_extra_ids,
+                            })
+                            suggestions = _suggest_available_ranges_near(
+                                country,
+                                start_date_req,
+                                nights=min(max(requested_nights, 3), 11),
+                                limit=4,
+                                buffer_days=3,
+                                exclude_user=request.user,
+                            )
+                            if suggestions:
+                                sug_txt = " ; ".join([f"{s.strftime('%Y-%m-%d')} to {e.strftime('%Y-%m-%d')}" for s, e in suggestions])
+                                computed_hints_lines.append("Requested dates are unavailable. Offer alternatives: " + sug_txt + ". Ask which one they prefer.")
+                                deterministic_text = (
+                                    "Ces dates ne sont pas disponibles. Tu préfères laquelle ? " + sug_txt
                                     if lang == 'fr' else
-                                    "Which tour/city do you want to book? Tell me the destination name or the tour ID."
+                                    "Those dates aren’t available. Which option do you prefer? " + sug_txt
                                 )
                             else:
-                                asked = (f"tour #{explicit_id}" if explicit_id else (booking_hint or 'that destination'))
-                                deterministic_reply = (
-                                    f"Désolé — ce tour/destination (“{asked}”) n’est pas encore disponible sur ce site."
+                                computed_hints_lines.append("Requested dates are unavailable. Ask the user for another date range.")
+                                deterministic_text = (
+                                    "Ces dates ne sont pas disponibles. Donne-moi un autre intervalle (du … au …)."
                                     if lang == 'fr' else
-                                    f"Sorry — this tour/destination (“{asked}”) isn’t available on this site yet."
+                                    "Those dates aren’t available. Please share another date range (from … to …)."
                                 )
-                    else:
-                        selected_tour_id = int(tour.id)
-                        action['navigate'] = reverse('tour_detail', args=[tour.id])
-                        action['prefill'] = {
-                            'start_date': start_date_req.strftime('%Y-%m-%d'),
-                            'end_date': end_date_req.strftime('%Y-%m-%d'),
-                            'persons': persons_req,
-                        }
-                        deterministic_reply = (
-                            f"Super — je t’ouvre la réservation pour {tour.title}."
-                            if lang == 'fr' else
-                            f"Great — I’m opening the booking for {tour.title}."
-                        )
-        else:
-            suggestions = _suggest_available_ranges(country, nights=5, limit=4)
-            if lang == 'fr':
-                if suggestions:
-                    sug_txt = " ; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
-                    deterministic_reply = (
-                        "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes (et la ville si tu veux). "
-                        "Exemples de périodes disponibles (5 nuits) : " + sug_txt + "."
-                    )
-                else:
-                    deterministic_reply = "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes, et je vérifie la disponibilité."
-            else:
-                if suggestions:
-                    sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
-                    deterministic_reply = (
-                        "Sure — tell me your dates and number of people (and the destination if you want). "
-                        "Examples of available windows (5 nights): " + sug_txt + "."
-                    )
-                else:
-                    deterministic_reply = "Sure — tell me your dates and number of people and I’ll check availability."
+                        else:
+                            # Effective add-ons
+                            full_pkg = bool(addons_req.get('full_package'))
+                            inc_transport = bool(addons_req.get('include_transport') or full_pkg)
+                            inc_hotel = bool(addons_req.get('include_hotel') or full_pkg)
 
-    if not deterministic_reply and destination_hint:
-        tours = _find_relevant_tours(country, destination_hint, limit=2)
-        deterministic_reply = _format_tour_info_reply(
-            country,
-            tours,
-            {'price', 'activities'},
-            lang,
-            include_booking_tip=False,
-            include_admin_hint=include_admin_hint,
-        )
+                            if full_pkg:
+                                computed_hints_lines.append("User selected FULL PACKAGE. Do NOT ask about hotel/transport; they are included.")
 
-    if not deterministic_reply:
-        deterministic_reply = _answer_from_site_content(country, message, lang)
+                            if not payment_method_req:
+                                _set_pending_booking(request, {
+                                    'tour_id': int(tour.id),
+                                    'destination': booking_hint or '',
+                                    'start_date': start_date_req.strftime('%Y-%m-%d'),
+                                    'end_date': end_date_req.strftime('%Y-%m-%d'),
+                                    'persons': int(persons_req),
+                                    'payment_method': None,
+                                    'full_package': full_pkg,
+                                    'include_transport': inc_transport,
+                                    'include_hotel': inc_hotel,
+                                    'extras': addons_req.get('extras'),
+                                    'extra_activity_ids': pending_extra_ids,
+                                })
+                                computed_hints_lines.append("All booking fields are known except payment_method. Ask ONLY: cash (espèces) or card (carte).")
+                                deterministic_text = (
+                                    "OK. Paiement par carte ou en espèces ?"
+                                    if lang == 'fr' else
+                                    "OK — would you like to pay by card or cash?"
+                                )
+                            else:
+                                _set_pending_booking(request, None)
+                                action['navigate'] = reverse('tour_detail', args=[tour.slug])
+                                action['prefill'] = {
+                                    'start_date': start_date_req.strftime('%Y-%m-%d'),
+                                    'end_date': end_date_req.strftime('%Y-%m-%d'),
+                                    'persons': int(persons_req),
+                                    'payment_method': payment_method_req,
+                                }
+                                if full_pkg:
+                                    action['prefill']['full_package'] = 1
+                                if inc_transport:
+                                    action['prefill']['include_transport'] = 1
+                                if inc_hotel:
+                                    action['prefill']['include_hotel'] = 1
+                                if pending_extra_ids:
+                                    action['prefill']['extra_activity_ids'] = [str(pending_extra_ids[0])]
+                                if getattr(request, 'user', None) and request.user.is_authenticated:
+                                    action['autobook'] = 1
+                                computed_hints_lines.append("Booking is ready. Do not re-confirm; proceed as completed.")
 
-    if getattr(settings, 'CHAT_FORCE_LLM', False) and deterministic_reply:
-        # Give the model extra grounded hints without forcing the exact wording.
-        system_prompt = (
-            system_prompt
-            + "\n\nComputed hints (ground truth from the website/DB logic; do not contradict):\n"
-            + deterministic_reply
-        )
+                                if session_memory:
+                                    try:
+                                        request.session['chat_last_tour_id'] = int(tour.id)
+                                        request.session['chat_last_payment_method'] = payment_method_req
+                                        request.session['chat_last_full_package'] = bool(full_pkg)
+                                        request.session['chat_last_include_transport'] = bool(inc_transport)
+                                        request.session['chat_last_include_hotel'] = bool(inc_hotel)
+                                        request.session['chat_last_extra_activity_ids'] = list(pending_extra_ids or [])
+                                    except Exception:
+                                        pass
 
-    # If booking details are complete and the range is available, prepare a navigation action.
-    if booking_intent and start_date_req and end_date_req and persons_req:
-        requested_nights = max(0, (end_date_req - start_date_req).days)
-        if requested_nights <= 11 and _is_range_available(country, start_date_req, end_date_req, buffer_days=3):
-            tour, status, _candidates = _select_tour_for_booking(country, message, booking_hint)
-            if tour:
-                selected_tour_id = int(tour.id)
-                action['navigate'] = reverse('tour_detail', args=[tour.id])
-                action['prefill'] = {
-                    'start_date': start_date_req.strftime('%Y-%m-%d'),
-                    'end_date': end_date_req.strftime('%Y-%m-%d'),
-                    'persons': persons_req,
-                }
+                                if lang == 'fr':
+                                    deterministic_text = "✅ Parfait — je pré-remplis la réservation et je l’envoie maintenant (en attente de validation admin)."
+                                    if will_replace_existing:
+                                        deterministic_text += " (Cela remplace ta réservation précédente.)"
+                                else:
+                                    deterministic_text = "✅ Great — I’m prefilling and submitting your booking request now (pending admin validation)."
+                                    if will_replace_existing:
+                                        deterministic_text += " (This replaces your previous reservation.)"
+
+    if computed_hints_lines:
+        system_prompt = system_prompt + "\n\nComputed booking state (ground truth; follow strictly):\n- " + "\n- ".join(computed_hints_lines)
+
+    # If we have a deterministic booking/cancellation reply, return immediately (no LLM).
+    if deterministic_text:
+        final_action = action or {}
+
+        if session_memory:
+            try:
+                session_history = request.session.get('chat_history') or []
+                if not isinstance(session_history, list):
+                    session_history = []
+                session_history.append({'role': 'assistant', 'content': deterministic_text})
+                request.session['chat_history'] = session_history[-session_history_max:]
+            except Exception:
+                pass
+
+        def _gen_final():
+            yield _sse_pack({'type': 'final', 'text': deterministic_text, 'action': final_action, 'model': None})
+
+        resp = StreamingHttpResponse(_gen_final(), content_type='text/event-stream; charset=utf-8')
+        resp['Cache-Control'] = 'no-cache'
+        resp['X-Accel-Buffering'] = 'no'
+        return resp
 
     def event_stream():
         full_text_parts: list[str] = []
 
         llm_available = bool(getattr(settings, 'HF_API_TOKEN', '') or getattr(settings, 'OPENAI_API_KEY', ''))
+        if not llm_available:
+            # Requirement: do not serve canned/deterministic replies when no model is configured.
+            msg = (
+                "Assistant IA non configuré pour le moment (clé modèle manquante). Réessaie plus tard."
+                if lang == 'fr' else
+                "AI assistant is not configured right now (missing model key). Please try again later."
+            )
+            yield _sse_pack({'type': 'final', 'text': msg, 'action': action or {}, 'model': None})
+            return
 
         if getattr(settings, 'CHAT_DEBUG', False):
             yield _sse_pack({
@@ -848,19 +1084,7 @@ def ai_chat_stream(request):
                 'session_memory': session_memory,
             })
 
-        # If no LLM is configured, fall back to deterministic responses.
-        if _is_greeting(message) and (not llm_available or not getattr(settings, 'CHAT_FORCE_LLM', False)):
-            greet = _greeting_reply(country, lang)
-            greet = _redact_secrets(greet)
-            yield _sse_pack({'type': 'delta', 'text': greet})
-            yield _sse_pack({'type': 'final', 'text': greet, 'action': action or {}, 'model': None})
-            return
-
-        if deterministic_reply and (not llm_available or not getattr(settings, 'CHAT_FORCE_LLM', False)):
-            reply = _redact_secrets(deterministic_reply)
-            yield _sse_pack({'type': 'delta', 'text': reply})
-            yield _sse_pack({'type': 'final', 'text': reply, 'action': action or {}, 'model': None})
-            return
+        # We always prefer the model for responses (no canned replies).
 
         # Prefer HuggingFace streaming when configured.
         used_model = None
@@ -939,18 +1163,6 @@ def ai_chat_stream(request):
         except Exception as e:
             logging.exception('[ai_chat_stream] streaming exception')
 
-            # If we forced the LLM but it failed, fall back to the grounded deterministic reply.
-            if getattr(settings, 'CHAT_FORCE_LLM', False) and deterministic_reply:
-                reply = _redact_secrets(deterministic_reply)
-                full_text_parts = [reply]
-                yield _sse_pack({'type': 'delta', 'text': reply})
-                final_text = reply
-                parsed_action, cleaned = parse_actions_from_response(final_text, country)
-                final_action = action or parsed_action or {}
-                final_text = cleaned.strip() if cleaned else final_text
-                yield _sse_pack({'type': 'final', 'text': final_text, 'action': final_action, 'model': None})
-                return
-
             err = None
             # Common case in this project: OpenAI key present but quota exhausted.
             try:
@@ -969,13 +1181,6 @@ def ai_chat_stream(request):
                         "OpenAI quota is exceeded on the server. "
                         "For a real generative + streaming chat, configure HuggingFace: set HF_API_TOKEN and HF_MODEL."
                     )
-
-            if not err:
-                # Provide a useful non-LLM fallback instead of a generic error.
-                try:
-                    err = (generate_fallback_reply(message, country, lang=lang) or '').strip()
-                except Exception:
-                    err = None
 
             if not err:
                 if lang == 'fr':
@@ -1002,6 +1207,7 @@ def ai_chat_stream(request):
             end_date_req=end_date_req,
             persons_req=persons_req,
             allowed_tour_id=selected_tour_id,
+            exclude_user=request.user,
         )
         final_action = action or parsed_action or {}
         final_text = cleaned.strip() if cleaned else final_text
@@ -1094,10 +1300,75 @@ def _build_booking_rules_context() -> str:
         "Booking rules: maximum stay is 11 nights. "
         "Single-group rule: if there is any pending/booked reservation in a country, other tours in that country are unavailable for overlapping dates. "
         "Buffer rule: 3-day buffer after each reservation end date. "
+        "Currency: all prices shown to users are in USD. "
         "Pricing rules: the base price is per person per day and covers the guided tour, activities, and meals (lunch & dinner). "
         "Hotel and transport are optional add-ons unless explicitly selected (Full package = Transport + Hotel). "
         "Extra activities are optional add-ons; some are per day and some per trip (per person)."
     )
+
+
+def _detect_reservation_manage_intent(message: str) -> str | None:
+    """Return 'cancel' | 'change' | None based on FR/EN cues."""
+    msg = (message or '').strip().lower()
+    if not msg:
+        return None
+    if re.search(r"\b(cancel|cancellation|annul(?:er|e|es)?|supprim(?:er|e|es)?|delete)\b", msg):
+        return 'cancel'
+    if re.search(r"\b(change|changer|modif(?:ier|ie|ies)?|move|shift|resched(?:ule|uling)?|report(?:er|e|es)?)\b", msg):
+        return 'change'
+    return None
+
+
+def _cancel_matching_user_reservation(
+    *,
+    user,
+    country: str,
+    start_date: date | None,
+    end_date: date | None,
+    destination_hint: str | None,
+    tour_id_hint: int | None,
+):
+    """Cancel a best-match active reservation for a user.
+
+    Returns (reservation, status) where status is one of:
+      'cancelled', 'none', 'ambiguous'
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return None, 'none'
+    country = _normalize_country(country)
+
+    try:
+        qs = Reservation.objects.filter(
+            user=user,
+            tour__country=country,
+        ).exclude(status__in=['cancelled', 'rejected', 'completed']).select_related('tour', 'tour__destination').order_by('-created_at')
+    except Exception:
+        return None, 'none'
+
+    if tour_id_hint:
+        qs = qs.filter(tour_id=int(tour_id_hint))
+    elif destination_hint:
+        qs = qs.filter(
+            Q(tour__destination__name__icontains=destination_hint) |
+            Q(tour__title__icontains=destination_hint)
+        )
+
+    if start_date and end_date:
+        qs = qs.filter(start_date__lt=end_date, end_date__gt=start_date)
+
+    candidates = list(qs[:3])
+    if not candidates:
+        return None, 'none'
+    if len(candidates) > 1 and not (tour_id_hint or destination_hint or (start_date and end_date)):
+        return None, 'ambiguous'
+
+    r = candidates[0]
+    try:
+        r.status = 'cancelled'
+        r.save(update_fields=['status'])
+        return r, 'cancelled'
+    except Exception:
+        return None, 'none'
 
 
 def _detect_language(message: str) -> str:
@@ -1117,6 +1388,9 @@ def _detect_language(message: str) -> str:
 def _extract_booking_details(message: str):
     """Extract (start_date, end_date, persons, destination_hint) from FR/EN/ISO-ish messages."""
     msg_lower = (message or '').lower()
+    # Normalize common ordinal tokens that can appear as separate words (e.g. "5 may th").
+    msg_lower = re.sub(r'\b(st|nd|rd|th)\b', '', msg_lower)
+    msg_lower = re.sub(r'\s+', ' ', msg_lower).strip()
 
     months = {
         'january': 1, 'jan': 1, 'janvier': 1,
@@ -1228,6 +1502,34 @@ def _extract_booking_details(message: str):
             except Exception:
                 start_date = end_date = None
 
+    # Month-first: May 5 to May 8 (EN/FR month tokens supported)
+    if not (start_date and end_date):
+        m = re.search(
+            r'(january|jan|janvier|february|feb|février|fevrier|march|mar|mars|april|apr|avril|may|mai|june|jun|juin|july|jul|juillet|august|aug|août|aout|september|sep|sept|septembre|october|oct|octobre|november|nov|novembre|december|dec|décembre|decembre)'
+            r'\s*(\d{1,2})\s*(?:to|until|au|à|a|\-|–|—)\s*'
+            r'(january|jan|janvier|february|feb|février|fevrier|march|mar|mars|april|apr|avril|may|mai|june|jun|juin|july|jul|juillet|august|aug|août|aout|september|sep|sept|septembre|october|oct|octobre|november|nov|novembre|december|dec|décembre|decembre)'
+            r'\s*(\d{1,2})'
+            r'(?:\s*(\d{4}))?',
+            msg_lower,
+        )
+        if m:
+            try:
+                smonth, sday, emonth, eday, year = m.groups()
+                y = int(year) if year else date.today().year
+                start_date = date(y, parse_month(smonth) or 1, int(sday))
+                end_date = date(y, parse_month(emonth) or 1, int(eday))
+            except Exception:
+                start_date = end_date = None
+
+    # If year is omitted and the date is clearly in the past, roll to next year.
+    if start_date and end_date and (start_date.year == date.today().year):
+        try:
+            if (start_date < date.today() - timedelta(days=7)) and (str(date.today().year) not in msg_lower):
+                start_date = date(start_date.year + 1, start_date.month, start_date.day)
+                end_date = date(end_date.year + 1, end_date.month, end_date.day)
+        except Exception:
+            pass
+
     if start_date and end_date and end_date < start_date:
         start_date, end_date = end_date, start_date
 
@@ -1249,15 +1551,197 @@ def _extract_booking_details(message: str):
     return start_date, end_date, persons, destination_hint
 
 
-def _get_country_blocked_ranges(country: str, buffer_days: int = 3):
-    """Returns list of blocked date ranges (start, end_inclusive) for a country."""
+def _extract_day_range_without_month(message: str, ref: date | None) -> tuple[date | None, date | None]:
+    """Extract a day-only range like 'from 8 to 11' and apply ref month/year.
+
+    Intended for follow-up messages where the user changes only the day while
+    keeping the same month as the ongoing (pending) booking.
+    """
+    if not ref:
+        return None, None
+
+    msg = (message or '').lower().strip()
+    if not msg:
+        return None, None
+
+    # Normalize ordinals like "8th".
+    msg = re.sub(r'\b(st|nd|rd|th)\b', '', msg)
+    msg = re.sub(r'\s+', ' ', msg).strip()
+
+    m = re.search(r'(?:from\s*)?(\d{1,2})\s*(?:to|until|au|à|a|\-|–|—)\s*(\d{1,2})\b', msg)
+    if not m:
+        # French short form sometimes: "du 8 au 11"
+        m = re.search(r'(?:du\s*)?(\d{1,2})\s*(?:au|à|a|\-|–|—)\s*(\d{1,2})\b', msg)
+    if not m:
+        return None, None
+
+    try:
+        sday = int(m.group(1))
+        eday = int(m.group(2))
+        start_date = date(ref.year, ref.month, sday)
+        end_date = date(ref.year, ref.month, eday)
+    except Exception:
+        return None, None
+
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    return start_date, end_date
+
+
+def _extract_booking_addons(message: str) -> dict:
+    """Extract add-on preferences from a free-form message.
+
+    Returns dict with keys:
+      full_package (bool|None), include_transport (bool|None), include_hotel (bool|None), extras (bool|None)
+    """
+    msg = (message or '').lower()
+    msg = re.sub(r'\s+', ' ', msg).strip()
+
+    full_package = None
+    include_transport = None
+    include_hotel = None
+    extras = None
+
+    if re.search(r'\b(full\s*package|package\s*complet|pack\s*complet|tout\s*inclus|all\s*inclusive|all\s*included)\b', msg):
+        full_package = True
+        include_transport = True
+        include_hotel = True
+
+    if re.search(r'\b(transport|car|driver|pickup|pick\s*up)\b', msg):
+        include_transport = True
+    if re.search(r'\b(hotel|h[oô]tel|accommodation|hébergement|hebergement)\b', msg):
+        include_hotel = True
+
+    # Explicit negatives
+    if re.search(r'\b(without|no|sans)\b[^\n]{0,40}\b(extra|extras|extra\s*activities|activit[eé]s?\s*extra|activit[eé]s?\s*suppl[eé]mentaires)\b', msg):
+        extras = False
+    elif re.search(r'\b(with|avec)\b[^\n]{0,40}\b(extra|extras|extra\s*activities|activit[eé]s?\s*extra)\b', msg):
+        extras = True
+
+    return {
+        'full_package': full_package,
+        'include_transport': include_transport,
+        'include_hotel': include_hotel,
+        'extras': extras,
+    }
+
+
+def _select_single_extra_activity_id(tour: Tour | None, message: str) -> int | None:
+    """Return a single matching TourExtraActivity id for this tour, or None.
+
+    Matching is conservative to avoid accidental selections.
+    """
+    if not tour or not message:
+        return None
+    msg = (message or '').lower()
+    msg = re.sub(r"[^a-z0-9\s\-']+", ' ', msg)
+    msg = re.sub(r'\s+', ' ', msg).strip()
+    if not msg:
+        return None
+
+    try:
+        extras = list(tour.extra_activities.filter(is_active=True).only('id', 'title'))
+    except Exception:
+        extras = []
+    if not extras:
+        return None
+
+    best_id = None
+    best_score = 0
+    for ea in extras:
+        title = (getattr(ea, 'title', '') or '').lower().strip()
+        if not title:
+            continue
+
+        score = 0
+        if title in msg:
+            score = 100 + len(title)
+        else:
+            tokens = [t for t in re.findall(r"[a-z0-9']+", title) if len(t) >= 4]
+            if tokens:
+                score = sum(1 for t in tokens if t in msg) * 10
+
+        if score > best_score:
+            best_score = score
+            best_id = int(ea.id)
+
+    return best_id if best_score >= 10 else None
+
+
+def _format_tour_extra_activities(tour: Tour | None, limit: int = 6) -> str:
+    if not tour:
+        return ''
+    try:
+        extras = list(tour.extra_activities.filter(is_active=True).only('title').order_by('id'))
+    except Exception:
+        extras = []
+    titles = [str(getattr(ea, 'title', '') or '').strip() for ea in extras if str(getattr(ea, 'title', '') or '').strip()]
+    if not titles:
+        return ''
+    titles = titles[: max(1, int(limit))]
+    return '; '.join(titles)
+
+
+def _extract_payment_method(message: str) -> str | None:
+    """Return 'cash', 'card', or None from a short FR/EN message."""
+    msg = (message or '').strip().lower()
+    if not msg:
+        return None
+
+    # Prefer explicit mentions.
+    if re.search(r"\b(card|carte|cb|credit|visa|mastercard)\b", msg):
+        return 'card'
+    if re.search(r"\b(cash|esp[eè]ces?|espece|liquide|sur\s*place)\b", msg):
+        return 'cash'
+    return None
+
+
+_CHAT_PENDING_BOOKING_KEY = 'chat_pending_booking_v1'
+
+
+def _get_pending_booking(request) -> dict | None:
+    try:
+        pending = request.session.get(_CHAT_PENDING_BOOKING_KEY)
+    except Exception:
+        return None
+    return pending if isinstance(pending, dict) else None
+
+
+def _set_pending_booking(request, pending: dict | None) -> None:
+    try:
+        if pending:
+            request.session[_CHAT_PENDING_BOOKING_KEY] = pending
+        else:
+            request.session.pop(_CHAT_PENDING_BOOKING_KEY, None)
+    except Exception:
+        return
+
+
+def _date_from_iso(s: str | None) -> date | None:
+    if not s:
+        return None
+    try:
+        return datetime.strptime(str(s), '%Y-%m-%d').date()
+    except Exception:
+        return None
+
+
+def _get_country_blocked_ranges(country: str, buffer_days: int = 3, exclude_user=None):
+    """Returns list of blocked date ranges (start, end_inclusive) for a country.
+
+    If exclude_user is provided, their reservations are ignored (useful when a user
+    is updating their own booking and we only want to block other users).
+    """
     country = _normalize_country(country)
     active_statuses = ['pending', 'booked']
     try:
         reservations = Reservation.objects.filter(
             tour__country=country,
             status__in=active_statuses,
-        ).order_by('start_date')
+        )
+        if exclude_user and getattr(exclude_user, 'is_authenticated', False):
+            reservations = reservations.exclude(user=exclude_user)
+        reservations = reservations.order_by('start_date')
     except (OperationalError, ProgrammingError):
         return []
 
@@ -1282,22 +1766,95 @@ def _get_country_blocked_ranges(country: str, buffer_days: int = 3):
     return [(s, e) for s, e in merged]
 
 
-def _is_range_available(country: str, start_date: date, end_date: date, buffer_days: int = 3) -> bool:
+def _is_range_available(country: str, start_date: date, end_date: date, buffer_days: int = 3, exclude_user=None) -> bool:
+    """Return True iff there is no DB reservation blocking the requested window.
+
+    IMPORTANT: availability must be based only on persisted `Reservation` rows in DB
+    (pending/booked), never on chat/session text.
+    """
     if not start_date or not end_date:
         return False
     country = _normalize_country(country)
-    blocked = _get_country_blocked_ranges(country, buffer_days=buffer_days)
-    # booking overlap check with buffer: block window_start .. end_date
+
+    try:
+        buffer_days = int(buffer_days)
+    except Exception:
+        buffer_days = 3
+    buffer_days = max(0, buffer_days)
+
+    # Buffer rule: we block if an existing reservation overlaps either the requested
+    # stay OR the pre-buffer window_start.
     window_start = start_date - timedelta(days=buffer_days)
-    for s, e in blocked:
-        if s <= end_date and e >= window_start:
-            return False
-    return True
+    active_statuses = ['pending', 'booked']
+
+    try:
+        qs = Reservation.objects.filter(
+            tour__country=country,
+            status__in=active_statuses,
+            start_date__lte=end_date,
+            end_date__gte=window_start,
+        )
+        if exclude_user and getattr(exclude_user, 'is_authenticated', False):
+            qs = qs.exclude(user=exclude_user)
+        return not qs.exists()
+    except Exception:
+        # Fail-open for the assistant (don't wrongly claim "unavailable" on errors).
+        return True
+
+
+def _user_break_buffer_ok(user, country: str, start_date: date, buffer_days: int = 3) -> bool:
+    """Enforce a per-user buffer after their last reservation end date.
+
+    This is separate from the global single-group rule (which blocks other users).
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return True
+    if not start_date:
+        return True
+    country = _normalize_country(country)
+    try:
+        last = (
+            Reservation.objects.filter(user=user, tour__country=country)
+            .exclude(status__in=['cancelled', 'rejected'])
+            .order_by('-end_date')
+            .only('end_date')
+            .first()
+        )
+    except Exception:
+        return True
+    if not last or not getattr(last, 'end_date', None):
+        return True
+    try:
+        return start_date >= (last.end_date + timedelta(days=int(buffer_days)))
+    except Exception:
+        return True
+
+
+def _user_has_overlapping_reservation(user, country: str, start_date: date, end_date: date) -> bool:
+    """True if user already has an active reservation overlapping [start_date, end_date)."""
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    if not start_date or not end_date:
+        return False
+    country = _normalize_country(country)
+    try:
+        return Reservation.objects.filter(
+            user=user,
+            tour__country=country,
+            status__in=['pending', 'booked', 'completed'],
+        ).filter(
+            start_date__lt=end_date,
+            end_date__gt=start_date,
+        ).exists()
+    except Exception:
+        return False
 
 
 def _suggest_available_ranges(country: str, nights: int = 5, horizon_days: int = 120, limit: int = 4, buffer_days: int = 3):
     """Suggest next available continuous date ranges for a given stay length."""
     country = _normalize_country(country)
+    # Let users book far in the future; suggestions should cover more than ~4 months.
+    horizon_days = max(int(horizon_days), 365)
     nights = max(1, min(int(nights), 11))
     today = date.today()
 
@@ -1312,6 +1869,38 @@ def _suggest_available_ranges(country: str, nights: int = 5, horizon_days: int =
         if end > end_horizon:
             break
         if _is_range_available(country, start, end, buffer_days=buffer_days):
+            suggestions.append((start, end))
+            d = start + timedelta(days=7)
+        else:
+            d = d + timedelta(days=1)
+    return suggestions
+
+
+def _suggest_available_ranges_near(
+    country: str,
+    anchor: date,
+    *,
+    nights: int,
+    window_days: int = 180,
+    limit: int = 4,
+    buffer_days: int = 3,
+    exclude_user=None,
+):
+    """Suggest available ranges near an anchor date (useful for far-future requests)."""
+    country = _normalize_country(country)
+    if not anchor:
+        return []
+    nights = max(1, min(int(nights), 11))
+    today = date.today()
+    start_scan = max(today, anchor - timedelta(days=14))
+    end_scan = anchor + timedelta(days=int(window_days))
+
+    suggestions = []
+    d = start_scan
+    while d <= end_scan and len(suggestions) < limit:
+        start = d
+        end = d + timedelta(days=nights)
+        if _is_range_available(country, start, end, buffer_days=buffer_days, exclude_user=exclude_user):
             suggestions.append((start, end))
             d = start + timedelta(days=7)
         else:
@@ -1537,6 +2126,7 @@ def _filter_navigation_action(
     end_date_req,
     persons_req,
     allowed_tour_id: int | None,
+    exclude_user=None,
 ) -> dict:
     if not action or not isinstance(action, dict):
         return {}
@@ -1563,7 +2153,7 @@ def _filter_navigation_action(
         return action
 
     requested_nights = max(0, (end_date_req - start_date_req).days)
-    if requested_nights > 11 or (not _is_range_available(country, start_date_req, end_date_req, buffer_days=3)):
+    if requested_nights > 11 or (not _is_range_available(country, start_date_req, end_date_req, buffer_days=3, exclude_user=exclude_user)):
         action.pop('navigate', None)
         action.pop('prefill', None)
         return action
@@ -1727,9 +2317,9 @@ def _format_tour_info_reply(
 
         if 'price' in intents:
             if lang == 'fr':
-                line = f"- {header}: {t.price_per_night} par nuit."
+                line = f"- {header}: {t.price_per_night} USD par nuit."
             else:
-                line = f"- {header}: {t.price_per_night} per night."
+                line = f"- {header}: {t.price_per_night} USD per night."
             if getattr(t, 'is_promotion', False) and getattr(t, 'discount_percent', 0):
                 if lang == 'fr':
                     line += f" Promo: -{t.discount_percent}%."
@@ -1934,9 +2524,16 @@ def ai_chat_history(request):
         return JsonResponse({'history': []})
     except (OperationalError, ProgrammingError):
         return JsonResponse({'history': []})
-def tour_detail(request, tour_id):
+def tour_detail_legacy(request, tour_id: int):
+    """Legacy /tour/<id>/ endpoint that redirects to the slug URL."""
     country = get_country_from_site(request)
     tour = get_object_or_404(Tour, id=tour_id, country=country)
+    return HttpResponsePermanentRedirect(reverse('tour_detail', args=[tour.slug]))
+
+
+def tour_detail(request, tour_slug: str):
+    country = get_country_from_site(request)
+    tour = get_object_or_404(Tour, slug=tour_slug, country=country)
 
     reservation = None
     if request.user.is_authenticated:
@@ -2032,18 +2629,28 @@ def ai_chat(request):
     except Exception:
         return JsonResponse({'error': 'Invalid JSON payload.'}, status=400)
 
-    message = _redact_secrets(payload.get('message', '').strip())
+    message = _redact_secrets((payload.get('message') or '').strip())
     if not message:
         return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
 
+    if not getattr(request, 'user', None) or not request.user.is_authenticated:
+        return JsonResponse({
+            'reply': 'Please log in to use the chat and to book.',
+            'action': {'navigate': reverse('login')},
+        }, status=200)
+
+    llm_available = bool(getattr(settings, 'HF_API_TOKEN', '') or getattr(settings, 'OPENAI_API_KEY', ''))
+    if not llm_available:
+        return JsonResponse({'error': 'AI assistant not configured.'}, status=503)
+
     country = _normalize_country(get_country_from_site(request) or 'morocco')
     country_label = _country_label(country)
+    lang = getattr(settings, 'CHAT_FORCE_LANGUAGE', '') or _detect_language(message)
 
     welcome_should_show = _welcome_should_show(request)
     welcome_enabled = bool(welcome_should_show and _is_starting_chat(message))
     if welcome_enabled:
         _mark_welcome_shown(request)
-    # Privacy: do NOT store chat messages in DB.
 
     request_id = uuid.uuid4().hex
     session_memory = bool(getattr(settings, 'CHAT_SESSION_MEMORY', False))
@@ -2059,294 +2666,387 @@ def ai_chat(request):
         session_history.append({'role': 'user', 'content': message})
         request.session['chat_history'] = session_history[-session_history_max:]
 
-    bot_reply = ''
-    action = {}
+    action: dict = {}
     used_model = None
-    lang = getattr(settings, 'CHAT_FORCE_LANGUAGE', '') or _detect_language(message)
+    deterministic_text: str | None = None
 
-    if _is_greeting(message):
-        bot_reply = _greeting_reply(country, lang)
-    elif _is_smalltalk(message):
-        bot_reply = _smalltalk_reply(country, lang)
-
-    if _detect_how_it_works_intent(message) and not bot_reply:
-        bot_reply = _how_it_works_reply(country, lang)
-
-    if _detect_list_cities_intent(message) and not bot_reply:
-        bot_reply = _list_cities_reply(country, lang, limit=12)
-
-    booking_intent = any(k in message.lower() for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
-    include_admin_hint = bool(getattr(request, 'user', None) and getattr(request.user, 'is_staff', False))
-
-    # Parse once, reuse everywhere
+    msg_lower = message.lower()
+    keyword_booking_intent = any(k in msg_lower for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
     start_date_req, end_date_req, persons_req, parsed_dest = _extract_booking_details(message)
+    payment_method_req = _extract_payment_method(message)
+    addons_req = _extract_booking_addons(message)
+
     destination_hint = None
     if not _is_greeting(message) and not _is_smalltalk(message):
         destination_hint = _resolve_destination_hint(country, message, parsed_dest)
 
+    pending = _get_pending_booking(request)
+    pending_extra_ids: list[str] = []
+    if pending:
+        # Follow-up date updates like "from 8th to 11th" may omit the month/year.
+        # Infer them from the pending booking month to keep the flow deterministic.
+        if not (start_date_req and end_date_req):
+            ref = _date_from_iso(pending.get('start_date')) or _date_from_iso(pending.get('end_date'))
+            sd2, ed2 = _extract_day_range_without_month(message, ref)
+            if sd2 and ed2:
+                start_date_req, end_date_req = sd2, ed2
 
-    # If the user asked about a specific destination but there are no tours for it, be explicit.
-    if (not bot_reply) and parsed_dest and (not destination_hint) and _detect_list_tours_intent(message):
-        if not _tours_for_hint(country, parsed_dest):
-            asked = parsed_dest
-            bot_reply = (
-                f"Désolé — je n’ai pas encore de tour pour “{asked}” sur ce site."
-                if lang == 'fr' else
-                f"Sorry — we don’t have a tour for “{asked}” on this site yet."
-            )
-
-    if session_memory:
-        if (not destination_hint) and (not parsed_dest):
-            destination_hint = request.session.get('chat_last_destination')
+        if not destination_hint:
+            destination_hint = (pending.get('destination') or None)
         if not persons_req:
             try:
-                persons_req = int(request.session.get('chat_last_persons') or 0) or None
+                persons_req = int(pending.get('persons') or 0) or None
             except Exception:
                 persons_req = None
-        if destination_hint:
-            request.session['chat_last_destination'] = destination_hint
-        if persons_req:
-            request.session['chat_last_persons'] = int(persons_req)
-        if start_date_req:
-            request.session['chat_last_start_date'] = start_date_req.strftime('%Y-%m-%d')
-        if end_date_req:
-            request.session['chat_last_end_date'] = end_date_req.strftime('%Y-%m-%d')
+        if not start_date_req:
+            start_date_req = _date_from_iso(pending.get('start_date'))
+        if not end_date_req:
+            end_date_req = _date_from_iso(pending.get('end_date'))
+        if not payment_method_req:
+            pm = (pending.get('payment_method') or '').strip().lower()
+            payment_method_req = pm if pm in {'cash', 'card'} else None
+
+        # Merge add-ons from pending unless explicitly provided in current message.
+        for key in ['full_package', 'include_transport', 'include_hotel', 'extras']:
+            if addons_req.get(key) is None and isinstance(pending.get(key), (bool, type(None))):
+                addons_req[key] = pending.get(key)
+
+        _pei = pending.get('extra_activity_ids')
+        if isinstance(_pei, list):
+            pending_extra_ids = [str(x).strip() for x in _pei if str(x).strip()]
 
     booking_hint = (parsed_dest or destination_hint)
-    selected_tour_id: int | None = None
+    has_core_booking_fields = bool(booking_hint and start_date_req and end_date_req and persons_req)
+    booking_intent = bool(keyword_booking_intent or has_core_booking_fields or pending)
 
-    # DB-backed informational Q&A (price / activities / what's included) — highest priority
-    info_intents = _detect_info_intent(message)
-    if info_intents and not bot_reply:
-        tours = _find_relevant_tours(country, destination_hint, limit=3) if destination_hint else []
-        bot_reply = _format_tour_info_reply(
-            country,
-            tours,
-            info_intents,
-            lang,
-            include_booking_tip=booking_intent,
-            include_admin_hint=include_admin_hint,
+    # Reservation management (cancel / change) should be handled without looping.
+    manage_intent = _detect_reservation_manage_intent(message)
+    tour_id_hint = None
+    try:
+        if pending and pending.get('tour_id'):
+            tour_id_hint = int(pending.get('tour_id'))
+        elif session_memory:
+            tour_id_hint = int(request.session.get('chat_last_tour_id') or 0) or None
+    except Exception:
+        tour_id_hint = None
+
+    if manage_intent == 'cancel':
+        r, st = _cancel_matching_user_reservation(
+            user=request.user,
+            country=country,
+            start_date=start_date_req,
+            end_date=end_date_req,
+            destination_hint=booking_hint,
+            tour_id_hint=tour_id_hint,
         )
-
-    if _detect_list_tours_intent(message) and not destination_hint and not bot_reply:
-        bot_reply = _list_tours_reply(country, lang, limit=6)
-
-    if destination_hint and persons_req and not (start_date_req and end_date_req) and not bot_reply:
-        if lang == 'fr':
-            bot_reply = f"Parfait — pour {persons_req} personnes à {destination_hint}. Quelles sont tes dates (arrivée et départ) ?"
+        _set_pending_booking(request, None)
+        if st == 'cancelled' and r:
+            tour_title = getattr(getattr(r, 'tour', None), 'title', '') or 'your tour'
+            deterministic_text = (
+                f"✅ C’est fait — j’ai annulé ta réservation pour “{tour_title}”." if lang == 'fr'
+                else f"✅ Done — I cancelled your reservation for “{tour_title}”."
+            )
+        elif st == 'ambiguous':
+            deterministic_text = (
+                "J’ai trouvé plusieurs réservations actives. Tu veux annuler laquelle (ville ou dates) ?" if lang == 'fr'
+                else "I found multiple active reservations. Which one should I cancel (city or dates)?"
+            )
         else:
-            bot_reply = f"Great — for {persons_req} people in {destination_hint}. What dates are you considering (check-in and check-out)?"
+            deterministic_text = (
+                "Je ne trouve aucune réservation active à annuler pour le moment." if lang == 'fr'
+                else "I can’t find an active reservation to cancel right now."
+            )
 
-    # Booking intelligence (works even without OpenAI credits)
-    if booking_intent and not bot_reply:
-        # If dates provided, validate rules + availability first.
-        if start_date_req and end_date_req:
+    computed_hints_lines: list[str] = []
+    if (not deterministic_text) and booking_intent:
+        missing = []
+        if not booking_hint:
+            missing.append('destination/tour')
+        if not (start_date_req and end_date_req):
+            missing.append('dates')
+        if not persons_req:
+            missing.append('number_of_people')
+
+        if missing:
+            computed_hints_lines.append(
+                "Booking intent detected. Missing fields: " + ", ".join(missing) + ". Ask ONLY for the most important missing field (one question)."
+            )
+            if lang == 'fr':
+                if 'destination/tour' in missing:
+                    deterministic_text = "Pour quelle ville/destination veux-tu réserver ?"
+                elif 'dates' in missing:
+                    deterministic_text = "Quelles dates (du … au …) ?"
+                else:
+                    deterministic_text = "C’est pour combien de personnes ?"
+            else:
+                if 'destination/tour' in missing:
+                    deterministic_text = "Which city/destination is the tour for?"
+                elif 'dates' in missing:
+                    deterministic_text = "What dates (from … to …)?"
+                else:
+                    deterministic_text = "How many people is it for?"
+        else:
             requested_nights = max(0, (end_date_req - start_date_req).days)
-            if requested_nights > 11:
-                bot_reply = (
-                    "Désolé, la durée maximale est de 11 nuits. Peux-tu choisir une période plus courte ?"
-                    if lang == 'fr' else
-                    "Sorry — the maximum stay is 11 nights. Can you pick a shorter date range?"
+            if requested_nights <= 0:
+                computed_hints_lines.append("Invalid date range: end_date must be after start_date. Ask the user to correct dates.")
+                deterministic_text = (
+                    "La date de fin doit être après la date de début. Tu peux me redonner les dates (du … au …) ?" if lang == 'fr'
+                    else "End date must be after start date. Can you resend the dates (from … to …)?"
+                )
+            elif requested_nights > 11:
+                computed_hints_lines.append("Booking rule: maximum stay is 11 nights. Ask for a shorter date range.")
+                deterministic_text = (
+                    "La durée maximale est de 11 nuits. Peux-tu choisir des dates plus courtes ?" if lang == 'fr'
+                    else "Maximum stay is 11 nights. Can you choose a shorter date range?"
                 )
             else:
-                # If the user mentioned a specific tour/city, verify it exists before talking about date availability.
-                tour_check, status_check, candidates_check = _select_tour_for_booking(country, message, booking_hint)
-                explicit_id = _extract_explicit_tour_id(message)
-                if (explicit_id or booking_hint) and status_check != 'ok':
-                    if status_check == 'multiple' and candidates_check:
-                        titles = [f"{t.id}: {t.title}" for t in candidates_check[:5]]
-                        bot_reply = (
-                            "Plusieurs tours correspondent. Lequel veux-tu réserver (ID ou titre) ?\n- "
-                            + "\n- ".join(titles)
-                            if lang == 'fr' else
-                            "I found multiple matching tours. Which one do you want to book (ID or title)?\n- "
-                            + "\n- ".join(titles)
-                        )
-                    else:
-                        asked = (f"tour #{explicit_id}" if explicit_id else (booking_hint or 'that destination'))
-                        bot_reply = (
-                            f"Désolé — ce tour/destination (“{asked}”) n’est pas encore disponible sur ce site."
-                            if lang == 'fr' else
-                            f"Sorry — this tour/destination (“{asked}”) isn’t available on this site yet."
-                        )
+                will_replace_existing = _user_has_overlapping_reservation(request.user, country, start_date_req, end_date_req)
+                tour, status, candidates = _select_tour_for_booking(country, message, booking_hint)
 
-            if bot_reply:
-                pass
-            elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=3):
-                suggestions = _suggest_available_ranges(country, nights=min(max(requested_nights, 3), 11), limit=4)
-                if lang == 'fr':
-                    if suggestions:
-                        sug_txt = " ; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
-                        bot_reply = (
-                            "Ces dates semblent déjà bloquées sur ce site. Voici des alternatives disponibles : "
-                            + sug_txt
-                            + ". Tu préfères laquelle ?"
-                        )
-                    else:
-                        bot_reply = "Ces dates semblent déjà bloquées sur ce site. Donne-moi une autre période (et le nombre de personnes) et je te propose des options."
-                else:
-                    if suggestions:
-                        sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
-                        bot_reply = (
-                            "Those dates look unavailable on this site. Here are available alternatives: "
-                            + sug_txt
-                            + ". Which one do you prefer?"
-                        )
-                    else:
-                        bot_reply = "Those dates look unavailable on this site. Share another date range (+ number of people) and I’ll suggest options."
-            else:
-                # Dates are available. If persons is given, we can navigate/prefill.
-                if not persons_req:
-                    bot_reply = (
-                        "Parfait — pour combien de personnes ?"
-                        if lang == 'fr' else
-                        "Great — for how many people?"
+                if not tour:
+                    computed_hints_lines.append("Could not resolve an exact tour from the user's destination. Ask them to specify the destination or tour ID.")
+                    deterministic_text = (
+                        "Je ne trouve pas le tour exact. Tu peux préciser la ville/destination ou me donner l’ID du tour ?" if lang == 'fr'
+                        else "I can’t resolve the exact tour. Can you specify the destination/city or the tour ID?"
                     )
                 else:
-                    tour, status, candidates = _select_tour_for_booking(country, message, booking_hint)
-                    if not tour:
-                        if status == 'multiple' and candidates:
-                            titles = [f"{t.id}: {t.title}" for t in candidates[:5]]
-                            bot_reply = (
-                                "Plusieurs tours correspondent. Lequel veux-tu réserver (ID ou titre) ?\n- "
-                                + "\n- ".join(titles)
-                                if lang == 'fr' else
-                                "I found multiple matching tours. Which one do you want to book (ID or title)?\n- "
-                                + "\n- ".join(titles)
+                    chosen_extra_id = _select_single_extra_activity_id(tour, message)
+                    if chosen_extra_id:
+                        addons_req['extras'] = True
+                        pending_extra_ids = [str(chosen_extra_id)]
+
+                    if addons_req.get('extras') is False:
+                        pending_extra_ids = []
+                        computed_hints_lines.append("User explicitly does NOT want extra activities. Do not ask about extras.")
+
+                    if addons_req.get('extras') is True and not pending_extra_ids:
+                        # If the user replies with a bare "yes" and there is only ONE extra option,
+                        # auto-select it to avoid looping on the same question.
+                        if _is_affirmative(message):
+                            try:
+                                only_extra = list(tour.extra_activities.filter(is_active=True).only('id').order_by('id')[:2])
+                            except Exception:
+                                only_extra = []
+                            if len(only_extra) == 1:
+                                pending_extra_ids = [str(getattr(only_extra[0], 'id'))]
+
+                        options_txt = _format_tour_extra_activities(tour)
+                        if options_txt:
+                            _set_pending_booking(request, {
+                                'tour_id': int(tour.id),
+                                'destination': booking_hint or '',
+                                'start_date': start_date_req.strftime('%Y-%m-%d'),
+                                'end_date': end_date_req.strftime('%Y-%m-%d'),
+                                'persons': int(persons_req),
+                                'payment_method': payment_method_req,
+                                'full_package': bool(addons_req.get('full_package')),
+                                'include_transport': bool(addons_req.get('include_transport') or bool(addons_req.get('full_package'))),
+                                'include_hotel': bool(addons_req.get('include_hotel') or bool(addons_req.get('full_package'))),
+                                'extras': True,
+                                'extra_activity_ids': [],
+                            })
+                            computed_hints_lines.append(
+                                "User wants extra activities. Ask them to choose exactly ONE extra activity from these options: " + options_txt + "."
+                            )
+                            deterministic_text = (
+                                "Tu veux une activité extra. Choisis-en UNE: " + options_txt if lang == 'fr'
+                                else "You want an extra activity. Pick EXACTLY ONE: " + options_txt
                             )
                         else:
-                            explicit_id = _extract_explicit_tour_id(message)
-                            if (not booking_hint) and (not explicit_id):
-                                bot_reply = (
-                                    "Pour quel tour / quelle ville veux-tu réserver ? Donne le nom de la destination ou l’ID du tour."
-                                    if lang == 'fr' else
-                                    "Which tour/city do you want to book? Tell me the destination name or the tour ID."
+                            addons_req['extras'] = False
+                            pending_extra_ids = []
+                    else:
+                        if not _user_break_buffer_ok(request.user, country, start_date_req, buffer_days=3):
+                            computed_hints_lines.append("User must respect a 3-day break after their last reservation end date. Ask them to choose a later start date.")
+                            # Preserve booking context so user can reply with only new dates.
+                            _set_pending_booking(request, {
+                                'tour_id': int(tour.id),
+                                'destination': booking_hint or '',
+                                'start_date': start_date_req.strftime('%Y-%m-%d'),
+                                'end_date': end_date_req.strftime('%Y-%m-%d'),
+                                'persons': int(persons_req),
+                                'payment_method': payment_method_req,
+                                'full_package': bool(addons_req.get('full_package')),
+                                'include_transport': bool(addons_req.get('include_transport') or bool(addons_req.get('full_package'))),
+                                'include_hotel': bool(addons_req.get('include_hotel') or bool(addons_req.get('full_package'))),
+                                'extras': addons_req.get('extras'),
+                                'extra_activity_ids': pending_extra_ids,
+                            })
+                            deterministic_text = (
+                                "Tu dois laisser 3 jours de pause après ta dernière réservation. Peux-tu choisir une date de début plus tardive ?" if lang == 'fr'
+                                else "You need a 3-day break after your last reservation. Can you choose a later start date?"
+                            )
+                        elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=3, exclude_user=request.user):
+                            _set_pending_booking(request, {
+                                'tour_id': int(tour.id),
+                                'destination': booking_hint or '',
+                                'start_date': start_date_req.strftime('%Y-%m-%d'),
+                                'end_date': end_date_req.strftime('%Y-%m-%d'),
+                                'persons': int(persons_req),
+                                'payment_method': payment_method_req,
+                                'full_package': bool(addons_req.get('full_package')),
+                                'include_transport': bool(addons_req.get('include_transport') or bool(addons_req.get('full_package'))),
+                                'include_hotel': bool(addons_req.get('include_hotel') or bool(addons_req.get('full_package'))),
+                                'extras': addons_req.get('extras'),
+                                'extra_activity_ids': pending_extra_ids,
+                            })
+                            suggestions = _suggest_available_ranges_near(
+                                country,
+                                start_date_req,
+                                nights=min(max(requested_nights, 3), 11),
+                                limit=4,
+                                buffer_days=3,
+                                exclude_user=request.user,
+                            )
+                            if suggestions:
+                                sug_txt = " ; ".join([f"{s.strftime('%Y-%m-%d')} to {e.strftime('%Y-%m-%d')}" for s, e in suggestions])
+                                computed_hints_lines.append(
+                                    "Requested dates are unavailable. Propose these available alternatives: " + sug_txt + ". Ask which one they prefer."
+                                )
+                                deterministic_text = (
+                                    "Ces dates ne sont pas disponibles. Tu préfères laquelle ? " + sug_txt if lang == 'fr'
+                                    else "Those dates aren’t available. Which option do you prefer? " + sug_txt
                                 )
                             else:
-                                asked = (f"tour #{explicit_id}" if explicit_id else (booking_hint or 'that destination'))
-                                bot_reply = (
-                                    f"Désolé — ce tour/destination (“{asked}”) n’est pas encore disponible sur ce site."
-                                    if lang == 'fr' else
-                                    f"Sorry — this tour/destination (“{asked}”) isn’t available on this site yet."
+                                computed_hints_lines.append("Requested dates are unavailable. Ask the user for another date range.")
+                                deterministic_text = (
+                                    "Ces dates ne sont pas disponibles. Donne-moi un autre intervalle (du … au …)." if lang == 'fr'
+                                    else "Those dates aren’t available. Please share another date range (from … to …)."
                                 )
-                    else:
-                        selected_tour_id = int(tour.id)
-                        action['navigate'] = reverse('tour_detail', args=[tour.id])
-                        action['prefill'] = {
-                            'start_date': start_date_req.strftime('%Y-%m-%d'),
-                            'end_date': end_date_req.strftime('%Y-%m-%d'),
-                            'persons': persons_req,
-                        }
-                        if lang == 'fr':
-                            bot_reply = f"Super — je t’ouvre la réservation pour {tour.title}."
                         else:
-                            bot_reply = f"Great — I’m opening the booking for {tour.title}."
-        else:
-            # No dates provided: propose real free windows.
-            suggestions = _suggest_available_ranges(country, nights=5, limit=4)
-            if lang == 'fr':
-                if suggestions:
-                    sug_txt = " ; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
-                    bot_reply = (
-                        "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes (et la ville si tu veux). "
-                        "Exemples de périodes disponibles (5 nuits) : " + sug_txt + "."
-                    )
-                else:
-                    bot_reply = "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes, et je vérifie la disponibilité."
-            else:
-                if suggestions:
-                    sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
-                    bot_reply = (
-                        "Sure — tell me your dates and number of people (and the destination if you want). "
-                        "Examples of available windows (5 nights): " + sug_txt + "."
-                    )
-                else:
-                    bot_reply = "Sure — tell me your dates and number of people and I’ll check availability."
+                            full_pkg = bool(addons_req.get('full_package'))
+                            inc_transport = bool(addons_req.get('include_transport') or full_pkg)
+                            inc_hotel = bool(addons_req.get('include_hotel') or full_pkg)
 
-    # If user sends just a destination name, be helpful instead of resetting the conversation
-    if not bot_reply and destination_hint:
-        tours = _find_relevant_tours(country, destination_hint, limit=2)
-        bot_reply = _format_tour_info_reply(
-            country,
-            tours,
-            {'price', 'activities'},
-            lang,
-            include_booking_tip=False,
-            include_admin_hint=include_admin_hint,
+                            if full_pkg:
+                                computed_hints_lines.append("User selected FULL PACKAGE. Do NOT ask about hotel/transport; they are included.")
+
+                            if not payment_method_req:
+                                _set_pending_booking(request, {
+                                    'tour_id': int(tour.id),
+                                    'destination': booking_hint or '',
+                                    'start_date': start_date_req.strftime('%Y-%m-%d'),
+                                    'end_date': end_date_req.strftime('%Y-%m-%d'),
+                                    'persons': int(persons_req),
+                                    'payment_method': None,
+                                    'full_package': full_pkg,
+                                    'include_transport': inc_transport,
+                                    'include_hotel': inc_hotel,
+                                    'extras': addons_req.get('extras'),
+                                    'extra_activity_ids': pending_extra_ids,
+                                })
+                                computed_hints_lines.append(
+                                    "All booking details are provided except payment_method. Ask ONLY: cash (espèces) or card (carte). Do not ask for dates/people/destination again."
+                                )
+                                deterministic_text = (
+                                    "OK. Paiement par carte ou en espèces ?" if lang == 'fr'
+                                    else "OK — would you like to pay by card or cash?"
+                                )
+                            else:
+                                _set_pending_booking(request, None)
+                                action = {
+                                    'navigate': reverse('tour_detail', args=[tour.slug]),
+                                    'prefill': {
+                                        'start_date': start_date_req.strftime('%Y-%m-%d'),
+                                        'end_date': end_date_req.strftime('%Y-%m-%d'),
+                                        'persons': int(persons_req),
+                                        'payment_method': payment_method_req,
+                                    },
+                                }
+                                if full_pkg:
+                                    action['prefill']['full_package'] = 1
+                                if inc_transport:
+                                    action['prefill']['include_transport'] = 1
+                                if inc_hotel:
+                                    action['prefill']['include_hotel'] = 1
+                                if pending_extra_ids:
+                                    action['prefill']['extra_activity_ids'] = [str(pending_extra_ids[0])]
+                                if getattr(request, 'user', None) and request.user.is_authenticated:
+                                    action['autobook'] = 1
+                                computed_hints_lines.append(
+                                    "Booking is ready. Tell the user you are submitting their booking request (pending admin validation). Do not claim it's confirmed/paid."
+                                )
+
+                                if session_memory:
+                                    try:
+                                        request.session['chat_last_tour_id'] = int(tour.id)
+                                        request.session['chat_last_payment_method'] = payment_method_req
+                                        request.session['chat_last_full_package'] = bool(full_pkg)
+                                        request.session['chat_last_include_transport'] = bool(inc_transport)
+                                        request.session['chat_last_include_hotel'] = bool(inc_hotel)
+                                        request.session['chat_last_extra_activity_ids'] = list(pending_extra_ids or [])
+                                    except Exception:
+                                        pass
+
+                                if lang == 'fr':
+                                    deterministic_text = "✅ Parfait — je pré-remplis la réservation et je l’envoie maintenant (en attente de validation admin)."
+                                    if will_replace_existing:
+                                        deterministic_text += " (Cela remplace ta réservation précédente.)"
+                                else:
+                                    deterministic_text = "✅ Great — I’m prefilling and submitting your booking request now (pending admin validation)."
+                                    if will_replace_existing:
+                                        deterministic_text += " (This replaces your previous reservation.)"
+
+    booking_rules_context = _build_booking_rules_context()
+    site_context = _build_country_catalog_context(country, message)
+
+    language_instruction = (
+        "Respond in English only. " if lang == 'en' else (
+            "Respond in French only. " if lang == 'fr' else "Respond in the same language as the user (French or English). "
         )
+    )
 
-    if not bot_reply:
-        bot_reply = _answer_from_site_content(country, message, lang)
+    system_prompt = (
+        f"You are the official virtual assistant for the {country_label} travel website. "
+        "You can answer general travel questions about this country and its cities (what a city is like, how to choose, tips). "
+        "If the user asks about another country/site, politely refuse and redirect them to the current site. "
+        + language_instruction +
+        "Sound natural and human (not robotic). Be concise and helpful. "
+        "Ask at most 1 short follow-up question, only when needed. "
+        "Do not repeat questions already answered by the user. "
+        "Avoid re-confirmation loops: if the user says yes/correct, do not ask to confirm again; move to the next missing detail. "
+        "Never ask the user to confirm details (no 'Let's confirm...'); assume provided details are correct unless the user changes them. "
+        "Never ask for card/payment details (numbers, CVV, etc). This site only needs a payment method: cash or card. "
+        "Do not restate all booking details unless the user asks. "
+        + ("This is the first user message in this session: start with a brief friendly greeting (one short sentence). " if welcome_enabled else "Do not add a repetitive greeting if the conversation is already ongoing. ")
+        +
+        "Do NOT output special navigation markers like [NAVIGATE] or [PREFILL]. The backend/UI handles navigation. "
+        "Currency rule: always present prices in USD only; do NOT mention MAD or Moroccan dirhams. "
+        "Never invent site inventory (tours IDs, prices, availability) beyond the provided catalog/context. "
+        "For booking, ask only for missing fields and follow the booking rules.\n\n"
+        f"{booking_rules_context}\n\n"
+        f"{site_context}"
+    )
 
-    # If the user wants the HuggingFace model to always respond, keep the computed reply as hints.
-    computed_hints = ''
-    if getattr(settings, 'CHAT_FORCE_LLM', False) and bot_reply:
-        computed_hints = bot_reply
-        bot_reply = ''
+    if computed_hints_lines:
+        system_prompt = system_prompt + "\n\nComputed booking state (ground truth; follow strictly):\n- " + "\n- ".join(computed_hints_lines)
 
-    site_context = ''
-    system_prompt = ''
+    if deterministic_text:
+        bot_reply = deterministic_text
+        used_model = None
+    else:
+        bot_reply = None
+
+    if session_memory and session_history:
+        def _fmt_role(r: str) -> str:
+            return 'Assistant' if r in {'assistant', 'bot'} else 'User'
+
+        recent = session_history[-session_history_max:]
+        recent_lines = []
+        for item in recent:
+            role = _fmt_role(str(item.get('role') or 'user'))
+            content = str(item.get('content') or '').strip()
+            if not content:
+                continue
+            recent_lines.append(f"{role}: {content}")
+        if recent_lines:
+            system_prompt = system_prompt + "\n\nRecent conversation (context):\n" + "\n".join(recent_lines[-session_history_max:])
 
     try:
-        booking_rules_context = _build_booking_rules_context()
-        site_context = _build_country_catalog_context(country, message)
-
-        language_instruction = (
-            "Respond in English only. " if lang == 'en' else (
-                "Respond in French only. " if lang == 'fr' else "Respond in the same language as the user (French or English). "
-            )
-        )
-
-        welcome_rule = (
-            f"Welcome line (use only if welcome_enabled=YES and only once per session): {_welcome_line(country_label)} "
-            f"welcome_enabled={'YES' if welcome_enabled else 'NO'}. "
-            "If welcome_enabled=YES, start your reply with exactly the welcome line. "
-            "If welcome_enabled=NO, do NOT include or repeat that welcome line."
-        )
-
-        system_prompt = (
-            f"You are the official virtual assistant for the {country_label} travel website only. "
-            f"You must ONLY answer using information relevant to {country_label}. "
-            "If the user asks about another country/site, politely refuse and redirect them to questions about the current site. "
-            + language_instruction +
-            "Be conversational, concise, and helpful. Ask 1 short follow-up question when needed. "
-            + welcome_rule + " "
-            "Do NOT repeat or dump the provided site context verbatim; never echo long blocks of text. "
-            "Do NOT tell the user to type a specific magic command like 'book ...'. Instead, understand natural language and ask for missing info. "
-            "Only include booking navigation markers when the user explicitly asks to book AND provides a date range AND number of people, "
-            "AND the mentioned tour/destination exists on this site AND the dates are available. "
-            "When those conditions are met, include: [NAVIGATE: /tour/<id>/] and [PREFILL: start_date=YYYY-MM-DD,end_date=YYYY-MM-DD,persons=N]. "
-            "Never invent tours, destinations, or prices; use the provided catalog/context.\n\n"
-            f"{booking_rules_context}\n\n"
-            f"{site_context}"
-        )
-
-        if session_memory and session_history:
-            def _fmt_role(r: str) -> str:
-                return 'Assistant' if r in {'assistant', 'bot'} else 'User'
-
-            recent = session_history[-session_history_max:]
-            recent_lines = []
-            for item in recent:
-                role = _fmt_role(str(item.get('role') or 'user'))
-                content = str(item.get('content') or '').strip()
-                if not content:
-                    continue
-                recent_lines.append(f"{role}: {content}")
-            if recent_lines:
-                system_prompt = system_prompt + "\n\nRecent conversation (context):\n" + "\n".join(recent_lines[-session_history_max:])
-
-        # Prefer HuggingFace over OpenAI when configured.
-        if settings.HF_API_TOKEN and not bot_reply:
-            try:
+        if bot_reply is None:
+            if settings.HF_API_TOKEN:
                 hf_model = getattr(settings, 'HF_MODEL', None) or 'Qwen/Qwen2.5-7B-Instruct:fastest'
                 hf_fallback = getattr(settings, 'HF_FALLBACK_MODEL', None) or ''
-                if computed_hints:
-                    system_prompt = (
-                        system_prompt
-                        + "\n\nComputed hints (ground truth from the website/DB logic; do not contradict):\n"
-                        + computed_hints
-                    )
 
                 def _run_full(model_to_use: str) -> str:
                     return _hf_router_chat_completion_full_text(
@@ -2373,74 +3073,30 @@ def ai_chat(request):
                     else:
                         raise
 
-                bot_reply = _redact_secrets(str(bot_reply or '').strip())
-                parsed_action, bot_reply = parse_actions_from_response(bot_reply, country)
-                parsed_action = _filter_navigation_action(
-                    parsed_action,
-                    country=country,
-                    booking_intent=booking_intent,
-                    start_date_req=start_date_req,
-                    end_date_req=end_date_req,
-                    persons_req=persons_req,
-                    allowed_tour_id=selected_tour_id,
-                )
-                action = action or parsed_action or {}
-            except Exception:
-                logging.exception('[ai_chat] HF exception')
-                bot_reply = computed_hints or ''
-                action = {}
-
-        if (not settings.HF_API_TOKEN) and settings.OPENAI_API_KEY and not bot_reply:
-            try:
+            elif settings.OPENAI_API_KEY:
+                used_model = getattr(settings, 'OPENAI_MODEL', None) or 'gpt-4o'
                 client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message},
                 ]
-
                 response = client.chat.completions.create(
-                    model=getattr(settings, 'OPENAI_MODEL', None) or "gpt-4o",
+                    model=used_model,
                     messages=messages,
                     max_tokens=300,
-                    temperature=0.7
+                    temperature=0.7,
                 )
-
                 bot_reply = response.choices[0].message.content.strip()
-                parsed_action, bot_reply = parse_actions_from_response(bot_reply, country)
-                parsed_action = _filter_navigation_action(
-                    parsed_action,
-                    country=country,
-                    booking_intent=booking_intent,
-                    start_date_req=start_date_req,
-                    end_date_req=end_date_req,
-                    persons_req=persons_req,
-                    allowed_tour_id=selected_tour_id,
-                )
-                action = action or parsed_action or {}
+            else:
+                return JsonResponse({'error': 'AI assistant not configured.'}, status=503)
 
-            except Exception:
-                logging.exception('[ai_chat] OpenAI exception')
-                # Keep any already computed deterministic reply (availability checks, etc).
-                bot_reply = bot_reply or ''
-                action = action or {}
-
-        if not bot_reply:
-            bot_reply = generate_fallback_reply(message, country, lang=lang)
-            action = parse_actions(message, country)
+        # else: bot_reply is deterministic (no model call)
 
     except Exception:
-        logging.exception('[ai_chat] Unhandled exception')
-        bot_reply = (
-            'Désolé, une erreur est survenue. Veuillez réessayer dans quelques instants.'
-            if lang == 'fr' else
-            'Sorry — an error occurred. Please try again in a moment.'
-        )
-        action = parse_actions(message, country)
+        logging.exception('[ai_chat] Model exception')
+        return JsonResponse({'error': 'AI assistant unavailable.'}, status=503)
 
-    if not action:
-        action = parse_actions(message, country)
-
-    bot_reply = _redact_secrets(bot_reply)
+    bot_reply = _redact_secrets(str(bot_reply or '').strip())
     if not welcome_enabled:
         bot_reply = _strip_welcome_banner(bot_reply, country_label)
 
@@ -2455,22 +3111,27 @@ def ai_chat(request):
         except Exception:
             pass
 
-    result = {'reply': bot_reply, 'model': used_model}
+    result = {
+        'reply': bot_reply,
+        'model': used_model,
+        'action': action or {},
+    }
+    # Backward compat for older frontends
+    if action:
+        result.update(action)
+
     if getattr(settings, 'CHAT_DEBUG', False):
         result['debug'] = {
             'request_id': request_id,
             'provider': 'huggingface' if getattr(settings, 'HF_API_TOKEN', '') else ('openai' if getattr(settings, 'OPENAI_API_KEY', '') else None),
-            'forced_llm': bool(getattr(settings, 'CHAT_FORCE_LLM', False)),
-            'session_memory': session_memory,
             'country': country,
             'lang': lang,
             'model_used': used_model,
             'message_chars': len(message or ''),
-            'site_context_chars': len(site_context or ''),
             'system_prompt_chars': len(system_prompt or ''),
-            'computed_hints_chars': len(computed_hints or ''),
+            'computed_hints_lines': computed_hints_lines,
         }
-    result.update(action)
+
     return JsonResponse(result)
 
 
@@ -2488,6 +3149,9 @@ def generate_fallback_reply(message, country, lang: str | None = None):
         if lang == 'fr':
             return f"Les prix dépendent du tour sur le site {country_label}. Dis-moi la destination, les dates et le nombre de personnes, et je te propose la meilleure option."
         return f"Prices vary by tour on the {country_label} site. Tell me the destination, dates, and number of people, and I’ll suggest the best option."
+
+    if _detect_private_tour_intent(message):
+        return _private_tour_reply(country, lang)
 
     if any(k in msg_lower for k in ['book', 'reserve', 'booking', 'réserver', 'reserver', 'réservation', 'reservation']):
         start_date_req, end_date_req, persons_req, destination_hint = _extract_booking_details(message)
@@ -2569,21 +3233,27 @@ def parse_actions(message, country):
     elif 'blog' in msg_lower:
         action['navigate'] = reverse('blog_list')
 
-    # Booking navigation is intentionally strict: only when user mentioned a valid tour.
-    booking_intent = any(k in msg_lower for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
+    # Booking navigation is intentionally strict: only when we have enough concrete info.
+    keyword_booking_intent = any(k in msg_lower for k in ['book', 'booking', 'reserve', 'reservation', 'réserver', 'reserver'])
+    start_date, end_date, persons, parsed_dest = _extract_booking_details(message)
+    has_core_booking_fields = bool(parsed_dest and start_date and end_date and persons)
+    booking_intent = bool(keyword_booking_intent or has_core_booking_fields)
+
     if booking_intent:
-        start_date, end_date, persons, parsed_dest = _extract_booking_details(message)
         if start_date and end_date and persons:
             requested_nights = max(0, (end_date - start_date).days)
             if requested_nights <= 11 and _is_range_available(country, start_date, end_date, buffer_days=3):
                 tour, status, _candidates = _select_tour_for_booking(country, message, parsed_dest)
                 if tour and status == 'ok':
-                    action['navigate'] = reverse('tour_detail', args=[tour.id])
+                    action['navigate'] = reverse('tour_detail', args=[tour.slug])
                     action['prefill'] = {
                         'start_date': start_date.strftime('%Y-%m-%d'),
                         'end_date': end_date.strftime('%Y-%m-%d'),
                         'persons': persons,
                     }
+                    pm = _extract_payment_method(message)
+                    if pm:
+                        action['prefill']['payment_method'] = pm
 
     return action
 

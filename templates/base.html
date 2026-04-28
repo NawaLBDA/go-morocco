@@ -184,12 +184,41 @@
 <!-- ================= MAIN CONTENT ================= -->
 
 {% if messages %}
-  <div class="container mt-3" aria-live="polite" aria-atomic="true">
+  <div class="toast-container position-fixed end-0 p-3" style="z-index: 2001; bottom: 90px;">
     {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
+      {% with tags=message.tags %}
+        {% if 'error' in tags %}
+          {% with bg='text-bg-danger' %}
+            <div class="toast align-items-center {{ bg }} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+              <div class="d-flex">
+                <div class="toast-body">{{ message }}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+              </div>
+            </div>
+          {% endwith %}
+        {% elif 'warning' in tags %}
+          <div class="toast align-items-center text-bg-warning border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="6000">
+            <div class="d-flex">
+              <div class="toast-body">{{ message }}</div>
+              <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+          </div>
+        {% elif 'success' in tags %}
+          <div class="toast align-items-center text-bg-success border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4500">
+            <div class="d-flex">
+              <div class="toast-body">{{ message }}</div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+          </div>
+        {% else %}
+          <div class="toast align-items-center text-bg-info border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+            <div class="d-flex">
+              <div class="toast-body">{{ message }}</div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+          </div>
+        {% endif %}
+      {% endwith %}
     {% endfor %}
   </div>
 {% endif %}
@@ -205,6 +234,18 @@
 
 <!-- ================= JS ================= -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" defer></script>
+
+<script>
+  // Show Django messages as bottom-right toasts (instead of top alert bars).
+  window.addEventListener('load', function () {
+    if (!window.bootstrap || !document.querySelectorAll) return;
+    document.querySelectorAll('.toast-container .toast').forEach((el) => {
+      try {
+        window.bootstrap.Toast.getOrCreateInstance(el).show();
+      } catch (e) {}
+    });
+  });
+</script>
 
 <script>
   // Header UX: add background + (home) sticky behavior on scroll.
@@ -256,6 +297,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
+  const CHAT_AUTHENTICATED = {{ user.is_authenticated|yesno:"true,false" }};
+  const CHAT_LOGIN_URL = '{% url "login" %}';
+
   const chatToggle   = document.getElementById('chat-toggle');
   const chatWidget   = document.getElementById('chat-widget');
   const chatForm     = document.getElementById('chat-form');
@@ -265,11 +309,29 @@ document.addEventListener('DOMContentLoaded', function () {
   const CHAT_OPEN_KEY = 'oma_chat_open_session';
   let historyLoaded = false;
 
+  function setChatEnabled(enabled) {
+    if (!chatInput) return;
+    const btn = chatForm ? chatForm.querySelector('button') : null;
+    chatInput.disabled = !enabled;
+    if (btn) btn.disabled = !enabled;
+    if (!enabled) {
+      chatInput.placeholder = '';
+      chatForm && chatForm.setAttribute('aria-disabled', 'true');
+    } else {
+      chatInput.placeholder = 'Type your message...';
+      chatForm && chatForm.removeAttribute('aria-disabled');
+    }
+  }
+
   function setDefaultGreeting() {
     chatMessages.innerHTML = '';
     const msg = document.createElement('div');
     msg.className = 'msg bot';
-    msg.textContent = 'Hello! Your virtual assistant is ready for {% if country == "ireland" %}Ireland{% else %}Morocco{% endif %}. You can ask in English or French about tours, booking, and travel tips.';
+    if (!CHAT_AUTHENTICATED) {
+      msg.textContent = 'Welcome! Please log in to use the chat and to check booking availability.';
+    } else {
+      msg.textContent = 'Hello! Your virtual assistant is ready for {% if country == "ireland" %}Ireland{% else %}Morocco{% endif %}. You can ask in English or French about tours, booking, and travel tips.';
+    }
     chatMessages.appendChild(msg);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
@@ -310,7 +372,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const isOpen = chatWidget.getAttribute('aria-hidden') === 'true';
     setChatOpen(isOpen);
     if (isOpen) {
-      loadChatHistory();
+      if (CHAT_AUTHENTICATED) loadChatHistory();
+      else setDefaultGreeting();
     }
   });
 
@@ -451,12 +514,26 @@ document.addEventListener('DOMContentLoaded', function () {
     // Handle action (navigate/prefill) after stream ends
     if (finalAction) {
       if (finalAction.navigate && finalAction.prefill) {
-        const query = new URLSearchParams({
-          start_date: finalAction.prefill.start_date,
-          end_date: finalAction.prefill.end_date,
-          persons: finalAction.prefill.persons,
-        }).toString();
-        setTimeout(() => { window.location.href = finalAction.navigate + '?' + query; }, 600);
+        const params = new URLSearchParams();
+        const prefill = finalAction.prefill || {};
+        for (const [k, v] of Object.entries(prefill)) {
+          if (v === undefined || v === null || v === '') continue;
+          if (Array.isArray(v)) {
+            v.forEach((item) => {
+              if (item === undefined || item === null || item === '') return;
+              params.append(k, String(item));
+            });
+          } else {
+            params.set(k, String(v));
+          }
+        }
+
+        if (finalAction.autobook === 1 || finalAction.autobook === true || finalAction.autobook === '1' || finalAction.autobook === 'true') {
+          params.set('autobook', '1');
+        }
+
+        const qs = params.toString();
+        setTimeout(() => { window.location.href = finalAction.navigate + (qs ? ('?' + qs) : ''); }, 600);
         return;
       }
 
@@ -486,6 +563,12 @@ document.addEventListener('DOMContentLoaded', function () {
   chatForm.addEventListener('submit', function (e) {
     e.preventDefault();
 
+    if (!CHAT_AUTHENTICATED) {
+      addMessage('Veuillez vous connecter pour utiliser le chat.', 'bot');
+      setTimeout(() => { window.location.href = CHAT_LOGIN_URL; }, 600);
+      return;
+    }
+
     const text = chatInput.value.trim();
     if (!text) return;
 
@@ -497,11 +580,12 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   /* ========= INIT ========= */
+  setChatEnabled(CHAT_AUTHENTICATED);
   setDefaultGreeting();
   const shouldOpen = sessionStorage.getItem(CHAT_OPEN_KEY) === 'true';
   setChatOpen(shouldOpen);
   if (shouldOpen) {
-    loadChatHistory();
+    if (CHAT_AUTHENTICATED) loadChatHistory();
   }
 
 });

@@ -18,6 +18,62 @@ from apps.core.context_processors import get_country_from_site
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
+def _bool_from_post(value: str | None) -> bool:
+    return (value or "").lower() in {"1", "true", "on", "yes"}
+
+
+def _recalculate_total_for_reservation(
+    *,
+    tour: Tour,
+    start_date: date,
+    end_date: date,
+    persons: int,
+    full_package: bool,
+    include_transport: bool,
+    include_hotel: bool,
+    selected_extra_activities: list,
+) -> tuple[Decimal, Decimal, Decimal, Decimal, Decimal]:
+    nights = max(0, (end_date - start_date).days)
+    persons = max(1, int(persons or 1))
+
+    base_price = Decimal(tour.price_per_night or 0)
+    if getattr(tour, 'is_promotion', False) and (getattr(tour, 'discount_percent', 0) or 0) > 0:
+        try:
+            discount = (Decimal(100) - Decimal(tour.discount_percent)) / Decimal(100)
+            base_price = (base_price * discount).quantize(Decimal('0.01'))
+        except Exception:
+            base_price = Decimal(tour.price_per_night or 0)
+
+    if full_package:
+        include_transport = True
+        include_hotel = True
+
+    transport_rate = Decimal(getattr(tour, 'transport_price_per_night', None) or 0)
+    hotel_rate = Decimal(getattr(tour, 'hotel_price_per_night', None) or 0)
+    transport_add = transport_rate if include_transport else Decimal('0')
+    hotel_add = hotel_rate if include_hotel else Decimal('0')
+
+    extras_total = Decimal('0')
+    for item in (selected_extra_activities or []):
+        try:
+            price = Decimal(str(item.get('price') or '0'))
+            is_per_night = bool(item.get('is_per_night'))
+        except Exception:
+            continue
+
+        line = price * Decimal(persons) * (Decimal(nights) if is_per_night else Decimal('1'))
+        extras_total += line
+
+    extras_total = extras_total.quantize(Decimal('0.01'))
+    nightly_total = (base_price + transport_add + hotel_add) * Decimal(nights) * Decimal(persons)
+    total = (nightly_total + extras_total).quantize(Decimal('0.01'))
+
+    if persons >= 5:
+        total = (total * Decimal('0.90')).quantize(Decimal('0.01'))
+
+    return total, base_price, transport_add, hotel_add, extras_total
+
+
 # ============================================================
 # TOUR DETAIL PAGE (IMPORTANT) -> envoie disabled_ranges + reservation
 # ============================================================
@@ -82,7 +138,7 @@ def book_tour(request, tour_id):
     tour = get_object_or_404(Tour, id=tour_id)
 
     if request.method != "POST":
-        return redirect("tour_detail", tour_id=tour.id)
+        return redirect("tour_detail", tour_slug=tour.slug)
 
     start = request.POST.get("start_date")
     end = request.POST.get("end_date")
@@ -91,25 +147,53 @@ def book_tour(request, tour_id):
     except Exception:
         persons = 1
     persons = max(1, persons)
-    payment_method = request.POST.get("payment_method", "cash")
+    payment_method = (request.POST.get("payment_method") or "").strip().lower()
+    if payment_method not in {"cash", "card"}:
+        messages.error(request, "Please select a payment method.")
+        return redirect("tour_detail", tour_slug=tour.slug)
 
     try:
         start_date = datetime.strptime(start, "%Y-%m-%d").date()
         end_date = datetime.strptime(end, "%Y-%m-%d").date()
     except:
         messages.error(request, "Invalid date format")
-        return redirect("tour_detail", tour_id=tour.id)
+        return redirect("tour_detail", tour_slug=tour.slug)
 
     nights = (end_date - start_date).days
     if nights <= 0:
         messages.error(request, "Invalid date range")
-        return redirect("tour_detail", tour_id=tour.id)
+        return redirect("tour_detail", tour_slug=tour.slug)
 
     # ✅ business rule: reservations must not exceed 11 nights
     max_nights = 11
     if nights > max_nights:
         messages.error(request, f"Maximum allowed duration is {max_nights} nights.")
-        return redirect("tour_detail", tour_id=tour.id)
+        return redirect("tour_detail", tour_slug=tour.slug)
+
+    # ✅ per-user break rule: enforce a 3-day pause after the user's last reservation in this country.
+    buffer_days = 3
+    try:
+        last_user_res = (
+            Reservation.objects.filter(user=request.user, tour__country=tour.country)
+            .exclude(status__in=["cancelled", "rejected"])
+            .order_by('-end_date')
+            .only('end_date')
+            .first()
+        )
+    except Exception:
+        last_user_res = None
+
+    if last_user_res and getattr(last_user_res, 'end_date', None):
+        try:
+            min_start = last_user_res.end_date + timedelta(days=buffer_days)
+            if start_date < min_start:
+                messages.error(
+                    request,
+                    f"❌ Please leave a {buffer_days}-day break after your last trip. Earliest start: {min_start.isoformat()}."
+                )
+                return redirect("tour_detail", tour_slug=tour.slug)
+        except Exception:
+            pass
 
     # ✅ single-group rule:
     # Block ANY overlap with other active reservations across the same country,
@@ -138,7 +222,7 @@ def book_tour(request, tour_id):
                 "❌ These dates are unavailable (our group is already booked). "
                 "Please choose another date range."
             )
-            return redirect("tour_detail", tour_id=tour.id)
+            return redirect("tour_detail", tour_slug=tour.slug)
 
     # =====================
     # Pricing
@@ -474,6 +558,92 @@ def admin_reservations(request):
         "reservations": reservations_qs,
         "reservations_count": reservations_qs.count(),
     })
+
+
+@login_required
+@require_POST
+def admin_update_reservation(request, id):
+    if not request.user.is_staff:
+        return redirect("home")
+
+    r = get_object_or_404(Reservation.objects.select_related('tour'), id=id)
+
+    try:
+        start_date = datetime.strptime(request.POST.get('start_date') or '', '%Y-%m-%d').date()
+        end_date = datetime.strptime(request.POST.get('end_date') or '', '%Y-%m-%d').date()
+    except Exception:
+        messages.error(request, 'Invalid date format.')
+        return redirect('admin_reservations')
+
+    nights = (end_date - start_date).days
+    if nights <= 0:
+        messages.error(request, 'Invalid date range.')
+        return redirect('admin_reservations')
+
+    try:
+        persons = int(request.POST.get('num_persons', 1))
+    except Exception:
+        persons = 1
+    persons = max(1, persons)
+
+    status = (request.POST.get('status') or r.status).strip().lower()
+    if status not in {c[0] for c in Reservation.STATUS_CHOICES}:
+        status = r.status
+
+    payment_method = (request.POST.get('payment_method') or '').strip().lower() or None
+    if payment_method not in {c[0] for c in Reservation.PAYMENT_CHOICES}:
+        payment_method = None
+
+    payment_status = (request.POST.get('payment_status') or r.payment_status).strip().lower()
+    if payment_status not in {c[0] for c in Reservation.PAYMENT_STATUS}:
+        payment_status = r.payment_status
+
+    full_package = _bool_from_post(request.POST.get('full_package'))
+    include_transport = _bool_from_post(request.POST.get('include_transport'))
+    include_hotel = _bool_from_post(request.POST.get('include_hotel'))
+    booking_for_other = _bool_from_post(request.POST.get('booking_for_other'))
+
+    guest_full_name = (request.POST.get('guest_full_name') or '').strip()
+    guest_phone = (request.POST.get('guest_phone') or '').strip()
+    admin_note = (request.POST.get('admin_note') or '').strip()
+
+    total, base_price, transport_add, hotel_add, extras_total = _recalculate_total_for_reservation(
+        tour=r.tour,
+        start_date=start_date,
+        end_date=end_date,
+        persons=persons,
+        full_package=full_package,
+        include_transport=include_transport,
+        include_hotel=include_hotel,
+        selected_extra_activities=r.selected_extra_activities,
+    )
+
+    r.start_date = start_date
+    r.end_date = end_date
+    r.num_persons = persons
+    r.status = status
+
+    r.payment_method = payment_method
+    r.payment_status = payment_status
+
+    r.full_package = full_package
+    r.include_transport = include_transport or full_package
+    r.include_hotel = include_hotel or full_package
+
+    r.base_price_per_night = base_price
+    r.transport_price_per_night = transport_add
+    r.hotel_price_per_night = hotel_add
+    r.extras_total = extras_total
+    r.total_price = total
+
+    r.booking_for_other = booking_for_other
+    r.guest_full_name = guest_full_name
+    r.guest_phone = guest_phone
+    r.admin_note = admin_note
+
+    r.save()
+    messages.success(request, '✅ Reservation updated.')
+    return redirect('admin_reservations')
 
 
 @login_required

@@ -503,7 +503,7 @@
               <span class="price-suffix text-muted small">/ day</span>
             </div>
 
-            <a href="{% url 'tour_detail' tour.id %}"
+            <a href="{% url 'tour_detail' tour.slug %}"
                class="btn btn-primary btn-sm">
               {% if tour.user_reservation %}View{% else %}Book{% endif %}
               <i class="fa-solid fa-arrow-right ms-1"></i>

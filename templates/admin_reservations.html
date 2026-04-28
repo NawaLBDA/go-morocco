@@ -83,6 +83,30 @@
 
               <td>
                 <div class="d-flex justify-content-end gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm"
+                    title="Edit"
+                    data-bs-toggle="modal"
+                    data-bs-target="#editReservationModal"
+                    data-id="{{ r.id }}"
+                    data-start_date="{{ r.start_date|date:'Y-m-d' }}"
+                    data-end_date="{{ r.end_date|date:'Y-m-d' }}"
+                    data-num_persons="{{ r.num_persons }}"
+                    data-status="{{ r.status }}"
+                    data-payment_method="{{ r.payment_method|default_if_none:'' }}"
+                    data-payment_status="{{ r.payment_status }}"
+                    data-full_package="{{ r.full_package|yesno:'1,0' }}"
+                    data-include_transport="{{ r.include_transport|yesno:'1,0' }}"
+                    data-include_hotel="{{ r.include_hotel|yesno:'1,0' }}"
+                    data-booking_for_other="{{ r.booking_for_other|yesno:'1,0' }}"
+                    data-guest_full_name="{{ r.guest_full_name|default_if_none:''|escape }}"
+                    data-guest_phone="{{ r.guest_phone|default_if_none:''|escape }}"
+                    data-admin_note="{{ r.admin_note|default_if_none:''|escape }}"
+                  >
+                    Edit
+                  </button>
+
                   {% if r.status == 'pending' %}
                     <a href="{% url 'validate_reservation' r.id %}" class="btn btn-outline-success btn-sm" title="Validate">
                       Validate
@@ -106,13 +130,16 @@
                     </a>
                   {% endif %}
 
-                  <form method="post" action="{% url 'delete_reservation' r.id %}" class="d-inline"
-                        onsubmit="return confirm('Delete this reservation permanently?');">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete" aria-label="Delete">
-                      <i class="fa-solid fa-trash"></i>
-                    </button>
-                  </form>
+                  <button
+                    type="submit"
+                    class="btn btn-outline-danger btn-sm"
+                    title="Delete"
+                    aria-label="Delete"
+                    formaction="{% url 'delete_reservation' r.id %}"
+                    onclick="return confirm('Delete this reservation permanently?');"
+                  >
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
                 </div>
               </td>
             </tr>
@@ -129,4 +156,138 @@
 
   <div class="admin-page-spacer" aria-hidden="true"></div>
 </div>
+
+<!-- Edit modal (separate form to avoid nested forms) -->
+<div class="modal fade" id="editReservationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post" id="editReservationForm" data-action-template="{% url 'admin_update_reservation' 999999 %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Edit reservation <span class="text-muted">#<span id="editReservationId"></span></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Start date</label>
+              <input type="date" class="form-control" name="start_date" id="editStartDate" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">End date</label>
+              <input type="date" class="form-control" name="end_date" id="editEndDate" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Persons</label>
+              <input type="number" class="form-control" name="num_persons" id="editNumPersons" min="1" required>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Status</label>
+              <select class="form-select" name="status" id="editStatus">
+                <option value="pending">Pending</option>
+                <option value="booked">Booked</option>
+                <option value="completed">Completed</option>
+                <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Payment method</label>
+              <select class="form-select" name="payment_method" id="editPaymentMethod">
+                <option value="">—</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Payment status</label>
+              <select class="form-select" name="payment_status" id="editPaymentStatus">
+                <option value="unpaid">Unpaid</option>
+                <option value="paid">Paid</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <div class="d-flex flex-wrap gap-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="full_package" id="editFullPackage">
+                  <label class="form-check-label" for="editFullPackage">Full package</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="include_transport" id="editIncludeTransport">
+                  <label class="form-check-label" for="editIncludeTransport">Include transport</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="include_hotel" id="editIncludeHotel">
+                  <label class="form-check-label" for="editIncludeHotel">Include hotel</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="booking_for_other" id="editBookingForOther">
+                  <label class="form-check-label" for="editBookingForOther">Booking for other</label>
+                </div>
+              </div>
+              <div class="text-muted small mt-1">Note: total price is recalculated on save.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Guest full name</label>
+              <input type="text" class="form-control" name="guest_full_name" id="editGuestFullName">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Guest phone</label>
+              <input type="text" class="form-control" name="guest_phone" id="editGuestPhone">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Admin note</label>
+              <textarea class="form-control" name="admin_note" id="editAdminNote" rows="3"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const modal = document.getElementById('editReservationModal');
+    if (!modal) return;
+
+    modal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      if (!button) return;
+
+      const form = document.getElementById('editReservationForm');
+      const id = button.getAttribute('data-id') || '';
+      const actionTemplate = form.getAttribute('data-action-template') || '';
+
+      document.getElementById('editReservationId').textContent = id;
+      form.action = actionTemplate.replace('999999', id);
+
+      document.getElementById('editStartDate').value = button.getAttribute('data-start_date') || '';
+      document.getElementById('editEndDate').value = button.getAttribute('data-end_date') || '';
+      document.getElementById('editNumPersons').value = button.getAttribute('data-num_persons') || '1';
+
+      document.getElementById('editStatus').value = button.getAttribute('data-status') || 'pending';
+      document.getElementById('editPaymentMethod').value = button.getAttribute('data-payment_method') || '';
+      document.getElementById('editPaymentStatus').value = button.getAttribute('data-payment_status') || 'unpaid';
+
+      document.getElementById('editFullPackage').checked = (button.getAttribute('data-full_package') === '1');
+      document.getElementById('editIncludeTransport').checked = (button.getAttribute('data-include_transport') === '1');
+      document.getElementById('editIncludeHotel').checked = (button.getAttribute('data-include_hotel') === '1');
+      document.getElementById('editBookingForOther').checked = (button.getAttribute('data-booking_for_other') === '1');
+
+      document.getElementById('editGuestFullName').value = button.getAttribute('data-guest_full_name') || '';
+      document.getElementById('editGuestPhone').value = button.getAttribute('data-guest_phone') || '';
+      document.getElementById('editAdminNote').value = button.getAttribute('data-admin_note') || '';
+    });
+  })();
+</script>
 {% endblock %}

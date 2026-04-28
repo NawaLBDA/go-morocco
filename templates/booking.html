@@ -258,7 +258,7 @@
 
       <div class="d-flex justify-content-between">
         <span><i class="fa-regular fa-credit-card me-1"></i> Method</span>
-        <strong class="text-uppercase">{{ reservation.payment_method }}</strong>
+        <strong class="text-uppercase">{% if reservation.payment_method %}{{ reservation.get_payment_method_display }}{% else %}—{% endif %}</strong>
       </div>
 
       <div class="d-flex justify-content-between mt-2">
@@ -441,7 +441,7 @@
     <label class="fw-bold mb-2">Payment method</label>
     <div class="mb-3 payment-options">
       <label class="payment-option">
-        <input class="form-check-input" type="radio" name="payment_method" value="cash" checked>
+        <input class="form-check-input" type="radio" name="payment_method" value="cash" required>
         <span class="payment-option-body">
           <span class="payment-option-title"><span class="me-2">💸</span> Cash</span>
           <span class="payment-option-sub">Pay on arrival after validation</span>
@@ -449,7 +449,7 @@
       </label>
 
       <label class="payment-option">
-        <input class="form-check-input" type="radio" name="payment_method" value="card">
+        <input class="form-check-input" type="radio" name="payment_method" value="card" required>
         <span class="payment-option-body">
           <span class="payment-option-title"><span class="me-2">💳</span> Card payment</span>
           <span class="payment-option-sub">Secure payment via Stripe (after validation)</span>
@@ -874,10 +874,17 @@ async function openAndInitStripe(){
     const startField = document.getElementById('start_date');
     const endField = document.getElementById('end_date');
     const personsField = document.getElementById('persons');
+    const bookingForm = document.getElementById('booking-form');
 
     const startValue = params.get('start_date');
     const endValue = params.get('end_date');
     const personsValue = params.get('persons');
+    const paymentValue = params.get('payment_method');
+
+    const fullPackageValue = params.get('full_package');
+    const transportValue = params.get('include_transport');
+    const hotelValue = params.get('include_hotel');
+    const autobook = params.get('autobook');
 
     if (startField && startValue) {
       startField.value = startValue;
@@ -890,6 +897,56 @@ async function openAndInitStripe(){
     if (personsField && personsValue) {
       personsField.value = personsValue;
       personsField.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // Payment method (required, no default selected)
+    if (paymentValue) {
+      const radios = document.querySelectorAll('input[name="payment_method"]');
+      radios.forEach((r) => {
+        if (r && r.value === paymentValue) {
+          r.checked = true;
+          r.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    }
+
+    // Optional add-ons
+    const fullPackageEl = document.getElementById('full_package');
+    const transportEl = document.getElementById('include_transport');
+    const hotelEl = document.getElementById('include_hotel');
+    if (fullPackageEl && (fullPackageValue === '1' || fullPackageValue === 'true')) {
+      fullPackageEl.checked = true;
+      fullPackageEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (transportEl && (transportValue === '1' || transportValue === 'true')) {
+      transportEl.checked = true;
+      transportEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (hotelEl && (hotelValue === '1' || hotelValue === 'true')) {
+      hotelEl.checked = true;
+      hotelEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Auto-submit when requested and the form is complete.
+    // Note: booking is always pending admin validation.
+    if (bookingForm && (autobook === '1' || autobook === 'true')) {
+      // Wait a tick so Litepicker + pricing handlers settle.
+      setTimeout(() => {
+        const dateWarning = document.getElementById('dateWarning');
+        const durationWarning = document.getElementById('durationWarning');
+        const hasWarnings =
+          (dateWarning && !dateWarning.classList.contains('d-none')) ||
+          (durationWarning && !durationWarning.classList.contains('d-none'));
+
+        const startOk = startField && startField.value;
+        const endOk = endField && endField.value;
+        const personsOk = personsField && personsField.value;
+        const paymentOk = document.querySelector('input[name="payment_method"]:checked');
+
+        if (!hasWarnings && startOk && endOk && personsOk && paymentOk) {
+          bookingForm.submit();
+        }
+      }, 350);
     }
   });
 </script>

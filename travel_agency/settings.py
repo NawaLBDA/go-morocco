@@ -91,11 +91,11 @@ CHAT_FORCE_LLM = os.environ.get("CHAT_FORCE_LLM", "True") == "True"
 
 # Chat debugging / session memory (safe metadata only; never logs secrets)
 CHAT_DEBUG = os.environ.get("CHAT_DEBUG", "False") == "True"
-CHAT_SESSION_MEMORY = os.environ.get("CHAT_SESSION_MEMORY", "False") == "True"
+CHAT_SESSION_MEMORY = os.environ.get("CHAT_SESSION_MEMORY", "True") == "True"
 CHAT_SESSION_HISTORY_MAX = int(os.environ.get("CHAT_SESSION_HISTORY_MAX", "8"))
 
 # Force assistant language. Supported: 'en' or 'fr'. Empty => auto-detect.
-CHAT_FORCE_LANGUAGE = (os.environ.get("CHAT_FORCE_LANGUAGE") or "").strip().lower()
+CHAT_FORCE_LANGUAGE = (os.environ.get("CHAT_FORCE_LANGUAGE") or "en").strip().lower()
 if CHAT_FORCE_LANGUAGE not in {"", "en", "fr"}:
     CHAT_FORCE_LANGUAGE = ""
 
@@ -506,4 +506,3 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 
 # ✅ Admin Security
 ADMIN_URL = os.environ.get('ADMIN_URL', 'admin/')
-

@@ -5,7 +5,9 @@ from django.contrib.auth import views as auth_views
 urlpatterns = [
     path('', views.home, name='home'),
     path('reservations/', views.reservations, name='reservations'),
-    path('tour/<int:tour_id>/', views.tour_detail, name='tour_detail'),
+    path('tour/<slug:tour_slug>/', views.tour_detail, name='tour_detail'),
+    # Legacy numeric URL (backward compatibility)
+    path('tour/<int:tour_id>/', views.tour_detail_legacy, name='tour_detail_legacy'),
 
     path('blog/', views.blog_list, name='blog_list'),
     path('blog/<slug:slug>/', views.blog_detail, name='blog_detail'),

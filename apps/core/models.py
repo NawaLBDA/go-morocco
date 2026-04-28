@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils.text import slugify
 
 from cloudinary.models import CloudinaryField
 
@@ -128,6 +129,14 @@ class Tour(models.Model):
     destination = models.ForeignKey(Destination, on_delete=models.CASCADE, related_name='tours')
     title = models.CharField(max_length=200)
 
+    slug = models.SlugField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="URL slug (auto-generated).",
+    )
+
     image = CloudinaryField('image', blank=True, null=True)
 
     price_per_night = models.DecimalField(max_digits=8, decimal_places=2)
@@ -161,6 +170,17 @@ class Tour(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base = slugify(f"{getattr(self.destination, 'name', '')}-{self.title}") or slugify(self.title) or 'tour'
+            slug = base
+            i = 2
+            while Tour.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base}-{i}"
+                i += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 
 class TourExtraActivity(models.Model):
@@ -262,7 +282,13 @@ class Reservation(models.Model):
 
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='pending')
 
-    payment_method = models.CharField(max_length=10, choices=PAYMENT_CHOICES, default='cash')
+    payment_method = models.CharField(
+        max_length=10,
+        choices=PAYMENT_CHOICES,
+        null=True,
+        blank=True,
+        default=None,
+    )
     payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS, default='unpaid')
 
     stripe_payment_intent = models.CharField(max_length=255, blank=True, null=True)
