@@ -547,89 +547,156 @@ def _safe_media_url(media_obj):
         return ''
 
 
-def _build_activity_gallery_cards(tour: Tour) -> list[dict]:
-    cards: list[dict] = []
-    legs_by_target: dict[int, dict] = {}
+def _time_to_minutes(value):
+    if value in (None, ''):
+        return None
+    if hasattr(value, 'hour') and hasattr(value, 'minute'):
+        return int(value.hour) * 60 + int(value.minute)
+    raw = str(value).strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.strptime(raw[:5], '%H:%M')
+        return parsed.hour * 60 + parsed.minute
+    except Exception:
+        return None
 
-    for leg in tour.itinerary_legs.filter(is_active=True).select_related('from_activity', 'to_activity').order_by('display_order', 'id'):
-        legs_by_target[leg.to_activity_id] = {
-            'from_title': leg.from_activity.title,
-            'to_title': leg.to_activity.title,
-            'distance_label': leg.distance_label,
-            'transport_mode': leg.transport_mode,
-            'transport_label': leg.transport_display_label,
-            'summary': f"{leg.distance_label} by {leg.transport_display_label}",
-            'card_badge': f"{leg.distance_label} by {leg.transport_display_label}",
+
+def _minutes_to_time_label(value):
+    if value is None:
+        return ''
+    total = int(value) % (24 * 60)
+    return f"{total // 60:02d}:{total % 60:02d}"
+
+
+def _serialize_extra_itinerary_option(extra):
+    start_minutes = _time_to_minutes(getattr(extra, 'itinerary_start_time', None))
+    duration_minutes = int(getattr(extra, 'itinerary_duration_minutes', 0) or 0)
+    end_minutes = start_minutes + duration_minutes if start_minutes is not None and duration_minutes > 0 else None
+    return {
+        'id': int(extra.id),
+        'title': extra.title,
+        'description': extra.description,
+        'image_url': _safe_media_url(extra.image),
+        'location': extra.location_display,
+        'map_url': extra.map_url,
+        'latitude': float(extra.latitude) if extra.latitude is not None else None,
+        'longitude': float(extra.longitude) if extra.longitude is not None else None,
+        'price_label': f"+{extra.price}$ {'/day' if extra.is_per_night else '/trip'}",
+        'insert_into_itinerary': bool(extra.insert_into_itinerary),
+        'itinerary_day_number': int(extra.itinerary_day_number or 0) if extra.itinerary_day_number else None,
+        'itinerary_start_time': _minutes_to_time_label(start_minutes),
+        'itinerary_end_time': _minutes_to_time_label(end_minutes),
+        'itinerary_start_minutes': start_minutes,
+        'itinerary_duration_minutes': duration_minutes,
+    }
+
+
+def _recompute_day_card_metadata(day_cards: list[dict]):
+    day_cards.sort(key=lambda item: (
+        _time_to_minutes(item.get('start_time')) if _time_to_minutes(item.get('start_time')) is not None else 10**9,
+        _time_to_minutes(item.get('end_time')) if _time_to_minutes(item.get('end_time')) is not None else 10**9,
+        int(item.get('sequence') or 0),
+    ))
+    for index, card in enumerate(day_cards, start=1):
+        card['sequence'] = index
+        if index == 1:
+            card['segment_distance'] = ''
+            card['segment_transport'] = ''
+            card['segment_from_title'] = ''
+            card['segment_summary'] = ''
+            card['segment_badge'] = ''
+            continue
+        previous = day_cards[index - 2]
+        from_activity_id = card.get('segment_from_activity_id')
+        if not card.get('is_extra') and not previous.get('is_extra') and from_activity_id and previous.get('activity_id') == from_activity_id:
+            continue
+        card['segment_distance'] = ''
+        card['segment_transport'] = ''
+        card['segment_from_title'] = ''
+        card['segment_summary'] = ''
+        card['segment_badge'] = ''
+
+
+def _apply_selected_extras_to_itinerary_days(base_days: list[dict], extra_options: list[dict], selected_extra_ids: list[int] | None = None) -> list[dict]:
+    selected_ids = {int(x) for x in (selected_extra_ids or []) if str(x).strip().isdigit()}
+    day_map: dict[int, dict] = {}
+    for day in (base_days or []):
+        cloned_cards = [dict(card) for card in day.get('cards', [])]
+        _recompute_day_card_metadata(cloned_cards)
+        day_map[int(day.get('day_number') or 1)] = {
+            'day_number': int(day.get('day_number') or 1),
+            'label': day.get('label') or f"Day {int(day.get('day_number') or 1)}",
+            'cards': cloned_cards,
+            'map_points': [],
         }
 
-    for index, activity in enumerate(tour.activity_cards.filter(is_active=True).order_by('day_number', 'display_order', 'id'), start=1):
-        leg_info = legs_by_target.get(activity.id)
-        cards.append({
-            'kind': 'activity',
-            'extra_id': None,
-            'is_extra': False,
-            'sequence': index,
-            'day_number': activity.day_number or 1,
-            'point_role': activity.point_role or TourActivity.POINT_REGULAR,
-            'title': activity.title,
-            'description': activity.description,
-            'image_url': _safe_media_url(activity.image),
-            'location': activity.location_display,
-            'map_url': activity.map_url,
-            'latitude': float(activity.latitude) if activity.latitude is not None else None,
-            'longitude': float(activity.longitude) if activity.longitude is not None else None,
-            'start_time': activity.start_time.strftime('%H:%M') if activity.start_time else '',
-            'end_time': activity.end_time.strftime('%H:%M') if activity.end_time else '',
-            'price_label': '',
-            'segment_distance': leg_info['distance_label'] if leg_info else '',
-            'segment_transport': leg_info['transport_label'] if leg_info else '',
-            'segment_from_title': leg_info['from_title'] if leg_info else '',
-            'segment_summary': leg_info['summary'] if leg_info else '',
-            'segment_badge': leg_info['card_badge'] if leg_info else '',
-        })
+    for extra in sorted(
+        [item for item in (extra_options or []) if int(item.get('id') or 0) in selected_ids and item.get('insert_into_itinerary')],
+        key=lambda item: (
+            int(item.get('itinerary_day_number') or 10**6),
+            int(item.get('itinerary_start_minutes') if item.get('itinerary_start_minutes') is not None else 10**6),
+            int(item.get('id') or 0),
+        ),
+    ):
+        day_number = int(extra.get('itinerary_day_number') or 0)
+        start_minutes = extra.get('itinerary_start_minutes')
+        duration_minutes = int(extra.get('itinerary_duration_minutes') or 0)
+        if not day_number or start_minutes is None or duration_minutes <= 0:
+            continue
 
-    itinerary_count = len(cards)
-    for offset, extra in enumerate(tour.extra_activities.filter(is_active=True).order_by('id'), start=1):
-        cards.append({
-            'kind': 'extra',
-            'extra_id': extra.id,
-            'is_extra': True,
-            'sequence': itinerary_count + offset,
-            'title': extra.title,
-            'description': extra.description,
-            'image_url': _safe_media_url(extra.image),
-            'location': extra.location_display,
-            'map_url': extra.map_url,
-            'latitude': float(extra.latitude) if extra.latitude is not None else None,
-            'longitude': float(extra.longitude) if extra.longitude is not None else None,
-            'start_time': '',
-            'end_time': '',
-            'price_label': f"+{extra.price}$ {'/day' if extra.is_per_night else '/trip'}",
-        })
-
-    return cards
-
-
-def _build_itinerary_days(tour: Tour) -> list[dict]:
-    activity_cards = [card for card in _build_activity_gallery_cards(tour) if not card.get('is_extra')]
-    if not activity_cards:
-        return []
-
-    day_map: dict[int, dict] = {}
-    for card in activity_cards:
-        day_number = int(card.get('day_number') or 1)
         day_entry = day_map.setdefault(day_number, {
             'day_number': day_number,
             'label': f"Day {day_number}",
             'cards': [],
             'map_points': [],
         })
-        day_entry['cards'].append(card)
+        day_cards = day_entry['cards']
+        for card in day_cards:
+            card_start = _time_to_minutes(card.get('start_time'))
+            card_end = _time_to_minutes(card.get('end_time'))
+            if card_start is not None and card_start >= start_minutes:
+                card['start_time'] = _minutes_to_time_label(card_start + duration_minutes)
+                if card_end is not None:
+                    card['end_time'] = _minutes_to_time_label(card_end + duration_minutes)
+            elif card_start is not None and card_end is not None and card_start < start_minutes < card_end:
+                shift = start_minutes + duration_minutes - card_start
+                card['start_time'] = _minutes_to_time_label(card_start + shift)
+                card['end_time'] = _minutes_to_time_label(card_end + shift)
+            elif card_end is not None and card_end > start_minutes:
+                card['end_time'] = _minutes_to_time_label(card_end + duration_minutes)
 
+        extra_card = {
+            'kind': 'extra',
+            'activity_id': None,
+            'extra_id': extra.get('id'),
+            'is_extra': True,
+            'sequence': len(day_cards) + 1,
+            'day_number': day_number,
+            'point_role': TourActivity.POINT_REGULAR,
+            'title': extra.get('title', ''),
+            'description': extra.get('description', ''),
+            'image_url': extra.get('image_url', ''),
+            'location': extra.get('location', ''),
+            'map_url': extra.get('map_url', ''),
+            'latitude': extra.get('latitude'),
+            'longitude': extra.get('longitude'),
+            'start_time': extra.get('itinerary_start_time', ''),
+            'end_time': extra.get('itinerary_end_time', ''),
+            'price_label': extra.get('price_label', ''),
+            'segment_distance': '',
+            'segment_transport': '',
+            'segment_from_title': '',
+            'segment_summary': '',
+            'segment_badge': '',
+            'segment_from_activity_id': None,
+        }
+        day_cards.append(extra_card)
+        _recompute_day_card_metadata(day_cards)
+
+    final_days = []
     for day_number in sorted(day_map):
         day_cards = day_map[day_number]['cards']
-        day_cards.sort(key=lambda item: (int(item.get('sequence') or 0), int(item.get('day_number') or 1)))
-
         map_points = []
         for local_index, card in enumerate(day_cards, start=1):
             if card.get('latitude') is None or card.get('longitude') is None:
@@ -640,7 +707,6 @@ def _build_itinerary_days(tour: Tour) -> list[dict]:
                 role_label = 'Starting point'
             elif point_role == TourActivity.POINT_END:
                 role_label = 'Ending point'
-
             map_points.append({
                 'sequence': local_index,
                 'global_sequence': card.get('sequence'),
@@ -660,11 +726,106 @@ def _build_itinerary_days(tour: Tour) -> list[dict]:
                 'start_time': card.get('start_time', ''),
                 'end_time': card.get('end_time', ''),
             })
+        final_days.append({
+            'day_number': day_number,
+            'label': day_map[day_number]['label'],
+            'cards': day_cards,
+            'map_points': map_points,
+            'has_map_points': bool(map_points),
+        })
+    return final_days
 
-        day_map[day_number]['map_points'] = map_points
-        day_map[day_number]['has_map_points'] = bool(map_points)
 
-    return [day_map[key] for key in sorted(day_map)]
+def _build_activity_gallery_cards(tour: Tour) -> list[dict]:
+    cards: list[dict] = []
+    legs_by_target: dict[int, dict] = {}
+
+    for leg in tour.itinerary_legs.filter(is_active=True).select_related('from_activity', 'to_activity').order_by('display_order', 'id'):
+        legs_by_target[leg.to_activity_id] = {
+            'from_activity_id': leg.from_activity_id,
+            'from_title': leg.from_activity.title,
+            'to_title': leg.to_activity.title,
+            'distance_label': leg.distance_label,
+            'transport_mode': leg.transport_mode,
+            'transport_label': leg.transport_display_label,
+            'summary': f"{leg.distance_label} by {leg.transport_display_label}",
+            'card_badge': f"{leg.distance_label} by {leg.transport_display_label}",
+        }
+
+    for index, activity in enumerate(tour.activity_cards.filter(is_active=True).order_by('day_number', 'display_order', 'id'), start=1):
+        leg_info = legs_by_target.get(activity.id)
+        cards.append({
+            'kind': 'activity',
+            'activity_id': activity.id,
+            'extra_id': None,
+            'is_extra': False,
+            'sequence': index,
+            'day_number': activity.day_number or 1,
+            'point_role': activity.point_role or TourActivity.POINT_REGULAR,
+            'title': activity.title,
+            'description': activity.description,
+            'image_url': _safe_media_url(activity.image),
+            'location': activity.location_display,
+            'map_url': activity.map_url,
+            'latitude': float(activity.latitude) if activity.latitude is not None else None,
+            'longitude': float(activity.longitude) if activity.longitude is not None else None,
+            'start_time': activity.start_time.strftime('%H:%M') if activity.start_time else '',
+            'end_time': activity.end_time.strftime('%H:%M') if activity.end_time else '',
+            'price_label': '',
+            'segment_from_activity_id': leg_info['from_activity_id'] if leg_info else None,
+            'segment_distance': leg_info['distance_label'] if leg_info else '',
+            'segment_transport': leg_info['transport_label'] if leg_info else '',
+            'segment_from_title': leg_info['from_title'] if leg_info else '',
+            'segment_summary': leg_info['summary'] if leg_info else '',
+            'segment_badge': leg_info['card_badge'] if leg_info else '',
+        })
+
+    itinerary_count = len(cards)
+    for offset, extra in enumerate(tour.extra_activities.filter(is_active=True).order_by('id'), start=1):
+        cards.append({
+            'kind': 'extra',
+            'activity_id': None,
+            'extra_id': extra.id,
+            'is_extra': True,
+            'sequence': itinerary_count + offset,
+            'title': extra.title,
+            'description': extra.description,
+            'image_url': _safe_media_url(extra.image),
+            'location': extra.location_display,
+            'map_url': extra.map_url,
+            'latitude': float(extra.latitude) if extra.latitude is not None else None,
+            'longitude': float(extra.longitude) if extra.longitude is not None else None,
+            'start_time': '',
+            'end_time': '',
+            'price_label': f"+{extra.price}$ {'/day' if extra.is_per_night else '/trip'}",
+            'segment_from_activity_id': None,
+        })
+
+    return cards
+
+
+def _build_itinerary_days(tour: Tour, selected_extra_ids: list[int] | None = None) -> list[dict]:
+    activity_cards = [card for card in _build_activity_gallery_cards(tour) if not card.get('is_extra')]
+    if not activity_cards:
+        return []
+
+    day_map: dict[int, dict] = {}
+    for card in activity_cards:
+        day_number = int(card.get('day_number') or 1)
+        day_entry = day_map.setdefault(day_number, {
+            'day_number': day_number,
+            'label': f"Day {day_number}",
+            'cards': [],
+            'map_points': [],
+        })
+        day_entry['cards'].append(card)
+
+    base_days = [day_map[key] for key in sorted(day_map)]
+    extra_options = [
+        _serialize_extra_itinerary_option(extra)
+        for extra in tour.extra_activities.filter(is_active=True).order_by('id')
+    ]
+    return _apply_selected_extras_to_itinerary_days(base_days, extra_options, selected_extra_ids)
 from .context_processors import get_country_from_site
 
 
@@ -2679,6 +2840,14 @@ def tour_detail(request, tour_slug: str):
             tour=tour
         ).exclude(status__in=["rejected", "cancelled", "completed"]).order_by("-created_at").first()
 
+    selected_extra_ids: list[int] = []
+    if reservation:
+        for item in getattr(reservation, 'selected_extra_activities', []) or []:
+            try:
+                selected_extra_ids.append(int((item or {}).get('id')))
+            except Exception:
+                continue
+
     # Single group booking rules:
     # - block any already reserved dates across ALL tours in the same country
     # - include pending + booked
@@ -2707,8 +2876,9 @@ def tour_detail(request, tour_slug: str):
         tour.promo_price = (Decimal(tour.price_per_night) * discount).quantize(Decimal("0.01"))
     structured_activities = list(tour.activity_cards.filter(is_active=True).order_by('day_number', 'display_order', 'id'))
     extra_activities = list(tour.extra_activities.filter(is_active=True).order_by('id'))
+    extra_itinerary_options = [_serialize_extra_itinerary_option(extra) for extra in extra_activities]
     activity_gallery_cards = _build_activity_gallery_cards(tour)
-    itinerary_days = _build_itinerary_days(tour)
+    itinerary_days = _build_itinerary_days(tour, selected_extra_ids=selected_extra_ids)
     return render(request, "booking.html", {
         "tour": tour,
         "reservation": reservation,
@@ -2718,8 +2888,10 @@ def tour_detail(request, tour_slug: str):
         "activities_list": [a.strip() for a in (tour.activities or '').replace('\n', ',').split(',') if a.strip()],
         "structured_activities": structured_activities,
         "extra_activities": extra_activities,
+        "extra_itinerary_options": extra_itinerary_options,
         "activity_gallery_cards": activity_gallery_cards,
         "itinerary_days": itinerary_days,
+        "selected_extra_ids": selected_extra_ids,
         "booking_max_nights": 5,
         "booking_buffer_days": buffer_days,
     })

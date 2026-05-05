@@ -292,6 +292,21 @@ class TourExtraActivity(models.Model):
         default=False,
         help_text="If enabled, the price is charged per night per person. Otherwise per trip per person.",
     )
+    insert_into_itinerary = models.BooleanField(
+        default=False,
+        help_text="If enabled, this extra activity will be inserted into the day itinerary when selected.",
+    )
+    itinerary_day_number = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text="Example: 1 for Day 1, 2 for Day 2.",
+    )
+    itinerary_start_time = models.TimeField(blank=True, null=True)
+    itinerary_duration_minutes = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text="Duration in minutes used to shift the following itinerary stops.",
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -306,10 +321,16 @@ class TourExtraActivity(models.Model):
         return ', '.join(parts)
 
     @property
+    def has_map_location(self):
+        return self.latitude is not None and self.longitude is not None or bool(self.location_display)
+
+    @property
     def map_query(self):
         if self.latitude is not None and self.longitude is not None:
             return f"{self.latitude},{self.longitude}"
-        return self.location_display or self.title
+        if self.location_display:
+            return self.location_display
+        return ''
 
     @property
     def map_url(self):

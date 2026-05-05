@@ -41,6 +41,31 @@
     };
   }
 
+  function parseCoordinatesInput(query) {
+    const raw = (query || '').trim();
+    if (!raw) return null;
+    const match = raw.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (!match) return null;
+    const lat = parseNumber(match[1]);
+    const lon = parseNumber(match[2]);
+    if (lat == null || lon == null) return null;
+    return { lat, lon };
+  }
+
+  async function reverseLookup(lat, lon) {
+    const params = new URLSearchParams({
+      format: 'jsonv2',
+      lat: String(lat),
+      lon: String(lon),
+      'accept-language': 'fr',
+      addressdetails: '1',
+    });
+    const url = 'https://nominatim.openstreetmap.org/reverse?' + params.toString();
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error('Reverse lookup failed');
+    return response.json();
+  }
+
   async function fetchSearch(query, restrictMorocco) {
     const params = new URLSearchParams({
       format: 'jsonv2',
@@ -56,6 +81,34 @@
     const response = await fetch(url, { headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error('Search failed');
     return response.json();
+  }
+
+  function buildQueries(query, cityHint) {
+    const base = (query || '').trim();
+    const city = (cityHint || '').trim();
+    const variants = [
+      base,
+      city ? `${base}, ${city}` : '',
+      city ? `${base}, ${city}, Morocco` : '',
+      `${base}, Morocco`,
+      `${base}, Rabat, Morocco`,
+      `${base}, Salé, Morocco`,
+    ];
+
+    if (/bouregreg/i.test(base)) {
+      variants.push(
+        base.replace(/bouregreg/ig, 'Bou Regreg'),
+        base.replace(/corniche/ig, 'Corniche du'),
+        `${base} Rabat`,
+        `${base} Sale`,
+        `Corniche Bouregreg, Rabat, Morocco`,
+        `Corniche du Bouregreg, Rabat, Morocco`,
+        `Corniche de Bouregreg, Rabat, Morocco`,
+        `Oued Bouregreg, Rabat, Morocco`
+      );
+    }
+
+    return [...new Set(variants.map((item) => (item || '').trim()).filter(Boolean))];
   }
 
   function dedupeResults(results) {
@@ -86,11 +139,26 @@
       return [googleCandidate];
     }
 
-    const queries = [
-      query,
-      cityHint ? `${query}, ${cityHint}, Morocco` : '',
-      `${query}, Morocco`,
-    ].filter(Boolean);
+    const directCoords = parseCoordinatesInput(query);
+    if (directCoords) {
+      try {
+        const result = await reverseLookup(directCoords.lat, directCoords.lon);
+        if (result && result.lat && result.lon) {
+          return [result];
+        }
+      } catch (error) {
+        return [{
+          lat: String(directCoords.lat),
+          lon: String(directCoords.lon),
+          name: 'Pinned coordinates',
+          display_name: `${directCoords.lat}, ${directCoords.lon}`,
+          address: { country_code: 'ma' },
+          _source: 'coordinates',
+        }];
+      }
+    }
+
+    const queries = buildQueries(query, cityHint);
 
     const collected = [];
     for (const q of queries) {
@@ -186,8 +254,38 @@
       }
     };
 
+    async function applyCoordinatesLookup() {
+      const coords = parseCoordinatesInput(coordinates.value || '');
+      if (!coords) return false;
+      resultsWrap.innerHTML = '<div class="tour-map-picker-empty">Looking up coordinates...</div>';
+      try {
+        const result = await reverseLookup(coords.lat, coords.lon);
+        if (result) {
+          applyResult(result);
+          renderResults(resultsWrap, [result], applyResult);
+          return true;
+        }
+      } catch (error) {
+        applyResult({
+          lat: coords.lat,
+          lon: coords.lon,
+          name: 'Pinned coordinates',
+          display_name: `${coords.lat}, ${coords.lon}`,
+          address: { country_code: 'ma' },
+        });
+        resultsWrap.innerHTML = '<div class="tour-map-picker-empty">Coordinates saved.</div>';
+        return true;
+      }
+      return false;
+    }
+
     async function runSearch() {
       const query = (mapSearch.value || '').trim();
+      const coordinateValue = (coordinates.value || '').trim();
+      if (!query && coordinateValue) {
+        await applyCoordinatesLookup();
+        return;
+      }
       if (!query) return;
       resultsWrap.innerHTML = '<div class="tour-map-picker-empty">Searching...</div>';
       try {
@@ -200,6 +298,13 @@
 
     searchButton.addEventListener('click', runSearch);
     mapSearch.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        runSearch();
+      }
+    });
+
+    coordinates.addEventListener('keydown', function (event) {
       if (event.key === 'Enter') {
         event.preventDefault();
         runSearch();

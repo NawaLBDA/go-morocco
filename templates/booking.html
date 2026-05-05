@@ -202,7 +202,8 @@
                 <div class="col-12 col-md-6">
                   <input class="extra-activity-toggle extra-activity-input" type="checkbox"
                          id="left_extra_{{ ea.id }}" name="extra_activity_ids" value="{{ ea.id }}"
-                         form="booking-form"
+                          form="booking-form"
+                         {% if ea.id in selected_extra_ids %}checked{% endif %}
                          data-price="{{ ea.price }}" data-per-night="{% if ea.is_per_night %}1{% else %}0{% endif %}">
                   <label class="extra-activity-card d-block h-100" for="left_extra_{{ ea.id }}">
                     <div class="extra-activity-card-inner h-100">
@@ -1821,15 +1822,20 @@ async function openAndInitStripe(){
 </style>
 
 {{ itinerary_days|json_script:"itinerary-days-data" }}
+{{ extra_itinerary_options|json_script:"extra-itinerary-options-data" }}
+{{ selected_extra_ids|json_script:"selected-extra-ids-data" }}
 
 <script>
   document.addEventListener('DOMContentLoaded', async function () {
     const mapElement = document.getElementById('tour-itinerary-map');
     const dataElement = document.getElementById('itinerary-days-data');
+    const extraOptionsElement = document.getElementById('extra-itinerary-options-data');
+    const selectedExtraIdsElement = document.getElementById('selected-extra-ids-data');
     const activeDayLabel = document.getElementById('itinerary-active-day-label');
     const prevDayButton = document.getElementById('itinerary-prev-day');
     const nextDayButton = document.getElementById('itinerary-next-day');
-    const dayPanels = Array.from(document.querySelectorAll('.itinerary-day-panel'));
+    const dayPanelsStack = document.getElementById('itinerary-days-stack');
+    const extraInputs = Array.from(document.querySelectorAll('.extra-activity-input'));
     const placeholderImage = "{% static 'img/placeholder.jpg' %}";
     const imageModalElement = document.getElementById('itineraryImageModal');
     const imageModalLabel = document.getElementById('itineraryImageModalLabel');
@@ -1839,15 +1845,29 @@ async function openAndInitStripe(){
 
     if (!mapElement || !dataElement) return;
 
-    let itineraryDays = [];
+    let baseItineraryDays = [];
     try {
-      itineraryDays = JSON.parse(dataElement.textContent || '[]');
+      baseItineraryDays = JSON.parse(dataElement.textContent || '[]');
     } catch (error) {
       return;
     }
 
-    itineraryDays = itineraryDays.filter((day) => Array.isArray(day.cards) && day.cards.length);
-    if (!itineraryDays.length) return;
+    baseItineraryDays = baseItineraryDays.filter((day) => Array.isArray(day.cards) && day.cards.length);
+    if (!baseItineraryDays.length) return;
+
+    let extraItineraryOptions = [];
+    try {
+      extraItineraryOptions = JSON.parse(extraOptionsElement?.textContent || '[]');
+    } catch (error) {
+      extraItineraryOptions = [];
+    }
+
+    let selectedExtraIds = [];
+    try {
+      selectedExtraIds = JSON.parse(selectedExtraIdsElement?.textContent || '[]');
+    } catch (error) {
+      selectedExtraIds = [];
+    }
 
     function escapeHtml(value) {
       return String(value || '')
@@ -1856,6 +1876,169 @@ async function openAndInitStripe(){
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    function toMinutes(value) {
+      if (value === null || value === undefined || value === '') return null;
+      const raw = String(value).trim();
+      const match = raw.match(/^(\d{2}):(\d{2})$/);
+      if (!match) return null;
+      return (parseInt(match[1], 10) * 60) + parseInt(match[2], 10);
+    }
+
+    function formatMinutes(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return '';
+      const total = ((Number(value) % (24 * 60)) + (24 * 60)) % (24 * 60);
+      const hours = String(Math.floor(total / 60)).padStart(2, '0');
+      const minutes = String(total % 60).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+
+    function cloneItineraryDays(days) {
+      return (days || []).map((day) => ({
+        ...day,
+        cards: Array.isArray(day.cards) ? day.cards.map((card) => ({ ...card })) : [],
+        map_points: [],
+      }));
+    }
+
+    function recomputeDayCardMetadata(dayCards) {
+      dayCards.sort((a, b) => {
+        const aStart = toMinutes(a.start_time);
+        const bStart = toMinutes(b.start_time);
+        const aEnd = toMinutes(a.end_time);
+        const bEnd = toMinutes(b.end_time);
+        const aSeq = parseInt(a.sequence || 0, 10);
+        const bSeq = parseInt(b.sequence || 0, 10);
+        return (aStart ?? 1000000) - (bStart ?? 1000000)
+          || (aEnd ?? 1000000) - (bEnd ?? 1000000)
+          || aSeq - bSeq;
+      });
+
+      dayCards.forEach((card, index) => {
+        card.sequence = index + 1;
+        if (index === 0) {
+          card.segment_distance = '';
+          card.segment_transport = '';
+          card.segment_from_title = '';
+          card.segment_summary = '';
+          card.segment_badge = '';
+          return;
+        }
+        const previous = dayCards[index - 1];
+        const fromActivityId = card.segment_from_activity_id;
+        if (!card.is_extra && !previous.is_extra && fromActivityId && previous.activity_id === fromActivityId) return;
+        card.segment_distance = '';
+        card.segment_transport = '';
+        card.segment_from_title = '';
+        card.segment_summary = '';
+        card.segment_badge = '';
+      });
+    }
+
+    function buildAdjustedItineraryDays() {
+      const days = cloneItineraryDays(baseItineraryDays);
+      const dayMap = new Map(days.map((day) => [Number(day.day_number), day]));
+      const selectedIds = extraInputs.length
+        ? extraInputs.filter((input) => input.checked).map((input) => Number(input.value))
+        : (Array.isArray(selectedExtraIds) ? selectedExtraIds.map((value) => Number(value)) : []);
+
+      const chosenExtras = (extraItineraryOptions || [])
+        .filter((item) => selectedIds.includes(Number(item.id)) && item.insert_into_itinerary)
+        .sort((a, b) => (Number(a.itinerary_day_number || 0) - Number(b.itinerary_day_number || 0))
+          || ((a.itinerary_start_minutes ?? 1000000) - (b.itinerary_start_minutes ?? 1000000))
+          || (Number(a.id || 0) - Number(b.id || 0)));
+
+      chosenExtras.forEach((extra) => {
+        const dayNumber = Number(extra.itinerary_day_number || 0);
+        const startMinutes = extra.itinerary_start_minutes;
+        const durationMinutes = Number(extra.itinerary_duration_minutes || 0);
+        if (!dayNumber || startMinutes === null || startMinutes === undefined || !durationMinutes) return;
+
+        let dayEntry = dayMap.get(dayNumber);
+        if (!dayEntry) {
+          dayEntry = { day_number: dayNumber, label: `Day ${dayNumber}`, cards: [], map_points: [] };
+          dayMap.set(dayNumber, dayEntry);
+          days.push(dayEntry);
+        }
+
+        dayEntry.cards.forEach((card) => {
+          const cardStart = toMinutes(card.start_time);
+          const cardEnd = toMinutes(card.end_time);
+          if (cardStart !== null && cardStart >= startMinutes) {
+            card.start_time = formatMinutes(cardStart + durationMinutes);
+            if (cardEnd !== null) card.end_time = formatMinutes(cardEnd + durationMinutes);
+          } else if (cardStart !== null && cardEnd !== null && cardStart < startMinutes && startMinutes < cardEnd) {
+            const shift = (startMinutes + durationMinutes) - cardStart;
+            card.start_time = formatMinutes(cardStart + shift);
+            card.end_time = formatMinutes(cardEnd + shift);
+          } else if (cardEnd !== null && cardEnd > startMinutes) {
+            card.end_time = formatMinutes(cardEnd + durationMinutes);
+          }
+        });
+
+        dayEntry.cards.push({
+          kind: 'extra',
+          activity_id: null,
+          extra_id: extra.id,
+          is_extra: true,
+          sequence: dayEntry.cards.length + 1,
+          day_number: dayNumber,
+          point_role: 'regular',
+          title: extra.title || '',
+          description: extra.description || '',
+          image_url: extra.image_url || '',
+          location: extra.location || '',
+          map_url: extra.map_url || '',
+          latitude: extra.latitude,
+          longitude: extra.longitude,
+          start_time: extra.itinerary_start_time || '',
+          end_time: extra.itinerary_end_time || '',
+          price_label: extra.price_label || '',
+          segment_distance: '',
+          segment_transport: '',
+          segment_from_title: '',
+          segment_summary: '',
+          segment_badge: '',
+          segment_from_activity_id: null,
+        });
+
+        recomputeDayCardMetadata(dayEntry.cards);
+      });
+
+      return days
+        .sort((a, b) => Number(a.day_number || 0) - Number(b.day_number || 0))
+        .map((day) => {
+          recomputeDayCardMetadata(day.cards);
+          const mapPoints = day.cards
+            .filter((card) => typeof card.latitude === 'number' && typeof card.longitude === 'number')
+            .map((card, index) => ({
+              sequence: index + 1,
+              global_sequence: card.sequence,
+              day_number: day.day_number,
+              title: card.title || '',
+              location: card.location || '',
+              image_url: card.image_url || '',
+              latitude: card.latitude,
+              longitude: card.longitude,
+              segment_distance: card.segment_distance || '',
+              segment_transport: card.segment_transport || '',
+              segment_from_title: card.segment_from_title || '',
+              segment_summary: card.segment_summary || '',
+              segment_badge: card.segment_badge || '',
+              point_role: card.point_role || 'regular',
+              role_label: card.point_role === 'start' ? 'Starting point' : (card.point_role === 'end' ? 'Ending point' : ''),
+              start_time: card.start_time || '',
+              end_time: card.end_time || '',
+            }));
+          return {
+            ...day,
+            cards: day.cards,
+            map_points: mapPoints,
+            has_map_points: mapPoints.length > 0,
+          };
+        })
+        .filter((day) => Array.isArray(day.cards) && day.cards.length);
     }
 
     function bindMapMarkerModal() {
@@ -2023,17 +2206,63 @@ async function openAndInitStripe(){
       bindMapMarkerModal();
     }
 
+    function renderDayPanels(days) {
+      if (!dayPanelsStack) return;
+      dayPanelsStack.innerHTML = days.map((day) => `
+        <div class="itinerary-day-panel" data-itinerary-day="${escapeHtml(day.day_number)}">
+          <div class="itinerary-day-heading">
+            <div>
+              <div class="itinerary-day-title">${escapeHtml(day.label || `Day ${day.day_number}`)}</div>
+              <div class="text-muted small">${day.cards.length} stop${day.cards.length > 1 ? 's' : ''}</div>
+            </div>
+          </div>
+          <div class="itinerary-grid">
+            ${day.cards.map((card, index) => `
+              <div class="itinerary-grid-item">
+                <div class="card activity-guide-card itinerary-card border-0 shadow-sm h-100" data-itinerary-sequence="${escapeHtml(card.sequence)}" data-itinerary-day="${escapeHtml(day.day_number)}">
+                  <div class="itinerary-rail"></div>
+                  <div class="itinerary-step">${index + 1}</div>
+                  <div class="card-body">
+                    <div class="itinerary-card-top mb-2">
+                      <span class="activity-guide-badge">${card.is_extra ? 'Extra activity' : `Stop ${index + 1}`}</span>
+                      ${card.point_role === 'start' ? '<span class="itinerary-distance-badge">Starting point</span>' : ''}
+                      ${card.point_role === 'end' ? '<span class="itinerary-distance-badge">Ending point</span>' : ''}
+                    </div>
+                    <h6 class="fw-bold mb-2 itinerary-stop-title">${escapeHtml(card.title || '')}</h6>
+                    ${(card.start_time || card.end_time) ? `
+                      <div class="itinerary-time-row mb-2">
+                        ${card.start_time ? `<span class="itinerary-time-chip"><i class="fa-regular fa-clock me-1"></i>${escapeHtml(card.start_time)}</span>` : ''}
+                        ${card.end_time ? `<span class="itinerary-time-chip is-end"><i class="fa-regular fa-clock me-1"></i>${escapeHtml(card.end_time)}</span>` : ''}
+                      </div>
+                    ` : ''}
+                    ${card.location ? `<div class="itinerary-place mb-2"><span>${escapeHtml(card.location)}</span></div>` : ''}
+                    ${card.description ? `<p class="text-muted small mb-0">${escapeHtml(card.description)}</p>` : ''}
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    let itineraryDays = buildAdjustedItineraryDays();
     let activeDayIndex = 0;
 
     function updateDayPanels(dayNumber) {
-      dayPanels.forEach((panel) => {
+      if (!dayPanelsStack) return;
+      dayPanelsStack.querySelectorAll('.itinerary-day-panel').forEach((panel) => {
         panel.classList.toggle('is-active', panel.getAttribute('data-itinerary-day') === String(dayNumber));
       });
     }
 
     function renderActiveDay() {
+      itineraryDays = buildAdjustedItineraryDays();
+      if (!itineraryDays.length) return;
+      if (activeDayIndex > itineraryDays.length - 1) activeDayIndex = itineraryDays.length - 1;
       const day = itineraryDays[activeDayIndex];
       if (!day) return;
+      renderDayPanels(itineraryDays);
       if (activeDayLabel) activeDayLabel.textContent = day.label || `Day ${day.day_number}`;
       if (prevDayButton) prevDayButton.disabled = activeDayIndex === 0;
       if (nextDayButton) nextDayButton.disabled = activeDayIndex === itineraryDays.length - 1;
@@ -2054,6 +2283,20 @@ async function openAndInitStripe(){
         if (activeDayIndex >= itineraryDays.length - 1) return;
         activeDayIndex += 1;
         renderActiveDay();
+      });
+    }
+
+    if (extraInputs.length) {
+      extraInputs.forEach((input) => {
+        input.addEventListener('change', function () {
+          const currentDayNumber = itineraryDays[activeDayIndex]?.day_number;
+          renderActiveDay();
+          if (currentDayNumber) {
+            const nextIndex = itineraryDays.findIndex((day) => Number(day.day_number) === Number(currentDayNumber));
+            if (nextIndex >= 0) activeDayIndex = nextIndex;
+            renderActiveDay();
+          }
+        });
       });
     }
 

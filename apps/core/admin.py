@@ -43,9 +43,9 @@ class TourActivityAdminForm(forms.ModelForm):
     )
     coordinates = forms.CharField(
         required=False,
-        help_text="Paste from Google Maps, for example: 34.0318501020754, -6.835778065718815",
+        help_text="Paste coordinates or a Google Maps value, for example: 34.0318501020754, -6.835778065718815",
         label="Coordinates",
-        widget=forms.TextInput(attrs={"readonly": "readonly"}),
+        widget=forms.TextInput(),
     )
 
     class Meta:
@@ -93,9 +93,9 @@ class TourExtraActivityAdminForm(forms.ModelForm):
     )
     coordinates = forms.CharField(
         required=False,
-        help_text="Paste from Google Maps, for example: 34.0318501020754, -6.835778065718815",
+        help_text="Paste coordinates or a Google Maps value, for example: 34.0318501020754, -6.835778065718815",
         label="Coordinates",
-        widget=forms.TextInput(attrs={"readonly": "readonly"}),
+        widget=forms.TextInput(),
     )
 
     class Meta:
@@ -132,6 +132,14 @@ class TourExtraActivityAdminForm(forms.ModelForm):
             latitude, longitude = _parse_coordinates(coordinates_value)
         cleaned_data['latitude'] = latitude
         cleaned_data['longitude'] = longitude
+        if cleaned_data.get('insert_into_itinerary'):
+            if not cleaned_data.get('itinerary_day_number'):
+                self.add_error('itinerary_day_number', "Choose the itinerary day for this extra activity.")
+            if not cleaned_data.get('itinerary_start_time'):
+                self.add_error('itinerary_start_time', "Choose the start time for this extra activity.")
+            duration = cleaned_data.get('itinerary_duration_minutes')
+            if not duration or int(duration) <= 0:
+                self.add_error('itinerary_duration_minutes', "Enter a duration in minutes greater than 0.")
         return cleaned_data
 
 
@@ -214,7 +222,9 @@ class TourExtraActivityInline(admin.StackedInline):
     fields = (
         'title', 'description', 'image',
         'city', 'place_name', 'map_search', 'coordinates', 'latitude', 'longitude',
-        'price', 'is_per_night', 'is_active',
+        'price', 'is_per_night',
+        'insert_into_itinerary', 'itinerary_day_number', 'itinerary_start_time', 'itinerary_duration_minutes',
+        'is_active',
     )
 
 
