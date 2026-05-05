@@ -699,8 +699,6 @@ def _apply_selected_extras_to_itinerary_days(base_days: list[dict], extra_option
         day_cards = day_map[day_number]['cards']
         map_points = []
         for local_index, card in enumerate(day_cards, start=1):
-            if card.get('latitude') is None or card.get('longitude') is None:
-                continue
             point_role = card.get('point_role') or TourActivity.POINT_REGULAR
             role_label = ''
             if point_role == TourActivity.POINT_START:

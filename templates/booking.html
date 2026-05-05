@@ -2011,7 +2011,6 @@ async function openAndInitStripe(){
         .map((day) => {
           recomputeDayCardMetadata(day.cards);
           const mapPoints = day.cards
-            .filter((card) => typeof card.latitude === 'number' && typeof card.longitude === 'number')
             .map((card, index) => ({
               sequence: index + 1,
               global_sequence: card.sequence,
@@ -2065,7 +2064,7 @@ async function openAndInitStripe(){
     }
 
     function renderRouteOverview(points) {
-      const validPoints = (points || []).filter((point) => typeof point.latitude === 'number' && typeof point.longitude === 'number');
+      const validPoints = Array.isArray(points) ? points.filter(Boolean) : [];
       const width = 1200;
       const height = 520;
       const paddingX = 120;
@@ -2080,7 +2079,7 @@ async function openAndInitStripe(){
       }
 
       if (!validPoints.length) {
-        mapElement.innerHTML = '<div class="itinerary-map-empty">No mapped places for this day yet.</div>';
+        mapElement.innerHTML = '<div class="itinerary-map-empty">No itinerary stops for this day yet.</div>';
         return;
       }
 
