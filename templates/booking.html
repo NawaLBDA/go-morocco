@@ -48,25 +48,25 @@
       </div>
 
       <div class="row g-3 mb-4">
-        {% if tour.transport %}
+        {% if tour.included %}
           <div class="col-12 col-md-4">
             <div class="card booking-feature border-0 shadow-sm h-100">
               <div class="card-body">
-                <div class="booking-icon mb-2"><i class="fa-solid fa-car"></i></div>
-                <div class="fw-bold">Transport</div>
-                <div class="text-muted small">{{ tour.transport }}</div>
+                <div class="booking-icon mb-2"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="fw-bold">Included</div>
+                <div class="text-muted small">{{ tour.included|striptags|truncatechars:120 }}</div>
               </div>
             </div>
           </div>
         {% endif %}
 
-        {% if tour.hotel %}
+        {% if tour.not_included %}
           <div class="col-12 col-md-4">
             <div class="card booking-feature border-0 shadow-sm h-100">
               <div class="card-body">
-                <div class="booking-icon mb-2"><i class="fa-solid fa-hotel"></i></div>
-                <div class="fw-bold">Stay</div>
-                <div class="text-muted small">{{ tour.hotel }}</div>
+                <div class="booking-icon mb-2"><i class="fa-solid fa-circle-minus"></i></div>
+                <div class="fw-bold">Not included</div>
+                <div class="text-muted small">{{ tour.not_included|striptags|truncatechars:120 }}</div>
               </div>
             </div>
           </div>
@@ -190,34 +190,6 @@
           <div class="itinerary-section-spacer"></div>
         {% endif %}
 
-        {% if tour.included or tour.not_included %}
-          <hr class="my-4">
-          <div class="row g-3">
-            {% if tour.included %}
-              <div class="col-12 {% if tour.not_included %}col-md-6{% endif %}">
-                <div class="booking-info-card h-100">
-                  <div class="booking-info-card-title">
-                    <i class="fa-solid fa-circle-check"></i>
-                    <span>Included</span>
-                  </div>
-                  <div class="booking-prose text-muted">{{ tour.included|linebreaks }}</div>
-                </div>
-              </div>
-            {% endif %}
-            {% if tour.not_included %}
-              <div class="col-12 {% if tour.included %}col-md-6{% endif %}">
-                <div class="booking-info-card h-100">
-                  <div class="booking-info-card-title is-muted">
-                    <i class="fa-solid fa-circle-minus"></i>
-                    <span>Not included</span>
-                  </div>
-                  <div class="booking-prose text-muted">{{ tour.not_included|linebreaks }}</div>
-                </div>
-              </div>
-            {% endif %}
-          </div>
-        {% endif %}
-
         <hr class="my-4">
         <div class="activity-section-heading mb-3">
           <h5 class="fw-bold mb-1">Extra activities (optional)</h5>
@@ -310,7 +282,7 @@
             </div>
             <div class="col-6 col-md-3">
               <div class="reservation-overview-item">
-                <div class="text-muted small">Nights</div>
+                <div class="text-muted small">Days</div>
                 <div class="fw-semibold">{{ reservation.nights }}</div>
               </div>
             </div>
@@ -382,7 +354,7 @@
   </div>
 {% else %}
   <p class="fs-3 fw-bold text-primary mb-1 booking-price-panel">
-    {{ tour.price_per_night }} $ / day
+    {{ tour.price_per_night }} $ / person / day
   </p>
 {% endif %}
 
@@ -398,8 +370,8 @@
       </div>
 
       <div class="d-flex justify-content-between mt-2">
-        <span><i class="fa-solid fa-moon me-1"></i> Nights</span>
-        <strong>{{ reservation.nights }} nights</strong>
+        <span><i class="fa-solid fa-calendar-day me-1"></i> Days</span>
+        <strong>{{ reservation.nights }} day{{ reservation.nights|pluralize }}</strong>
       </div>
 
       <div class="d-flex justify-content-between mt-2">
@@ -550,13 +522,13 @@
 
     <div id="durationWarning" class="alert alert-warning py-2 px-3 small d-none mt-2">
       <i class="fa-solid fa-triangle-exclamation me-1"></i>
-      Maximum allowed duration is <span id="maxNightsLabel">11</span> nights.
+      Maximum allowed duration is <span id="maxDaysLabel">11</span> days.
       Unavailable dates include a {{ booking_buffer_days|default:3 }}-day buffer after each trip.
     </div>
 
     <div class="booking-inline-meta d-flex justify-content-between align-items-center small text-muted mb-3">
-      <span><i class="fa-solid fa-moon me-1"></i> Nights</span>
-      <strong id="live-nights">—</strong>
+      <span><i class="fa-solid fa-calendar-day me-1"></i> Days</span>
+      <strong id="live-days">—</strong>
     </div>
 
     <div class="booking-form-group mb-3">
@@ -571,38 +543,19 @@
              class="form-control booking-person-input mt-3">
     </div>
 
-    <input type="hidden" id="transport-price" value="{{ tour.transport_price_per_night|default_if_none:'0' }}">
-    <input type="hidden" id="hotel-price" value="{{ tour.hotel_price_per_night|default_if_none:'0' }}">
-
     <div class="booking-form-group mb-3">
-      <div class="booking-form-heading mb-2">
+      <div class="booking-form-heading">
         <span class="booking-form-step">3</span>
         <div>
-          <label class="fw-bold mb-1 d-block">Options</label>
-          <div class="booking-form-hint">Customize transport and stay</div>
+          <label class="fw-bold mb-1 d-block">Tour price</label>
+          <div class="booking-form-hint">Price per person per day, adjusted by days, travelers, and selected extras.</div>
         </div>
       </div>
-      <div class="border rounded p-3 bg-light mb-3 booking-options-panel">
-      <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="full_package" name="full_package" value="1">
-        <label class="form-check-label" for="full_package">
-          Full package (Transport + Hotel)
-        </label>
-      </div>
-
-      <div class="form-check form-switch mt-2">
-        <input class="form-check-input" type="checkbox" id="include_transport" name="include_transport" value="1">
-        <label class="form-check-label" for="include_transport">
-          Transport{% if tour.transport_price_per_night %} (+{{ tour.transport_price_per_night }} $ / day){% endif %}
-        </label>
-      </div>
-
-      <div class="form-check form-switch mt-2">
-        <input class="form-check-input" type="checkbox" id="include_hotel" name="include_hotel" value="1">
-        <label class="form-check-label" for="include_hotel">
-          Hotel{% if tour.hotel_price_per_night %} (+{{ tour.hotel_price_per_night }} $ / day){% endif %}
-        </label>
-      </div>
+      <div class="booking-inline-meta mt-3 mb-0">
+        <div class="d-flex justify-content-between align-items-center gap-2">
+          <span>Package tour</span>
+          <strong>{{ tour.promo_price|default:tour.price_per_night }} $ / person / day</strong>
+        </div>
       </div>
     </div>
 
@@ -735,28 +688,20 @@ document.addEventListener("DOMContentLoaded", function () {
   const personsInput = document.getElementById("persons");
   const basePriceEl  = document.getElementById("base-price");
   const totalOutput  = document.getElementById("live-price");
-  const nightsOutput = document.getElementById("live-nights");
+  const daysOutput = document.getElementById("live-days");
   const dateWarning  = document.getElementById("dateWarning");
   const durationWarning = document.getElementById("durationWarning");
-
-  const fullPackageEl = document.getElementById('full_package');
-  const transportEl   = document.getElementById('include_transport');
-  const hotelEl       = document.getElementById('include_hotel');
-  const transportPriceEl = document.getElementById('transport-price');
-  const hotelPriceEl     = document.getElementById('hotel-price');
   const extraEls = document.querySelectorAll('.extra-activity-toggle');
 
   // ✅ si pas de form => stop calendrier فقط
   if (!startInput || !endInput || !personsInput || !basePriceEl) return;
 
   const basePrice = parseFloat(basePriceEl.value || "0");
-  const transportPrice = parseFloat((transportPriceEl && transportPriceEl.value) ? transportPriceEl.value : "0");
-  const hotelPrice = parseFloat((hotelPriceEl && hotelPriceEl.value) ? hotelPriceEl.value : "0");
   const disabledRanges = {{ disabled_ranges|default:"[]"|safe }};
   const MAX_NIGHTS = parseInt("{{ booking_max_nights|default:11 }}", 10);
 
-  const maxNightsLabel = document.getElementById('maxNightsLabel');
-  if (maxNightsLabel && Number.isFinite(MAX_NIGHTS)) maxNightsLabel.textContent = String(MAX_NIGHTS);
+  const maxDaysLabel = document.getElementById('maxDaysLabel');
+  if (maxDaysLabel && Number.isFinite(MAX_NIGHTS)) maxDaysLabel.textContent = String(MAX_NIGHTS);
 
   function showDateWarning(show=true){
     if (!dateWarning) return;
@@ -788,22 +733,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (!startInput.value || !endInput.value){
       totalOutput.textContent = (basePrice * persons).toFixed(2) + " $";
-      if (nightsOutput) nightsOutput.textContent = "—";
+      if (daysOutput) daysOutput.textContent = "—";
       return;
     }
 
     const start = new Date(startInput.value);
     const end   = new Date(endInput.value);
-    const nights = Math.round((end - start) / (1000 * 60 * 60 * 24));
+    const days = Math.round((end - start) / (1000 * 60 * 60 * 24));
 
-    if (nights < 1){
+    if (days < 1){
       totalOutput.textContent = (basePrice * persons).toFixed(2) + " $";
-      if (nightsOutput) nightsOutput.textContent = "—";
+      if (daysOutput) daysOutput.textContent = "—";
       return;
     }
 
-    if (Number.isFinite(MAX_NIGHTS) && nights > MAX_NIGHTS){
-      if (nightsOutput) nightsOutput.textContent = "—";
+    if (Number.isFinite(MAX_NIGHTS) && days > MAX_NIGHTS){
+      if (daysOutput) daysOutput.textContent = "—";
       showDurationWarning(true);
       totalOutput.textContent = '0 $';
       return;
@@ -811,22 +756,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     showDurationWarning(false);
 
-    if (nightsOutput) nightsOutput.textContent = nights + (nights === 1 ? " night" : " nights");
-
-    // Full package implies transport + hotel.
-    let includeTransport = transportEl ? transportEl.checked : false;
-    let includeHotel = hotelEl ? hotelEl.checked : false;
-    if (fullPackageEl && fullPackageEl.checked) {
-      includeTransport = true;
-      includeHotel = true;
-      if (transportEl) { transportEl.checked = true; transportEl.disabled = true; }
-      if (hotelEl) { hotelEl.checked = true; hotelEl.disabled = true; }
-    } else {
-      if (transportEl) transportEl.disabled = false;
-      if (hotelEl) hotelEl.disabled = false;
-    }
-
-    const perNightAdd = (includeTransport ? transportPrice : 0) + (includeHotel ? hotelPrice : 0);
+    if (daysOutput) daysOutput.textContent = days + (days === 1 ? " day" : " days");
 
     let extrasTotal = 0;
     if (extraEls && extraEls.length) {
@@ -834,11 +764,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!el.checked) return;
         const p = parseFloat(el.dataset.price || '0');
         const perNight = (el.dataset.perNight || '0') === '1';
-        extrasTotal += p * persons * (perNight ? nights : 1);
+        extrasTotal += p * persons * (perNight ? days : 1);
       });
     }
 
-    let total = ((basePrice + perNightAdd) * nights * persons) + extrasTotal;
+    let total = (basePrice * days * persons) + extrasTotal;
     if (persons >= 5) total *= 0.9;
 
     totalOutput.textContent = total.toFixed(2) + " $";
@@ -848,9 +778,6 @@ document.addEventListener("DOMContentLoaded", function () {
   personsInput.addEventListener("input", calculateTotal);
   startInput.addEventListener("change", calculateTotal);
   endInput.addEventListener("change", calculateTotal);
-  if (fullPackageEl) fullPackageEl.addEventListener('change', calculateTotal);
-  if (transportEl) transportEl.addEventListener('change', calculateTotal);
-  if (hotelEl) hotelEl.addEventListener('change', calculateTotal);
   if (extraEls && extraEls.length) extraEls.forEach((el) => el.addEventListener('change', calculateTotal));
 
   const picker = new Litepicker({
@@ -865,7 +792,7 @@ document.addEventListener("DOMContentLoaded", function () {
     numberOfColumns: 1,
     showTooltip: true,
     selectForward: true,
-    tooltipText: { one: "night", other: "nights" },
+    tooltipText: { one: "day", other: "days" },
     lockDays: disabledRanges.map(r => ({ from: r.from, to: r.to })),
   });
 
@@ -875,8 +802,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const s = startDate.dateInstance;
     const e = endDate.dateInstance;
 
-    const nights = Math.round((e - s) / (1000 * 60 * 60 * 24));
-    if (Number.isFinite(MAX_NIGHTS) && nights > MAX_NIGHTS) {
+    const days = Math.round((e - s) / (1000 * 60 * 60 * 24));
+    if (Number.isFinite(MAX_NIGHTS) && days > MAX_NIGHTS) {
       startInput.value = "";
       endInput.value = "";
       picker.clearSelection();
@@ -2169,9 +2096,6 @@ async function openAndInitStripe(){
     const personsValue = params.get('persons');
     const paymentValue = params.get('payment_method');
 
-    const fullPackageValue = params.get('full_package');
-    const transportValue = params.get('include_transport');
-    const hotelValue = params.get('include_hotel');
     const autobook = params.get('autobook');
 
     if (startField && startValue) {
@@ -2196,23 +2120,6 @@ async function openAndInitStripe(){
           r.dispatchEvent(new Event('change', { bubbles: true }));
         }
       });
-    }
-
-    // Optional add-ons
-    const fullPackageEl = document.getElementById('full_package');
-    const transportEl = document.getElementById('include_transport');
-    const hotelEl = document.getElementById('include_hotel');
-    if (fullPackageEl && (fullPackageValue === '1' || fullPackageValue === 'true')) {
-      fullPackageEl.checked = true;
-      fullPackageEl.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    if (transportEl && (transportValue === '1' || transportValue === 'true')) {
-      transportEl.checked = true;
-      transportEl.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    if (hotelEl && (hotelValue === '1' || hotelValue === 'true')) {
-      hotelEl.checked = true;
-      hotelEl.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     // Auto-submit when requested and the form is complete.
