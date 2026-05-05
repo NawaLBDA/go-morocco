@@ -958,12 +958,12 @@ def ai_chat_stream(request):
                     if lang == 'fr' else
                     "End date must be after start date. Can you resend the dates (from … to …)?"
                 )
-            elif requested_nights > 11:
-                computed_hints_lines.append("Booking rule: maximum stay is 11 nights. Ask for a shorter date range.")
+            elif requested_nights > 5:
+                computed_hints_lines.append("Booking rule: maximum stay is 5 days. Ask for a shorter date range.")
                 deterministic_text = (
                     "La durée maximale est de 11 nuits. Peux-tu choisir des dates plus courtes ?"
                     if lang == 'fr' else
-                    "Maximum stay is 11 nights. Can you choose a shorter date range?"
+                    "Maximum stay is 5 days. Can you choose a shorter date range?"
                 )
             else:
                 will_replace_existing = _user_has_overlapping_reservation(request.user, country, start_date_req, end_date_req)
@@ -1035,8 +1035,8 @@ def ai_chat_stream(request):
                             addons_req['extras'] = False
                             pending_extra_ids = []
                     else:
-                        if not _user_break_buffer_ok(request.user, country, start_date_req, buffer_days=3):
-                            computed_hints_lines.append("User must respect a 3-day break after their last reservation end date. Ask them to choose a later start date.")
+                        if not _user_break_buffer_ok(request.user, country, start_date_req, buffer_days=0):
+                            computed_hints_lines.append("No booking buffer is allowed anymore. Skip this rule.")
                             # Preserve booking context so user can reply with only new dates.
                             _set_pending_booking(request, {
                                 'tour_id': int(tour.id),
@@ -1054,9 +1054,9 @@ def ai_chat_stream(request):
                             deterministic_text = (
                                 "Tu dois laisser 3 jours de pause après ta dernière réservation. Peux-tu choisir une date de début plus tardive ?"
                                 if lang == 'fr' else
-                                "You need a 3-day break after your last reservation. Can you choose a later start date?"
+                                "Please choose different dates."
                             )
-                        elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=3, exclude_user=request.user):
+                        elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=0, exclude_user=request.user):
                             # Preserve booking context so the user can reply with only a new date range.
                             _set_pending_booking(request, {
                                 'tour_id': int(tour.id),
@@ -1076,7 +1076,7 @@ def ai_chat_stream(request):
                                 start_date_req,
                                 nights=min(max(requested_nights, 3), 11),
                                 limit=4,
-                                buffer_days=3,
+                                buffer_days=0,
                                 exclude_user=request.user,
                             )
                             if suggestions:
@@ -1422,11 +1422,11 @@ def _strip_welcome_banner(text: str, country_label: str) -> str:
 
 def _build_booking_rules_context() -> str:
     return (
-        "Booking rules: maximum stay is 11 nights. "
+        "Booking rules: maximum stay is 5 days. "
         "Single-group rule: if there is any pending/booked reservation in a country, other tours in that country are unavailable for overlapping dates. "
-        "Buffer rule: 3-day buffer after each reservation end date. "
+        "There is no extra buffer after a reservation. "
         "Currency: all prices shown to users are in USD. "
-        "Pricing rules: the base price is per person per day and covers the guided tour, activities, and meals (lunch & dinner). "
+        "Pricing rules: the base tour price is recalculated from the selected date range, traveler count, and chosen extras. "
         "Hotel and transport are optional add-ons unless explicitly selected (Full package = Transport + Hotel). "
         "Extra activities are optional add-ons; some are per day and some per trip (per person)."
     )
@@ -1851,7 +1851,7 @@ def _date_from_iso(s: str | None) -> date | None:
         return None
 
 
-def _get_country_blocked_ranges(country: str, buffer_days: int = 3, exclude_user=None):
+def _get_country_blocked_ranges(country: str, buffer_days: int = 0, exclude_user=None):
     """Returns list of blocked date ranges (start, end_inclusive) for a country.
 
     If exclude_user is provided, their reservations are ignored (useful when a user
@@ -1891,7 +1891,7 @@ def _get_country_blocked_ranges(country: str, buffer_days: int = 3, exclude_user
     return [(s, e) for s, e in merged]
 
 
-def _is_range_available(country: str, start_date: date, end_date: date, buffer_days: int = 3, exclude_user=None) -> bool:
+def _is_range_available(country: str, start_date: date, end_date: date, buffer_days: int = 0, exclude_user=None) -> bool:
     """Return True iff there is no DB reservation blocking the requested window.
 
     IMPORTANT: availability must be based only on persisted `Reservation` rows in DB
@@ -1904,11 +1904,9 @@ def _is_range_available(country: str, start_date: date, end_date: date, buffer_d
     try:
         buffer_days = int(buffer_days)
     except Exception:
-        buffer_days = 3
+        buffer_days = 0
     buffer_days = max(0, buffer_days)
 
-    # Buffer rule: we block if an existing reservation overlaps either the requested
-    # stay OR the pre-buffer window_start.
     window_start = start_date - timedelta(days=buffer_days)
     active_statuses = ['pending', 'booked']
 
@@ -1927,7 +1925,7 @@ def _is_range_available(country: str, start_date: date, end_date: date, buffer_d
         return True
 
 
-def _user_break_buffer_ok(user, country: str, start_date: date, buffer_days: int = 3) -> bool:
+def _user_break_buffer_ok(user, country: str, start_date: date, buffer_days: int = 0) -> bool:
     """Enforce a per-user buffer after their last reservation end date.
 
     This is separate from the global single-group rule (which blocks other users).
@@ -1935,6 +1933,11 @@ def _user_break_buffer_ok(user, country: str, start_date: date, buffer_days: int
     if not user or not getattr(user, 'is_authenticated', False):
         return True
     if not start_date:
+        return True
+    try:
+        if int(buffer_days) <= 0:
+            return True
+    except Exception:
         return True
     country = _normalize_country(country)
     try:
@@ -1975,7 +1978,7 @@ def _user_has_overlapping_reservation(user, country: str, start_date: date, end_
         return False
 
 
-def _suggest_available_ranges(country: str, nights: int = 5, horizon_days: int = 120, limit: int = 4, buffer_days: int = 3):
+def _suggest_available_ranges(country: str, nights: int = 5, horizon_days: int = 120, limit: int = 4, buffer_days: int = 0):
     """Suggest next available continuous date ranges for a given stay length."""
     country = _normalize_country(country)
     # Let users book far in the future; suggestions should cover more than ~4 months.
@@ -2278,7 +2281,7 @@ def _filter_navigation_action(
         return action
 
     requested_nights = max(0, (end_date_req - start_date_req).days)
-    if requested_nights > 11 or (not _is_range_available(country, start_date_req, end_date_req, buffer_days=3, exclude_user=exclude_user)):
+    if requested_nights > 5 or (not _is_range_available(country, start_date_req, end_date_req, buffer_days=0, exclude_user=exclude_user)):
         action.pop('navigate', None)
         action.pop('prefill', None)
         return action
@@ -2574,16 +2577,14 @@ def home(request):
             # If only start date is set, we still treat it as a 1-day range.
             range_end = end_date_val or start_date_val
 
-            buffer_days = 3
             active_statuses = ['pending', 'booked']
-            window_start = start_date_val - timedelta(days=buffer_days)
 
             try:
                 has_conflict = Reservation.objects.filter(
                     tour__country=country,
                     status__in=active_statuses,
                     start_date__lte=range_end,
-                    end_date__gte=window_start,
+                    end_date__gte=start_date_val,
                 ).exists()
                 if has_conflict:
                     tours = Tour.objects.none()
@@ -2682,7 +2683,7 @@ def tour_detail(request, tour_slug: str):
     # - block any already reserved dates across ALL tours in the same country
     # - include pending + booked
     # - add a buffer after each tour so the group can reset/prep
-    buffer_days = 3
+    buffer_days = 0
     active_statuses = ['pending', 'booked']
 
     active_reservations = Reservation.objects.filter(
@@ -2695,7 +2696,7 @@ def tour_detail(request, tour_slug: str):
     disabled_ranges = [
         {
             "from": r.start_date.isoformat(),
-            "to": (r.end_date + timedelta(days=buffer_days)).isoformat(),
+            "to": r.end_date.isoformat(),
         }
         for r in active_reservations.order_by('start_date')
     ]
@@ -2719,7 +2720,7 @@ def tour_detail(request, tour_slug: str):
         "extra_activities": extra_activities,
         "activity_gallery_cards": activity_gallery_cards,
         "itinerary_days": itinerary_days,
-        "booking_max_nights": 11,
+        "booking_max_nights": 5,
         "booking_buffer_days": buffer_days,
     })
 
@@ -2936,11 +2937,11 @@ def ai_chat(request):
                     "La date de fin doit être après la date de début. Tu peux me redonner les dates (du … au …) ?" if lang == 'fr'
                     else "End date must be after start date. Can you resend the dates (from … to …)?"
                 )
-            elif requested_nights > 11:
-                computed_hints_lines.append("Booking rule: maximum stay is 11 nights. Ask for a shorter date range.")
+            elif requested_nights > 5:
+                computed_hints_lines.append("Booking rule: maximum stay is 5 days. Ask for a shorter date range.")
                 deterministic_text = (
                     "La durée maximale est de 11 nuits. Peux-tu choisir des dates plus courtes ?" if lang == 'fr'
-                    else "Maximum stay is 11 nights. Can you choose a shorter date range?"
+                    else "Maximum stay is 5 days. Can you choose a shorter date range?"
                 )
             else:
                 will_replace_existing = _user_has_overlapping_reservation(request.user, country, start_date_req, end_date_req)
@@ -2999,8 +3000,8 @@ def ai_chat(request):
                             addons_req['extras'] = False
                             pending_extra_ids = []
                     else:
-                        if not _user_break_buffer_ok(request.user, country, start_date_req, buffer_days=3):
-                            computed_hints_lines.append("User must respect a 3-day break after their last reservation end date. Ask them to choose a later start date.")
+                        if not _user_break_buffer_ok(request.user, country, start_date_req, buffer_days=0):
+                            computed_hints_lines.append("No booking buffer is allowed anymore. Skip this rule.")
                             # Preserve booking context so user can reply with only new dates.
                             _set_pending_booking(request, {
                                 'tour_id': int(tour.id),
@@ -3017,9 +3018,9 @@ def ai_chat(request):
                             })
                             deterministic_text = (
                                 "Tu dois laisser 3 jours de pause après ta dernière réservation. Peux-tu choisir une date de début plus tardive ?" if lang == 'fr'
-                                else "You need a 3-day break after your last reservation. Can you choose a later start date?"
+                                else "Please choose different dates."
                             )
-                        elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=3, exclude_user=request.user):
+                        elif not _is_range_available(country, start_date_req, end_date_req, buffer_days=0, exclude_user=request.user):
                             _set_pending_booking(request, {
                                 'tour_id': int(tour.id),
                                 'destination': booking_hint or '',
@@ -3038,7 +3039,7 @@ def ai_chat(request):
                                 start_date_req,
                                 nights=min(max(requested_nights, 3), 11),
                                 limit=4,
-                                buffer_days=3,
+                                buffer_days=0,
                                 exclude_user=request.user,
                             )
                             if suggestions:
@@ -3381,7 +3382,7 @@ def parse_actions(message, country):
     if booking_intent:
         if start_date and end_date and persons:
             requested_nights = max(0, (end_date - start_date).days)
-            if requested_nights <= 11 and _is_range_available(country, start_date, end_date, buffer_days=3):
+            if requested_nights <= 5 and _is_range_available(country, start_date, end_date, buffer_days=0):
                 tour, status, _candidates = _select_tour_for_booking(country, message, parsed_dest)
                 if tour and status == 'ok':
                     action['navigate'] = reverse('tour_detail', args=[tour.slug])
@@ -3515,16 +3516,14 @@ def reservations(request):
 
             range_end = end_date_val or start_date_val
 
-            buffer_days = 3
             active_statuses = ['pending', 'booked']
-            window_start = start_date_val - timedelta(days=buffer_days)
 
             try:
                 has_conflict = Reservation.objects.filter(
                     tour__country=country,
                     status__in=active_statuses,
                     start_date__lte=range_end,
-                    end_date__gte=window_start,
+                    end_date__gte=start_date_val,
                 ).exists()
                 if has_conflict:
                     tours = Tour.objects.none()

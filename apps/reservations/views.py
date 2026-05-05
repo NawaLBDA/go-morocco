@@ -108,40 +108,16 @@ def _create_pending_reservation(
     if nights <= 0:
         return None, "Invalid date range.", None, 400
 
-    max_nights = 11
+    max_nights = 5
     if nights > max_nights:
-        return None, f"Maximum allowed duration is {max_nights} nights.", None, 400
-
-    buffer_days = 3
-    try:
-        last_user_res = (
-            Reservation.objects.filter(user=user, tour__country=tour.country)
-            .exclude(status__in=["cancelled", "rejected"])
-            .order_by("-end_date")
-            .only("end_date")
-            .first()
-        )
-    except Exception:
-        last_user_res = None
-
-    if last_user_res and getattr(last_user_res, "end_date", None):
-        min_start = last_user_res.end_date + timedelta(days=buffer_days)
-        if start_date < min_start:
-            return (
-                None,
-                f"Please leave a {buffer_days}-day break after your last trip. Earliest start: {min_start.isoformat()}.",
-                None,
-                409,
-            )
+        return None, f"Maximum allowed duration is {max_nights} days.", None, 400
 
     active_statuses = ["pending", "booked"]
-    window_start = start_date - timedelta(days=buffer_days)
-    window_end = end_date + timedelta(days=buffer_days)
     candidates = Reservation.objects.filter(
         tour__country=tour.country,
         status__in=active_statuses,
-        start_date__lte=window_end,
-        end_date__gte=window_start,
+        start_date__lte=end_date,
+        end_date__gte=start_date,
     ).exclude(user=user)
 
     def _overlaps(a_start, a_end, b_start, b_end):
@@ -149,7 +125,7 @@ def _create_pending_reservation(
 
     for existing in candidates.order_by("start_date"):
         blocked_start = existing.start_date
-        blocked_end = existing.end_date + timedelta(days=buffer_days)
+        blocked_end = existing.end_date
         if _overlaps(start_date, end_date, blocked_start, blocked_end):
             return (
                 None,
@@ -337,7 +313,7 @@ def tour_detail(request, tour_id):
     # - block any already reserved dates across ALL tours in the same country
     # - include pending + booked
     # - add a buffer after each tour so the group can reset/prep
-    buffer_days = 3
+    buffer_days = 0
     active_statuses = ['pending', 'booked']
 
     active_reservations = Reservation.objects.filter(
@@ -348,7 +324,7 @@ def tour_detail(request, tour_id):
     disabled_ranges = [
         {
             "from": r.start_date.isoformat(),
-            "to": (r.end_date + timedelta(days=buffer_days)).isoformat(),
+            "to": r.end_date.isoformat(),
         }
         for r in active_reservations.order_by('start_date')
     ]
@@ -361,7 +337,7 @@ def tour_detail(request, tour_id):
         "activities_list": [a.strip() for a in (tour.activities or '').replace('\n', ',').split(',') if a.strip()],
         "extra_activities": list(tour.extra_activities.filter(is_active=True).order_by('id')),
         "today": date.today(),
-        "booking_max_nights": 11,
+        "booking_max_nights": 5,
         "booking_buffer_days": buffer_days,
     })
 
@@ -437,14 +413,14 @@ def book_tour(request, tour_id):
         messages.error(request, "Invalid date range")
         return redirect("tour_detail", tour_slug=tour.slug)
 
-    # ✅ business rule: reservations must not exceed 11 nights
-    max_nights = 11
+    # ✅ business rule: reservations must not exceed 5 days
+    max_nights = 5
     if nights > max_nights:
-        messages.error(request, f"Maximum allowed duration is {max_nights} nights.")
+        messages.error(request, f"Maximum allowed duration is {max_nights} days.")
         return redirect("tour_detail", tour_slug=tour.slug)
 
     # ✅ per-user break rule: enforce a 3-day pause after the user's last reservation in this country.
-    buffer_days = 3
+    buffer_days = 0
     try:
         last_user_res = (
             Reservation.objects.filter(user=request.user, tour__country=tour.country)
@@ -471,7 +447,7 @@ def book_tour(request, tour_id):
     # ✅ single-group rule:
     # Block ANY overlap with other active reservations across the same country,
     # plus a buffer after the existing trip for reset/prep.
-    buffer_days = 3
+    buffer_days = 0
     active_statuses = ["pending", "booked"]
     window_start = start_date - timedelta(days=buffer_days)
     window_end = end_date + timedelta(days=buffer_days)
