@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     # ✅ create booking (POST)
     path("tour/<int:tour_id>/book/", views.book_tour, name="book_tour"),
+    path("api/chat-book-tour/", views.chat_book_tour, name="chat_book_tour"),
 
     # ✅ Stripe intent (AFTER validation admin)  ✅ NEW
     path(

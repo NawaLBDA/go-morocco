@@ -4,6 +4,7 @@ import csv
 import stripe
 from datetime import datetime, timedelta, date
 from django.conf import settings
+from django.db import transaction
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib import messages
@@ -20,6 +21,14 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 def _bool_from_post(value: str | None) -> bool:
     return (value or "").lower() in {"1", "true", "on", "yes"}
+
+
+def _bool_from_any(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value or "").strip().lower() in {"1", "true", "on", "yes"}
 
 
 def _recalculate_total_for_reservation(
@@ -72,6 +81,233 @@ def _recalculate_total_for_reservation(
         total = (total * Decimal('0.90')).quantize(Decimal('0.01'))
 
     return total, base_price, transport_add, hotel_add, extras_total
+
+
+def _create_pending_reservation(
+    *,
+    user,
+    tour: Tour,
+    start_date: date,
+    end_date: date,
+    persons: int,
+    payment_method: str,
+    full_package: bool,
+    include_transport: bool,
+    include_hotel: bool,
+    extra_activity_ids: list[int] | None,
+):
+    payment_method = (payment_method or "").strip().lower()
+    if payment_method not in {"cash", "card"}:
+        return None, "Please select a payment method.", None, 400
+
+    if start_date < date.today():
+        return None, "Start date cannot be in the past.", None, 400
+
+    persons = max(1, int(persons or 1))
+    nights = (end_date - start_date).days
+    if nights <= 0:
+        return None, "Invalid date range.", None, 400
+
+    max_nights = 11
+    if nights > max_nights:
+        return None, f"Maximum allowed duration is {max_nights} nights.", None, 400
+
+    buffer_days = 3
+    try:
+        last_user_res = (
+            Reservation.objects.filter(user=user, tour__country=tour.country)
+            .exclude(status__in=["cancelled", "rejected"])
+            .order_by("-end_date")
+            .only("end_date")
+            .first()
+        )
+    except Exception:
+        last_user_res = None
+
+    if last_user_res and getattr(last_user_res, "end_date", None):
+        min_start = last_user_res.end_date + timedelta(days=buffer_days)
+        if start_date < min_start:
+            return (
+                None,
+                f"Please leave a {buffer_days}-day break after your last trip. Earliest start: {min_start.isoformat()}.",
+                None,
+                409,
+            )
+
+    active_statuses = ["pending", "booked"]
+    window_start = start_date - timedelta(days=buffer_days)
+    window_end = end_date + timedelta(days=buffer_days)
+    candidates = Reservation.objects.filter(
+        tour__country=tour.country,
+        status__in=active_statuses,
+        start_date__lte=window_end,
+        end_date__gte=window_start,
+    ).exclude(user=user)
+
+    def _overlaps(a_start, a_end, b_start, b_end):
+        return a_start <= b_end and a_end >= b_start
+
+    for existing in candidates.order_by("start_date"):
+        blocked_start = existing.start_date
+        blocked_end = existing.end_date + timedelta(days=buffer_days)
+        if _overlaps(start_date, end_date, blocked_start, blocked_end):
+            return (
+                None,
+                "These dates are unavailable because another reservation already blocks part of this period. Please choose another date range.",
+                None,
+                409,
+            )
+
+    extra_ids: list[int] = []
+    for raw_id in (extra_activity_ids or []):
+        try:
+            extra_ids.append(int(raw_id))
+        except Exception:
+            continue
+
+    extras_qs = TourExtraActivity.objects.filter(tour=tour, is_active=True)
+    if extra_ids:
+        extras_qs = extras_qs.filter(id__in=extra_ids)
+    extras = list(extras_qs.order_by("id"))
+
+    selected_extras_payload = [
+        {
+            "id": int(extra.id),
+            "title": extra.title,
+            "price": str(Decimal(extra.price or 0)),
+            "is_per_night": bool(extra.is_per_night),
+        }
+        for extra in extras
+    ]
+
+    total, base_price, transport_add, hotel_add, extras_total = _recalculate_total_for_reservation(
+        tour=tour,
+        start_date=start_date,
+        end_date=end_date,
+        persons=persons,
+        full_package=full_package,
+        include_transport=include_transport,
+        include_hotel=include_hotel,
+        selected_extra_activities=selected_extras_payload,
+    )
+
+    with transaction.atomic():
+        existing_qs = Reservation.objects.select_for_update().filter(
+            user=user,
+            tour__country=tour.country,
+        ).exclude(status__in=["cancelled", "rejected"]).order_by("-created_at")
+
+        replaced_existing = existing_qs.exists()
+        if replaced_existing:
+            existing_qs.update(status="cancelled")
+
+        reservation = Reservation.objects.create(
+            user=user,
+            tour=tour,
+            start_date=start_date,
+            end_date=end_date,
+            num_persons=persons,
+            total_price=total,
+            full_package=bool(full_package),
+            include_transport=bool(include_transport or full_package),
+            include_hotel=bool(include_hotel or full_package),
+            selected_extra_activities=selected_extras_payload,
+            extras_total=extras_total,
+            base_price_per_night=base_price,
+            transport_price_per_night=transport_add,
+            hotel_price_per_night=hotel_add,
+            status="pending",
+            payment_method=payment_method,
+            payment_status="unpaid",
+            stripe_payment_intent="",
+        )
+
+    info_message = "Your previous booking was updated with new dates." if replaced_existing else None
+    return reservation, None, info_message, 200
+
+
+@login_required
+@require_POST
+def chat_book_tour(request):
+    country = get_country_from_site(request)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"success": False, "reply": "Invalid booking payload."}, status=400)
+
+    try:
+        tour_id = int(payload.get("tour_id"))
+    except Exception:
+        return JsonResponse({"success": False, "reply": "Tour not found for this booking request."}, status=400)
+
+    tour = get_object_or_404(Tour, id=tour_id, country=country)
+
+    start_raw = str(payload.get("start_date") or "").strip()
+    end_raw = str(payload.get("end_date") or "").strip()
+    try:
+        start_date = datetime.strptime(start_raw, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_raw, "%Y-%m-%d").date()
+    except Exception:
+        return JsonResponse(
+            {"success": False, "reply": "Please share valid dates in YYYY-MM-DD format."},
+            status=400,
+        )
+
+    try:
+        persons = int(payload.get("persons", 1))
+    except Exception:
+        persons = 1
+
+    reservation, error_message, info_message, status_code = _create_pending_reservation(
+        user=request.user,
+        tour=tour,
+        start_date=start_date,
+        end_date=end_date,
+        persons=persons,
+        payment_method=str(payload.get("payment_method") or "").strip().lower(),
+        full_package=_bool_from_any(payload.get("full_package")),
+        include_transport=_bool_from_any(payload.get("include_transport")),
+        include_hotel=_bool_from_any(payload.get("include_hotel")),
+        extra_activity_ids=payload.get("extra_activity_ids") or [],
+    )
+
+    lang = str(payload.get("lang") or "en").strip().lower()
+    if lang not in {"fr", "en"}:
+        lang = "en"
+
+    if error_message:
+        reply = error_message
+        if lang == "fr":
+            if status_code == 409:
+                reply = "Ces dates ne sont pas disponibles. Merci de choisir un autre intervalle."
+            elif "payment method" in error_message.lower():
+                reply = "Merci de choisir un mode de paiement : carte ou especes."
+            elif "date" in error_message.lower():
+                reply = "Les dates envoyees ne sont pas valides. Merci de choisir un autre intervalle."
+        return JsonResponse({"success": False, "reply": reply}, status=status_code)
+
+    parts = []
+    if lang == "fr":
+        if info_message:
+            parts.append("Ta precedente reservation a ete remplacee par les nouvelles dates.")
+        parts.append(
+            f"Reservation envoyee pour {tour.title} du {start_date.isoformat()} au {end_date.isoformat()} pour {persons} personne(s). Elle est maintenant en attente de validation admin."
+        )
+    else:
+        if info_message:
+            parts.append("Your previous booking was replaced with the new dates.")
+        parts.append(
+            f"Your booking request for {tour.title} from {start_date.isoformat()} to {end_date.isoformat()} for {persons} traveler(s) has been submitted and is now pending admin validation."
+        )
+
+    return JsonResponse(
+        {
+            "success": True,
+            "reply": " ".join(parts),
+            "reservation_id": reservation.id if reservation else None,
+        }
+    )
 
 
 # ============================================================
@@ -135,10 +371,47 @@ def tour_detail(request, tour_id):
 # ============================================================
 @login_required
 def book_tour(request, tour_id):
-    tour = get_object_or_404(Tour, id=tour_id)
+    country = get_country_from_site(request)
+    tour = get_object_or_404(Tour, id=tour_id, country=country)
 
     if request.method != "POST":
         return redirect("tour_detail", tour_slug=tour.slug)
+
+    start = request.POST.get("start_date")
+    end = request.POST.get("end_date")
+    try:
+        persons = int(request.POST.get("persons", 1))
+    except Exception:
+        persons = 1
+
+    try:
+        start_date = datetime.strptime(start, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end, "%Y-%m-%d").date()
+    except Exception:
+        messages.error(request, "Invalid date format")
+        return redirect("tour_detail", tour_slug=tour.slug)
+
+    reservation, error_message, info_message, _status_code = _create_pending_reservation(
+        user=request.user,
+        tour=tour,
+        start_date=start_date,
+        end_date=end_date,
+        persons=persons,
+        payment_method=(request.POST.get("payment_method") or "").strip().lower(),
+        full_package=_bool_from_post(request.POST.get("full_package")),
+        include_transport=_bool_from_post(request.POST.get("include_transport")),
+        include_hotel=_bool_from_post(request.POST.get("include_hotel")),
+        extra_activity_ids=request.POST.getlist("extra_activity_ids"),
+    )
+    if error_message:
+        messages.error(request, error_message)
+        return redirect("tour_detail", tour_slug=tour.slug)
+
+    if info_message:
+        messages.info(request, info_message)
+    if reservation:
+        messages.success(request, "Booking request submitted. Waiting for admin validation.")
+    return redirect("home")
 
     start = request.POST.get("start_date")
     end = request.POST.get("end_date")

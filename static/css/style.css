@@ -1482,6 +1482,30 @@ body[data-page="auth"] .site-footer{
   font-size: 0.92rem;
 }
 
+.available-tours-section .tour-activity-preview{
+  display: grid;
+  gap: 10px;
+}
+
+.available-tours-section .tour-activity-preview-item{
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 1));
+}
+
+.available-tours-section .tour-activity-preview-item img{
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 12px;
+  display: block;
+}
+
 /* Button alignment */
 .available-tours-section .btn-sm {
   padding: 6px 14px;

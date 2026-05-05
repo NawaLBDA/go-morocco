@@ -387,6 +387,65 @@ document.addEventListener('DOMContentLoaded', function () {
     return msg;
   }
 
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i += 1) {
+        const cookie = cookies[i].trim();
+        if (cookie.startsWith(name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  async function runDirectChatBooking(action) {
+    if (!action || !action.tour_id) return false;
+
+    const bookingUrl = action.url || '{% url "chat_book_tour" %}';
+    try {
+      const response = await fetch(bookingUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken') || '',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          tour_id: action.tour_id,
+          start_date: action.start_date,
+          end_date: action.end_date,
+          persons: action.persons,
+          payment_method: action.payment_method,
+          full_package: action.full_package,
+          include_transport: action.include_transport,
+          include_hotel: action.include_hotel,
+          extra_activity_ids: action.extra_activity_ids || [],
+          lang: document.documentElement.lang || 'en'
+        })
+      });
+
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (error) {}
+
+      const reply = data.reply || (response.ok ? 'Booking request submitted.' : 'Unable to submit the booking right now.');
+      addMessage(reply, 'bot');
+
+      if (response.ok && data.reservation_id) {
+        setTimeout(() => { window.location.href = '{% url "reservations" %}'; }, 900);
+      }
+      return response.ok;
+    } catch (error) {
+      addMessage('Sorry — I could not submit the booking right now. Please try again.', 'bot');
+      return false;
+    }
+  }
+
   async function streamBotReply(userText) {
     const botMsgEl = addMessage('', 'bot');
     botMsgEl.setAttribute('data-streaming', 'true');
@@ -513,6 +572,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Handle action (navigate/prefill) after stream ends
     if (finalAction) {
+      if (finalAction.book_direct) {
+        await runDirectChatBooking(finalAction.book_direct);
+        return;
+      }
+
       if (finalAction.navigate && finalAction.prefill) {
         const params = new URLSearchParams();
         const prefill = finalAction.prefill || {};

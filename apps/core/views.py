@@ -535,7 +535,136 @@ from django.views.decorators.csrf import csrf_exempt
 import openai
 from django.db.utils import OperationalError, ProgrammingError
 
-from .models import Tour, Reservation, BlogPost, Destination, ContactMessage, BlogComment, UserProfile, CountryContent, Section, Information, ChatMessage
+from .models import Tour, TourActivity, Reservation, BlogPost, Destination, ContactMessage, BlogComment, UserProfile, CountryContent, Section, Information, ChatMessage
+
+
+def _safe_media_url(media_obj):
+    if not media_obj:
+        return ''
+    try:
+        return media_obj.url
+    except Exception:
+        return ''
+
+
+def _build_activity_gallery_cards(tour: Tour) -> list[dict]:
+    cards: list[dict] = []
+    legs_by_target: dict[int, dict] = {}
+
+    for leg in tour.itinerary_legs.filter(is_active=True).select_related('from_activity', 'to_activity').order_by('display_order', 'id'):
+        legs_by_target[leg.to_activity_id] = {
+            'from_title': leg.from_activity.title,
+            'to_title': leg.to_activity.title,
+            'distance_label': leg.distance_label,
+            'transport_mode': leg.transport_mode,
+            'transport_label': leg.transport_display_label,
+            'summary': f"{leg.distance_label} by {leg.transport_display_label}",
+            'card_badge': f"{leg.distance_label} by {leg.transport_display_label}",
+        }
+
+    for index, activity in enumerate(tour.activity_cards.filter(is_active=True).order_by('day_number', 'display_order', 'id'), start=1):
+        leg_info = legs_by_target.get(activity.id)
+        cards.append({
+            'kind': 'activity',
+            'extra_id': None,
+            'is_extra': False,
+            'sequence': index,
+            'day_number': activity.day_number or 1,
+            'point_role': activity.point_role or TourActivity.POINT_REGULAR,
+            'title': activity.title,
+            'description': activity.description,
+            'image_url': _safe_media_url(activity.image),
+            'location': activity.location_display,
+            'map_url': activity.map_url,
+            'latitude': float(activity.latitude) if activity.latitude is not None else None,
+            'longitude': float(activity.longitude) if activity.longitude is not None else None,
+            'start_time': activity.start_time.strftime('%H:%M') if activity.start_time else '',
+            'end_time': activity.end_time.strftime('%H:%M') if activity.end_time else '',
+            'price_label': '',
+            'segment_distance': leg_info['distance_label'] if leg_info else '',
+            'segment_transport': leg_info['transport_label'] if leg_info else '',
+            'segment_from_title': leg_info['from_title'] if leg_info else '',
+            'segment_summary': leg_info['summary'] if leg_info else '',
+            'segment_badge': leg_info['card_badge'] if leg_info else '',
+        })
+
+    itinerary_count = len(cards)
+    for offset, extra in enumerate(tour.extra_activities.filter(is_active=True).order_by('id'), start=1):
+        cards.append({
+            'kind': 'extra',
+            'extra_id': extra.id,
+            'is_extra': True,
+            'sequence': itinerary_count + offset,
+            'title': extra.title,
+            'description': extra.description,
+            'image_url': _safe_media_url(extra.image),
+            'location': extra.location_display,
+            'map_url': extra.map_url,
+            'latitude': float(extra.latitude) if extra.latitude is not None else None,
+            'longitude': float(extra.longitude) if extra.longitude is not None else None,
+            'start_time': '',
+            'end_time': '',
+            'price_label': f"+{extra.price}$ {'/day' if extra.is_per_night else '/trip'}",
+        })
+
+    return cards
+
+
+def _build_itinerary_days(tour: Tour) -> list[dict]:
+    activity_cards = [card for card in _build_activity_gallery_cards(tour) if not card.get('is_extra')]
+    if not activity_cards:
+        return []
+
+    day_map: dict[int, dict] = {}
+    for card in activity_cards:
+        day_number = int(card.get('day_number') or 1)
+        day_entry = day_map.setdefault(day_number, {
+            'day_number': day_number,
+            'label': f"Day {day_number}",
+            'cards': [],
+            'map_points': [],
+        })
+        day_entry['cards'].append(card)
+
+    for day_number in sorted(day_map):
+        day_cards = day_map[day_number]['cards']
+        day_cards.sort(key=lambda item: (int(item.get('sequence') or 0), int(item.get('day_number') or 1)))
+
+        map_points = []
+        for local_index, card in enumerate(day_cards, start=1):
+            if card.get('latitude') is None or card.get('longitude') is None:
+                continue
+            point_role = card.get('point_role') or TourActivity.POINT_REGULAR
+            role_label = ''
+            if point_role == TourActivity.POINT_START:
+                role_label = 'Starting point'
+            elif point_role == TourActivity.POINT_END:
+                role_label = 'Ending point'
+
+            map_points.append({
+                'sequence': local_index,
+                'global_sequence': card.get('sequence'),
+                'day_number': day_number,
+                'title': card.get('title', ''),
+                'location': card.get('location', ''),
+                'image_url': card.get('image_url', ''),
+                'latitude': card.get('latitude'),
+                'longitude': card.get('longitude'),
+                'segment_distance': card.get('segment_distance', ''),
+                'segment_transport': card.get('segment_transport', ''),
+                'segment_from_title': card.get('segment_from_title', ''),
+                'segment_summary': card.get('segment_summary', ''),
+                'segment_badge': card.get('segment_badge', ''),
+                'point_role': point_role,
+                'role_label': role_label,
+                'start_time': card.get('start_time', ''),
+                'end_time': card.get('end_time', ''),
+            })
+
+        day_map[day_number]['map_points'] = map_points
+        day_map[day_number]['has_map_points'] = bool(map_points)
+
+    return [day_map[key] for key in sorted(day_map)]
 from .context_processors import get_country_from_site
 
 
@@ -996,23 +1125,19 @@ def ai_chat_stream(request):
                                 )
                             else:
                                 _set_pending_booking(request, None)
-                                action['navigate'] = reverse('tour_detail', args=[tour.slug])
-                                action['prefill'] = {
+                                action['book_direct'] = {
+                                    'url': reverse('chat_book_tour'),
+                                    'tour_id': int(tour.id),
+                                    'tour_slug': tour.slug,
                                     'start_date': start_date_req.strftime('%Y-%m-%d'),
                                     'end_date': end_date_req.strftime('%Y-%m-%d'),
                                     'persons': int(persons_req),
                                     'payment_method': payment_method_req,
+                                    'full_package': 1 if full_pkg else 0,
+                                    'include_transport': 1 if inc_transport else 0,
+                                    'include_hotel': 1 if inc_hotel else 0,
+                                    'extra_activity_ids': [int(x) for x in (pending_extra_ids or [])],
                                 }
-                                if full_pkg:
-                                    action['prefill']['full_package'] = 1
-                                if inc_transport:
-                                    action['prefill']['include_transport'] = 1
-                                if inc_hotel:
-                                    action['prefill']['include_hotel'] = 1
-                                if pending_extra_ids:
-                                    action['prefill']['extra_activity_ids'] = [str(pending_extra_ids[0])]
-                                if getattr(request, 'user', None) and request.user.is_authenticated:
-                                    action['autobook'] = 1
                                 computed_hints_lines.append("Booking is ready. Do not re-confirm; proceed as completed.")
 
                                 if session_memory:
@@ -2416,7 +2541,7 @@ def home(request):
 
     country = get_country_from_site(request)
     try:
-        tours = Tour.objects.filter(country=country)
+        tours = Tour.objects.filter(country=country).select_related('destination').prefetch_related('activity_cards')
     except (OperationalError, ProgrammingError):
         tours = Tour.objects.none()
 
@@ -2489,6 +2614,13 @@ def home(request):
                 ).exclude(status__in=["rejected", "cancelled", "completed"]).order_by("-created_at").first()
             except (OperationalError, ProgrammingError):
                 tour.user_reservation = None
+        tour.featured_activity_cards = list(tour.activity_cards.filter(is_active=True).order_by('display_order', 'id')[:2])
+        if not tour.featured_activity_cards and tour.activities:
+            tour.fallback_activity_labels = [
+                a.strip() for a in (tour.activities or '').replace('\n', ',').split(',') if a.strip()
+            ][:3]
+        else:
+            tour.fallback_activity_labels = []
 
     # Load country-specific content
     try:
@@ -2533,7 +2665,11 @@ def tour_detail_legacy(request, tour_id: int):
 
 def tour_detail(request, tour_slug: str):
     country = get_country_from_site(request)
-    tour = get_object_or_404(Tour, slug=tour_slug, country=country)
+    tour = get_object_or_404(
+        Tour.objects.select_related('destination').prefetch_related('activity_cards', 'extra_activities'),
+        slug=tour_slug,
+        country=country,
+    )
 
     reservation = None
     if request.user.is_authenticated:
@@ -2568,6 +2704,10 @@ def tour_detail(request, tour_slug: str):
     if tour.is_promotion and tour.discount_percent > 0:
         discount = (Decimal(100) - Decimal(tour.discount_percent)) / Decimal(100)
         tour.promo_price = (Decimal(tour.price_per_night) * discount).quantize(Decimal("0.01"))
+    structured_activities = list(tour.activity_cards.filter(is_active=True).order_by('day_number', 'display_order', 'id'))
+    extra_activities = list(tour.extra_activities.filter(is_active=True).order_by('id'))
+    activity_gallery_cards = _build_activity_gallery_cards(tour)
+    itinerary_days = _build_itinerary_days(tour)
     return render(request, "booking.html", {
         "tour": tour,
         "reservation": reservation,
@@ -2575,7 +2715,10 @@ def tour_detail(request, tour_slug: str):
         "today": date.today(),  # ✅ IMPORTANT
         "STRIPE_PUBLIC_KEY": settings.STRIPE_PUBLIC_KEY,
         "activities_list": [a.strip() for a in (tour.activities or '').replace('\n', ',').split(',') if a.strip()],
-        "extra_activities": list(tour.extra_activities.filter(is_active=True).order_by('id')),
+        "structured_activities": structured_activities,
+        "extra_activities": extra_activities,
+        "activity_gallery_cards": activity_gallery_cards,
+        "itinerary_days": itinerary_days,
         "booking_max_nights": 11,
         "booking_buffer_days": buffer_days,
     })
@@ -2945,24 +3088,20 @@ def ai_chat(request):
                             else:
                                 _set_pending_booking(request, None)
                                 action = {
-                                    'navigate': reverse('tour_detail', args=[tour.slug]),
-                                    'prefill': {
+                                    'book_direct': {
+                                        'url': reverse('chat_book_tour'),
+                                        'tour_id': int(tour.id),
+                                        'tour_slug': tour.slug,
                                         'start_date': start_date_req.strftime('%Y-%m-%d'),
                                         'end_date': end_date_req.strftime('%Y-%m-%d'),
                                         'persons': int(persons_req),
                                         'payment_method': payment_method_req,
+                                        'full_package': 1 if full_pkg else 0,
+                                        'include_transport': 1 if inc_transport else 0,
+                                        'include_hotel': 1 if inc_hotel else 0,
+                                        'extra_activity_ids': [int(x) for x in (pending_extra_ids or [])],
                                     },
                                 }
-                                if full_pkg:
-                                    action['prefill']['full_package'] = 1
-                                if inc_transport:
-                                    action['prefill']['include_transport'] = 1
-                                if inc_hotel:
-                                    action['prefill']['include_hotel'] = 1
-                                if pending_extra_ids:
-                                    action['prefill']['extra_activity_ids'] = [str(pending_extra_ids[0])]
-                                if getattr(request, 'user', None) and request.user.is_authenticated:
-                                    action['autobook'] = 1
                                 computed_hints_lines.append(
                                     "Booking is ready. Tell the user you are submitting their booking request (pending admin validation). Do not claim it's confirmed/paid."
                                 )

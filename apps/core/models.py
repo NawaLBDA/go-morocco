@@ -183,12 +183,110 @@ class Tour(models.Model):
         super().save(*args, **kwargs)
 
 
+class TourActivity(models.Model):
+    """Structured tour activity with optional image and precise place details."""
+
+    POINT_REGULAR = 'regular'
+    POINT_START = 'start'
+    POINT_END = 'end'
+    POINT_ROLE_CHOICES = (
+        (POINT_REGULAR, 'Regular stop'),
+        (POINT_START, 'Starting point'),
+        (POINT_END, 'Ending point'),
+    )
+
+    tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='activity_cards')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    image = CloudinaryField('image', blank=True, null=True)
+    city = models.CharField(max_length=120, blank=True)
+    place_name = models.CharField(max_length=200, blank=True)
+    day_number = models.PositiveIntegerField(default=1, help_text="Example: 1 for Day 1, 2 for Day 2.")
+    point_role = models.CharField(max_length=20, choices=POINT_ROLE_CHOICES, default=POINT_REGULAR)
+    start_time = models.TimeField(blank=True, null=True)
+    end_time = models.TimeField(blank=True, null=True)
+    latitude = models.DecimalField(max_digits=18, decimal_places=15, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=18, decimal_places=15, blank=True, null=True)
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['day_number', 'display_order', 'id']
+
+    def __str__(self):
+        return f"{self.tour.title} - {self.title}"
+
+    @property
+    def location_display(self):
+        parts = [part.strip() for part in [self.place_name, self.city] if (part or '').strip()]
+        return ', '.join(parts)
+
+    @property
+    def map_query(self):
+        if self.latitude is not None and self.longitude is not None:
+            return f"{self.latitude},{self.longitude}"
+        return self.location_display or self.title
+
+    @property
+    def map_url(self):
+        query = (self.map_query or '').strip()
+        if not query:
+            return ''
+        return f"https://www.google.com/maps/search/?api=1&query={query.replace(' ', '+')}"
+
+
+class TourItineraryLeg(models.Model):
+    TRANSPORT_WALK = 'walk'
+    TRANSPORT_BUS = 'bus'
+    TRANSPORT_TAXI = 'taxi'
+    TRANSPORT_INDRIVE = 'indrive'
+    TRANSPORT_TRAMWAY = 'tramway'
+    TRANSPORT_PRIVATE = 'private'
+    TRANSPORT_CAR = 'car'
+    TRANSPORT_OTHER = 'other'
+    TRANSPORT_CHOICES = (
+        (TRANSPORT_WALK, 'On foot'),
+        (TRANSPORT_BUS, 'Bus'),
+        (TRANSPORT_TAXI, 'Taxi'),
+        (TRANSPORT_INDRIVE, 'InDrive'),
+        (TRANSPORT_TRAMWAY, 'Tramway'),
+        (TRANSPORT_PRIVATE, 'Private transport'),
+        (TRANSPORT_CAR, 'Car'),
+        (TRANSPORT_OTHER, 'Other'),
+    )
+
+    tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='itinerary_legs')
+    from_activity = models.ForeignKey(TourActivity, on_delete=models.CASCADE, related_name='outgoing_legs')
+    to_activity = models.ForeignKey(TourActivity, on_delete=models.CASCADE, related_name='incoming_legs')
+    distance_label = models.CharField(max_length=80, help_text="Example: 200 m, 3 min, 12 km")
+    transport_mode = models.CharField(max_length=20, choices=TRANSPORT_CHOICES, default=TRANSPORT_WALK)
+    transport_label = models.CharField(max_length=80, blank=True, help_text="Optional custom label, for example: On foot, Small boat")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', 'id']
+        unique_together = [('tour', 'from_activity', 'to_activity')]
+
+    def __str__(self):
+        return f"{self.from_activity.title} -> {self.to_activity.title}"
+
+    @property
+    def transport_display_label(self):
+        return (self.transport_label or self.get_transport_mode_display() or '').strip()
+
+
 class TourExtraActivity(models.Model):
     """Optional add-on activity priced per tour."""
 
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='extra_activities')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    image = CloudinaryField('image', blank=True, null=True)
+    city = models.CharField(max_length=120, blank=True)
+    place_name = models.CharField(max_length=200, blank=True)
+    latitude = models.DecimalField(max_digits=18, decimal_places=15, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=18, decimal_places=15, blank=True, null=True)
     price = models.DecimalField(max_digits=8, decimal_places=2)
     is_per_night = models.BooleanField(
         default=False,
@@ -201,6 +299,24 @@ class TourExtraActivity(models.Model):
 
     def __str__(self):
         return f"{self.tour.title} - {self.title}"
+
+    @property
+    def location_display(self):
+        parts = [part.strip() for part in [self.place_name, self.city] if (part or '').strip()]
+        return ', '.join(parts)
+
+    @property
+    def map_query(self):
+        if self.latitude is not None and self.longitude is not None:
+            return f"{self.latitude},{self.longitude}"
+        return self.location_display or self.title
+
+    @property
+    def map_url(self):
+        query = (self.map_query or '').strip()
+        if not query:
+            return ''
+        return f"https://www.google.com/maps/search/?api=1&query={query.replace(' ', '+')}"
 
 
 class Information(models.Model):

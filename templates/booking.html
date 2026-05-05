@@ -8,9 +8,9 @@
 
 {% block content %}
 {% with c=tour.country|lower %}
-<section class="container my-4 my-lg-5" style="{% if c == 'morocco' %}--extras-accent:#2a9d8f;--extras-accent-rgb:42,157,143;{% elif c == 'ireland' %}--extras-accent:#6f42c1;--extras-accent-rgb:111,66,193;{% else %}--extras-accent:var(--primary);--extras-accent-rgb:13,110,253;{% endif %}">
+<section class="container my-4 my-lg-5 booking-page-shell" style="{% if c == 'morocco' %}--extras-accent:#2a9d8f;--extras-accent-rgb:42,157,143;{% elif c == 'ireland' %}--extras-accent:#6f42c1;--extras-accent-rgb:111,66,193;{% else %}--extras-accent:var(--primary);--extras-accent-rgb:13,110,253;{% endif %}">
 {% endwith %}
-  <nav aria-label="breadcrumb" class="mb-3">
+  <nav aria-label="breadcrumb" class="mb-3 booking-breadcrumb">
     <ol class="breadcrumb small mb-0">
       <li class="breadcrumb-item"><a href="{% url 'home' %}">Home</a></li>
       <li class="breadcrumb-item"><a href="{% url 'reservations' %}">Reservations</a></li>
@@ -18,12 +18,12 @@
     </ol>
   </nav>
 
-  <div class="row g-5">
+  <div class="row g-5 booking-layout">
 
     <!-- LEFT CONTENT -->
     <div class="col-lg-8">
-      <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-2">
-        <div>
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-2 booking-page-title">
+        <div class="booking-page-title-copy">
           <h1 class="fw-bold mb-1">{{ tour.title }}</h1>
           <p class="text-muted d-flex align-items-center gap-1 mb-0">
         <i class="fa-solid fa-location-dot text-success"></i>
@@ -72,113 +72,265 @@
           </div>
         {% endif %}
 
-        {% if tour.activities %}
+        {% if tour.activities or structured_activities %}
           <div class="col-12 col-md-4">
             <div class="card booking-feature border-0 shadow-sm h-100">
               <div class="card-body">
                 <div class="booking-icon mb-2"><i class="fa-solid fa-star"></i></div>
                 <div class="fw-bold">Highlights</div>
-                <div class="text-muted small">{{ tour.activities|truncatechars:90 }}</div>
+                <div class="text-muted small">
+                  {% if structured_activities %}
+                    {{ structured_activities|length }} mapped activities with places and images
+                  {% else %}
+                    {{ tour.activities|truncatechars:90 }}
+                  {% endif %}
+                </div>
               </div>
             </div>
           </div>
         {% endif %}
       </div>
 
-      <div class="booking-section card border-0 shadow-sm p-4 mb-4">
-        <h4 class="fw-bold mb-3">About this tour</h4>
-        <p>{{ tour.description|linebreaks }}</p>
-
-        {% if tour.included or tour.not_included %}
-          <hr class="my-4">
-        {% endif %}
-
-        {% if tour.included %}
-          <h5 class="fw-bold mb-2">Included</h5>
-          <div class="text-muted">{{ tour.included|linebreaks }}</div>
-        {% endif %}
-
-        {% if tour.not_included %}
-          <h5 class="fw-bold mb-2 mt-3">Not included</h5>
-          <div class="text-muted">{{ tour.not_included|linebreaks }}</div>
-        {% endif %}
+      <div class="booking-section booking-surface card border-0 shadow-sm p-4 mb-4">
+        <div class="booking-section-head mb-3">
+          <span class="booking-section-kicker">Overview</span>
+          <h4 class="fw-bold mb-0">About this tour</h4>
+        </div>
+        <div class="booking-prose">{{ tour.description|linebreaks }}</div>
 
         {% if activities_list %}
           <hr class="my-4">
-          <h5 class="fw-bold mb-2">Activities</h5>
-          <div class="d-flex flex-wrap gap-2">
+          <div class="activity-section-heading mb-3">
+            <h5 class="fw-bold mb-1">Tour itinerary</h5>
+          </div>
+          <div class="activity-chip-grid">
             {% for a in activities_list %}
-              <span class="badge rounded-pill text-bg-light border text-secondary">{{ a }}</span>
+              <span class="activity-chip">{{ a }}</span>
             {% endfor %}
           </div>
         {% endif %}
 
+        {% if itinerary_days %}
+          <hr class="my-4">
+          <div class="activity-section-heading mb-3">
+            <h5 class="fw-bold mb-1">Tour itinerary</h5>
+          </div>
+          <div class="itinerary-route-card mb-4">
+            <div class="itinerary-day-shell">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                  <div class="fw-bold">Route map</div>
+                  <div class="text-muted small">Navigate day by day to explore the tour plan.</div>
+                </div>
+                <div class="itinerary-day-nav" id="itinerary-day-nav">
+                  <button type="button" class="itinerary-day-arrow" id="itinerary-prev-day" aria-label="Previous day">
+                    <i class="fa-solid fa-chevron-left"></i>
+                  </button>
+                  <div class="itinerary-day-pill" id="itinerary-active-day-label">Day 1</div>
+                  <button type="button" class="itinerary-day-arrow" id="itinerary-next-day" aria-label="Next day">
+                    <i class="fa-solid fa-chevron-right"></i>
+                  </button>
+                </div>
+              </div>
+              <div id="tour-itinerary-map" class="tour-itinerary-map"></div>
+            </div>
+          </div>
+
+          <div class="itinerary-days-stack" id="itinerary-days-stack">
+            {% for day in itinerary_days %}
+              <div class="itinerary-day-panel{% if forloop.first %} is-active{% endif %}" data-itinerary-day="{{ day.day_number }}">
+                <div class="itinerary-day-heading">
+                  <div>
+                    <div class="itinerary-day-title">{{ day.label }}</div>
+                    <div class="text-muted small">{{ day.cards|length }} stop{{ day.cards|length|pluralize }}</div>
+                  </div>
+                </div>
+                <div class="itinerary-grid">
+                  {% for card in day.cards %}
+                    <div class="itinerary-grid-item">
+                      <div class="card activity-guide-card itinerary-card border-0 shadow-sm h-100" data-itinerary-sequence="{{ card.sequence }}" data-itinerary-day="{{ day.day_number }}">
+                        <div class="itinerary-rail"></div>
+                        <div class="itinerary-step">{{ forloop.counter }}</div>
+                        <div class="card-body">
+                          <div class="itinerary-card-top mb-2">
+                            <span class="activity-guide-badge">Stop {{ forloop.counter }}</span>
+                            {% if card.point_role == 'start' %}
+                              <span class="itinerary-distance-badge">Starting point</span>
+                            {% elif card.point_role == 'end' %}
+                              <span class="itinerary-distance-badge">Ending point</span>
+                            {% endif %}
+                          </div>
+                          <h6 class="fw-bold mb-2 itinerary-stop-title">{{ card.title }}</h6>
+                          {% if card.start_time or card.end_time %}
+                            <div class="itinerary-time-row mb-2">
+                              {% if card.start_time %}
+                                <span class="itinerary-time-chip"><i class="fa-regular fa-clock me-1"></i>{{ card.start_time }}</span>
+                              {% endif %}
+                              {% if card.end_time %}
+                                <span class="itinerary-time-chip is-end"><i class="fa-regular fa-clock me-1"></i>{{ card.end_time }}</span>
+                              {% endif %}
+                            </div>
+                          {% endif %}
+                          {% if card.location %}
+                            <div class="itinerary-place mb-2">
+                              <span>{{ card.location }}</span>
+                            </div>
+                          {% endif %}
+                          {% if card.description %}
+                            <p class="text-muted small mb-0">{{ card.description|truncatechars:130 }}</p>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="itinerary-section-spacer"></div>
+        {% endif %}
+
+        {% if tour.included or tour.not_included %}
+          <hr class="my-4">
+          <div class="row g-3">
+            {% if tour.included %}
+              <div class="col-12 {% if tour.not_included %}col-md-6{% endif %}">
+                <div class="booking-info-card h-100">
+                  <div class="booking-info-card-title">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Included</span>
+                  </div>
+                  <div class="booking-prose text-muted">{{ tour.included|linebreaks }}</div>
+                </div>
+              </div>
+            {% endif %}
+            {% if tour.not_included %}
+              <div class="col-12 {% if tour.included %}col-md-6{% endif %}">
+                <div class="booking-info-card h-100">
+                  <div class="booking-info-card-title is-muted">
+                    <i class="fa-solid fa-circle-minus"></i>
+                    <span>Not included</span>
+                  </div>
+                  <div class="booking-prose text-muted">{{ tour.not_included|linebreaks }}</div>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+
         <hr class="my-4">
-        <h5 class="fw-bold mb-2">Extra activities (optional)</h5>
+        <div class="activity-section-heading mb-3">
+          <h5 class="fw-bold mb-1">Extra activities (optional)</h5>
+        </div>
 
         {% if extra_activities %}
           {% if not reservation or reservation.status == 'cancelled' %}
-            <div class="d-flex flex-wrap gap-2">
+            <div class="row g-3">
               {% for ea in extra_activities %}
-                <input class="extra-activity-toggle extra-activity-input" type="checkbox"
-                       id="left_extra_{{ ea.id }}" name="extra_activity_ids" value="{{ ea.id }}"
-                       form="booking-form"
-                       data-price="{{ ea.price }}" data-per-night="{% if ea.is_per_night %}1{% else %}0{% endif %}">
-                <label class="badge rounded-pill text-bg-light border text-secondary extra-activity-pill"
-                       for="left_extra_{{ ea.id }}"
-                       {% if ea.description %}title="{{ ea.description }}"{% endif %}>
-                  {{ ea.title }} (+{{ ea.price }}$ {% if ea.is_per_night %}/day{% endif %})
-                </label>
+                <div class="col-12 col-md-6">
+                  <input class="extra-activity-toggle extra-activity-input" type="checkbox"
+                         id="left_extra_{{ ea.id }}" name="extra_activity_ids" value="{{ ea.id }}"
+                         form="booking-form"
+                         data-price="{{ ea.price }}" data-per-night="{% if ea.is_per_night %}1{% else %}0{% endif %}">
+                  <label class="extra-activity-card d-block h-100" for="left_extra_{{ ea.id }}">
+                    <div class="extra-activity-card-inner h-100">
+                      <div class="extra-activity-thumb">
+                        {% if ea.map_url %}<a href="{{ ea.map_url }}" target="_blank" rel="noopener" class="activity-guide-media-link" aria-label="Open {{ ea.title }} on map">{% endif %}
+                          {% if ea.image %}
+                            <img src="{{ ea.image.url }}" alt="{{ ea.title }}" loading="lazy" decoding="async">
+                          {% else %}
+                            <img src="{% static 'img/placeholder.jpg' %}" alt="{{ ea.title }}" loading="lazy" decoding="async">
+                          {% endif %}
+                          {% if ea.map_url %}
+                          <span class="activity-guide-overlay">
+                            <i class="fa-solid fa-map-location-dot me-2"></i>View on map
+                          </span>
+                          {% endif %}
+                        {% if ea.map_url %}</a>{% endif %}
+                        <span class="extra-activity-price">{{ ea.price }}$ {% if ea.is_per_night %}/day{% else %}/trip{% endif %}</span>
+                      </div>
+                      <div class="p-3">
+                        <div class="d-flex justify-content-between gap-2 align-items-start mb-2">
+                          <h6 class="fw-bold mb-0">{{ ea.title }}</h6>
+                          <span class="extra-activity-check"><i class="fa-solid fa-check"></i></span>
+                        </div>
+                        {% if ea.location_display %}
+                          <div class="itinerary-place mb-2">
+                            <span class="itinerary-place-thumb">
+                              <img src="{% if ea.image %}{{ ea.image.url }}{% else %}{% static 'img/placeholder.jpg' %}{% endif %}" alt="{{ ea.title }}">
+                            </span>
+                            <span>{{ ea.location_display }}</span>
+                          </div>
+                        {% endif %}
+                        {% if ea.description %}
+                          <p class="text-muted small mb-0">{{ ea.description|truncatechars:130 }}</p>
+                        {% else %}
+                          <p class="text-muted small mb-0">Optional experience to personalize the trip.</p>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </label>
+                </div>
               {% endfor %}
             </div>
           {% else %}
-            <ul class="mb-0 text-muted">
+            <div class="row g-3">
               {% for ea in extra_activities %}
                 <li>
                   {{ ea.title }} — +{{ ea.price }} $ {% if ea.is_per_night %}/ day{% endif %}
                 </li>
               {% endfor %}
-            </ul>
+            </div>
           {% endif %}
         {% else %}
           <div class="text-muted small">No extra activities available for this tour.</div>
         {% endif %}
 
-        {% if tour.destination.description %}
-          <hr class="my-4">
-          <h5 class="fw-bold mb-2">About {{ tour.destination.name }}</h5>
-          <p class="mb-0">{{ tour.destination.description|linebreaks }}</p>
-        {% endif %}
       </div>
 
-      <div class="booking-section card border-0 shadow-sm p-4 mb-4">
-        <h4 class="fw-bold mb-3">Your reservation</h4>
+      <div class="booking-section booking-surface card border-0 shadow-sm p-4 mb-4">
+        <div class="booking-section-head mb-3">
+          <span class="booking-section-kicker">Reservation</span>
+          <h4 class="fw-bold mb-0">Your reservation</h4>
+        </div>
 
         {% if reservation %}
-          <div class="row g-3">
+          <div class="row g-3 reservation-overview-grid">
             <div class="col-12 col-md-6">
+              <div class="reservation-overview-item">
               <div class="text-muted small">Dates</div>
               <div class="fw-semibold">{{ reservation.start_date }} → {{ reservation.end_date }}</div>
             </div>
+              </div>
             <div class="col-6 col-md-3">
-              <div class="text-muted small">Persons</div>
-              <div class="fw-semibold">{{ reservation.num_persons }}</div>
+              <div class="reservation-overview-item">
+                <div class="text-muted small">Persons</div>
+                <div class="fw-semibold">{{ reservation.num_persons }}</div>
+              </div>
             </div>
             <div class="col-6 col-md-3">
-              <div class="text-muted small">Nights</div>
-              <div class="fw-semibold">{{ reservation.nights }}</div>
+              <div class="reservation-overview-item">
+                <div class="text-muted small">Nights</div>
+                <div class="fw-semibold">{{ reservation.nights }}</div>
+              </div>
             </div>
             <div class="col-12 col-md-6">
-              <div class="text-muted small">Payment</div>
+              <div class="reservation-overview-item">
+                <div class="text-muted small">Payment</div>
               <div class="fw-semibold">{{ reservation.get_payment_method_display }}{% if reservation.payment_status %} • {{ reservation.get_payment_status_display }}{% endif %}</div>
             </div>
+              </div>
             <div class="col-12 col-md-6">
-              <div class="text-muted small">Status</div>
-              <div class="fw-semibold">{{ reservation.get_status_display }}</div>
+              <div class="reservation-overview-item">
+                <div class="text-muted small">Status</div>
+                <div class="fw-semibold">{{ reservation.get_status_display }}</div>
+              </div>
             </div>
             <div class="col-12">
-              <div class="text-muted small">Total</div>
-              <div class="fw-bold fs-5" style="color:var(--primary);">{{ reservation.total_price }} $</div>
+              <div class="reservation-overview-item is-total">
+                <div class="text-muted small">Total</div>
+                <div class="fw-bold fs-5" style="color:var(--primary);">{{ reservation.total_price }} $</div>
+              </div>
             </div>
           </div>
 
@@ -188,14 +340,20 @@
             <div class="text-muted">{{ reservation.admin_note|linebreaks }}</div>
           {% endif %}
         {% else %}
-          <p class="text-muted mb-0">Select your dates and submit your booking to generate your reservation details.</p>
+          <div class="booking-empty-state">
+            <i class="fa-regular fa-calendar-check"></i>
+            <div>
+              <div class="fw-semibold text-dark mb-1">Your reservation details will appear here</div>
+              <p class="text-muted mb-0">Select your dates and submit your booking to generate your reservation details.</p>
+            </div>
+          </div>
         {% endif %}
       </div>
     </div>
 
     <!-- RIGHT BOOKING CARD -->
     <div class="col-lg-4">
-      <div class="card p-4 shadow-sm border-0 booking-sidebar">
+      <div class="card p-4 shadow-sm border-0 booking-sidebar booking-surface">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h4 class="fw-bold mb-0">Booking</h4>
           <span class="badge rounded-pill text-bg-light border">
@@ -207,7 +365,7 @@
         
 
 {% if tour.is_promotion and tour.discount_percent > 0 and tour.promo_price %}
-  <div class="mb-3">
+  <div class="mb-3 booking-price-panel">
     <div class="text-muted small">Promo -{{ tour.discount_percent }}%</div>
 <div class="d-flex align-items-end gap-2">
   <span class="old-price-big">
@@ -223,7 +381,7 @@
 
   </div>
 {% else %}
-  <p class="fs-3 fw-bold text-primary mb-1">
+  <p class="fs-3 fw-bold text-primary mb-1 booking-price-panel">
     {{ tour.price_per_night }} $ / day
   </p>
 {% endif %}
@@ -365,16 +523,25 @@
   <input type="hidden" id="base-price" value="{{ tour.price_per_night }}">
 {% endif %}
 
-    
-    <label class="fw-bold">Dates</label>
+    <div class="booking-form-group mb-3">
+      <div class="booking-form-heading">
+        <span class="booking-form-step">1</span>
+        <div>
+          <label class="fw-bold mb-1">Dates</label>
+          <div class="booking-form-hint">Choose your trip window</div>
+        </div>
+      </div>
 
-    <input type="text" id="start_date" name="start_date"
-           class="form-control booking-date mb-2"
-           placeholder="Start date" autocomplete="off" required>
+      <div class="booking-input-grid mt-3">
+        <input type="text" id="start_date" name="start_date"
+               class="form-control booking-date"
+               placeholder="Start date" autocomplete="off" required>
 
-    <input type="text" id="end_date" name="end_date"
-           class="form-control booking-date mb-3"
-           placeholder="End date" autocomplete="off" required>
+        <input type="text" id="end_date" name="end_date"
+               class="form-control booking-date"
+               placeholder="End date" autocomplete="off" required>
+      </div>
+    </div>
 
     <div id="dateWarning" class="alert alert-warning py-2 px-3 small d-none mt-2">
       <i class="fa-solid fa-triangle-exclamation me-1"></i>
@@ -387,20 +554,35 @@
       Unavailable dates include a {{ booking_buffer_days|default:3 }}-day buffer after each trip.
     </div>
 
-    <div class="d-flex justify-content-between align-items-center small text-muted mb-3">
+    <div class="booking-inline-meta d-flex justify-content-between align-items-center small text-muted mb-3">
       <span><i class="fa-solid fa-moon me-1"></i> Nights</span>
       <strong id="live-nights">—</strong>
     </div>
 
-    <label class="fw-bold">Persons</label>
-    <input type="number" id="persons" name="persons" value="1" min="1"
-           class="form-control mb-3">
+    <div class="booking-form-group mb-3">
+      <div class="booking-form-heading">
+        <span class="booking-form-step">2</span>
+        <div>
+          <label class="fw-bold mb-1">Persons</label>
+          <div class="booking-form-hint">Number of travelers</div>
+        </div>
+      </div>
+      <input type="number" id="persons" name="persons" value="1" min="1"
+             class="form-control booking-person-input mt-3">
+    </div>
 
     <input type="hidden" id="transport-price" value="{{ tour.transport_price_per_night|default_if_none:'0' }}">
     <input type="hidden" id="hotel-price" value="{{ tour.hotel_price_per_night|default_if_none:'0' }}">
 
-    <label class="fw-bold mb-2 d-block">Options</label>
-    <div class="border rounded p-3 bg-light mb-3">
+    <div class="booking-form-group mb-3">
+      <div class="booking-form-heading mb-2">
+        <span class="booking-form-step">3</span>
+        <div>
+          <label class="fw-bold mb-1 d-block">Options</label>
+          <div class="booking-form-hint">Customize transport and stay</div>
+        </div>
+      </div>
+      <div class="border rounded p-3 bg-light mb-3 booking-options-panel">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" id="full_package" name="full_package" value="1">
         <label class="form-check-label" for="full_package">
@@ -421,11 +603,12 @@
           Hotel{% if tour.hotel_price_per_night %} (+{{ tour.hotel_price_per_night }} $ / day){% endif %}
         </label>
       </div>
+      </div>
     </div>
 
-    <div class="text-muted small mb-3">All add-on prices are per person per day.</div>
+    <div class="text-muted small mb-3 booking-form-note">All add-on prices are per person per day.</div>
 
-    <p class="text-muted small mt-2">
+    <p class="text-muted small mt-2 booking-form-note">
       🛈 Booking will be confirmed after admin validation.
     </p>
 
@@ -433,12 +616,18 @@
       <i class="fa-solid fa-gift"></i> 10% discount for 5+ persons
     </div>
 
-    <div class="d-flex justify-content-between fw-bold mb-3">
+    <div class="booking-total-bar d-flex justify-content-between fw-bold mb-3">
       <span>Total</span>
       <span id="live-price">0 $</span>
     </div>
 
-    <label class="fw-bold mb-2">Payment method</label>
+    <div class="booking-form-heading mb-2">
+      <span class="booking-form-step">4</span>
+      <div>
+        <label class="fw-bold mb-1">Payment method</label>
+        <div class="booking-form-hint">Choose how you want to pay</div>
+      </div>
+    </div>
     <div class="mb-3 payment-options">
       <label class="payment-option">
         <input class="form-check-input" type="radio" name="payment_method" value="cash" required>
@@ -520,6 +709,23 @@
 </div>
 
 <!-- ✅ Stripe JS -->
+<div class="modal fade" id="itineraryImageModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg itinerary-image-modal">
+      <div class="modal-header border-0 pb-0">
+        <div>
+          <h5 class="modal-title fw-bold mb-1" id="itineraryImageModalLabel">Itinerary stop</h5>
+          <div class="text-muted small" id="itineraryImageModalLocation"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <img id="itineraryImageModalPhoto" src="{% static 'img/placeholder.jpg' %}" alt="" class="img-fluid w-100 rounded-4">
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://js.stripe.com/v3/"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -841,7 +1047,846 @@ async function openAndInitStripe(){
 </style>
 
 <style>
+  .booking-page-shell{
+    --booking-surface-border:rgba(15, 23, 42, .08);
+    --booking-shadow:0 18px 42px rgba(15, 23, 42, .08);
+    --booking-soft-shadow:0 12px 28px rgba(15, 23, 42, .06);
+    --booking-neutral:#111111;
+    --booking-neutral-soft:#f4f4f4;
+    --booking-neutral-line:rgba(15, 23, 42, .14);
+    --booking-neutral-ring:rgba(15, 23, 42, .08);
+  }
+  .booking-breadcrumb{
+    padding:.2rem .1rem .35rem;
+  }
+  .booking-breadcrumb .breadcrumb{
+    gap:.2rem;
+  }
+  .booking-breadcrumb .breadcrumb-item,
+  .booking-breadcrumb .breadcrumb-item a{
+    color:#64748b;
+    text-decoration:none;
+    font-weight:600;
+  }
+  .booking-breadcrumb .breadcrumb-item.active{
+    color:#0f172a;
+  }
+  .booking-page-title{
+    margin-bottom:1rem !important;
+  }
+  .booking-page-title-copy{
+    max-width:680px;
+  }
+  .booking-page-title h1{
+    font-size:clamp(2rem, 4vw, 3rem);
+    letter-spacing:-.03em;
+    color:#0f172a;
+  }
+  .booking-page-title p{
+    font-size:1rem;
+    color:#5f6f7c !important;
+  }
+  .booking-hero-media{
+    border-radius:1.7rem;
+    overflow:hidden;
+    border:1px solid var(--booking-surface-border);
+    box-shadow:var(--booking-shadow);
+    background:#fff;
+  }
+  .tour-booking-image{
+    width:100%;
+    height:auto;
+    aspect-ratio:15 / 8;
+    object-fit:cover;
+    display:block;
+  }
+  .booking-feature{
+    border-radius:1.25rem;
+    border:1px solid var(--booking-surface-border) !important;
+    background:linear-gradient(180deg, #ffffff, #f9fbfb);
+    box-shadow:var(--booking-soft-shadow) !important;
+  }
+  .booking-feature .card-body{
+    padding:1.2rem 1.15rem;
+  }
+  .booking-icon{
+    width:2.85rem;
+    height:2.85rem;
+    border-radius:1rem;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:#ffffff;
+    color:#111111;
+    font-size:1.05rem;
+    box-shadow:inset 0 0 0 1px rgba(15, 23, 42, .10);
+  }
+  .booking-surface{
+    border-radius:1.5rem;
+    border:1px solid var(--booking-surface-border) !important;
+    background:linear-gradient(180deg, #ffffff, #fbfcfc);
+    box-shadow:var(--booking-shadow) !important;
+  }
+  .booking-section{
+    padding:1.55rem !important;
+  }
+  .booking-section-head{
+    display:flex;
+    flex-direction:column;
+    gap:.35rem;
+  }
+  .booking-section-kicker{
+    font-size:.76rem;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    font-weight:800;
+    color:#111111;
+  }
+  .booking-section h4{
+    font-size:1.28rem;
+    color:#0f172a;
+    margin-bottom:1rem !important;
+  }
+  .booking-section h5{
+    color:#12263a;
+    font-size:1.02rem;
+  }
+  .booking-section p,
+  .booking-section .text-muted,
+  .booking-section li{
+    line-height:1.72;
+  }
+  .booking-section hr{
+    border-color:rgba(15, 23, 42, .08);
+    opacity:1;
+  }
+  .booking-prose{
+    color:#4f6272;
+    line-height:1.78;
+  }
+  .booking-prose p:last-child{
+    margin-bottom:0;
+  }
+  .booking-info-card{
+    height:100%;
+    padding:1.05rem 1.1rem;
+    border-radius:1.15rem;
+    border:1px solid rgba(15, 23, 42, .08);
+    background:linear-gradient(180deg, #ffffff, #f9fbfb);
+  }
+  .booking-info-card-title{
+    display:flex;
+    align-items:center;
+    gap:.55rem;
+    margin-bottom:.8rem;
+    font-weight:800;
+    color:#111111;
+  }
+  .booking-info-card-title i{
+    color:#111111;
+  }
+  .booking-info-card-title.is-muted{
+    color:#42586a;
+  }
+  .reservation-overview-item{
+    height:100%;
+    padding:1rem 1.05rem;
+    border-radius:1rem;
+    border:1px solid rgba(15, 23, 42, .08);
+    background:linear-gradient(180deg, #ffffff, #fafcfc);
+  }
+  .reservation-overview-item.is-total{
+    background:linear-gradient(180deg, rgba(15, 23, 42, .035), #ffffff);
+  }
+  .booking-empty-state{
+    display:flex;
+    align-items:flex-start;
+    gap:.9rem;
+    padding:1.1rem 1.15rem;
+    border-radius:1rem;
+    border:1px dashed rgba(15, 23, 42, .14);
+    background:#fafafa;
+  }
+  .booking-empty-state i{
+    width:2.6rem;
+    height:2.6rem;
+    border-radius:.95rem;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:#ffffff;
+    color:#111111;
+    font-size:1rem;
+    flex-shrink:0;
+    box-shadow:inset 0 0 0 1px rgba(15, 23, 42, .10);
+  }
+  .booking-sidebar{
+    position:sticky;
+    top:1.4rem;
+    border-radius:.7rem;
+    overflow:hidden;
+  }
+  .booking-sidebar > *:last-child{
+    margin-bottom:0;
+  }
+  .old-price-big{
+    color:#94a3b8;
+    text-decoration:line-through;
+    font-size:1.05rem;
+    font-weight:700;
+  }
+  .new-price-big{
+    color:#111111;
+    font-size:2rem;
+    line-height:1;
+    font-weight:800;
+    letter-spacing:-.03em;
+  }
+  .booking-price-panel{
+    padding:.2rem 0 .65rem;
+    border-bottom:1px solid rgba(15, 23, 42, .08);
+    margin-bottom:.75rem !important;
+  }
+  .booking-sidebar h4{
+    margin-bottom:.25rem !important;
+  }
+  .booking-sidebar .mb-3{
+    margin-bottom:.75rem !important;
+  }
+  .booking-sidebar .mt-2{
+    margin-top:.55rem !important;
+  }
+  .booking-sidebar .border.rounded.p-3.bg-light{
+    border-radius:.55rem !important;
+    border-color:rgba(15, 23, 42, .08) !important;
+    background:linear-gradient(180deg, #fbfcfc, #f5f8f8) !important;
+  }
+  .booking-sidebar .form-control,
+  .booking-sidebar .form-select{
+    min-height:2.65rem;
+    border-radius:.45rem;
+    border-color:rgba(15, 23, 42, .12);
+    box-shadow:none;
+    padding:.55rem .8rem;
+  }
+  .booking-form-group{
+    padding:.8rem .82rem;
+    border:1px solid rgba(15, 23, 42, .08);
+    border-radius:.55rem;
+    background:linear-gradient(180deg, #ffffff, #fafcfc);
+  }
+  .booking-form-heading{
+    display:flex;
+    align-items:flex-start;
+    gap:.6rem;
+  }
+  .booking-form-step{
+    width:1.65rem;
+    height:1.65rem;
+    border-radius:.35rem;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:#ffffff;
+    color:#111111;
+    font-size:.78rem;
+    font-weight:800;
+    flex-shrink:0;
+    box-shadow:inset 0 0 0 1px rgba(15, 23, 42, .10);
+  }
+  .booking-form-hint{
+    color:#64748b;
+    font-size:.76rem;
+    line-height:1.4;
+  }
+  .booking-input-grid{
+    display:grid;
+    gap:.45rem;
+  }
+  .booking-person-input{
+    max-width:100%;
+  }
+  .booking-inline-meta{
+    padding:.55rem .7rem;
+    border-radius:.45rem;
+    background:rgba(15, 23, 42, .04);
+    border:1px solid rgba(15, 23, 42, .06);
+  }
+  .booking-options-panel{
+    margin-bottom:0 !important;
+    border-radius:.45rem !important;
+    border-color:rgba(15, 23, 42, .08) !important;
+    background:linear-gradient(180deg, #fbfcfc, #f7faf9) !important;
+  }
+  .booking-form-note{
+    color:#64748b !important;
+    margin-bottom:.65rem !important;
+  }
+  .booking-total-bar{
+    padding:.75rem .85rem;
+    border-radius:.45rem;
+    background:linear-gradient(180deg, #ffffff, #f6f6f6);
+    border:1px solid rgba(15, 23, 42, .12);
+    color:#0f172a;
+  }
+  .booking-total-bar #live-price{
+    color:#111111;
+    font-size:1.2rem;
+  }
+  .booking-sidebar .form-control:focus,
+  .booking-sidebar .form-select:focus{
+    border-color:rgba(15, 23, 42, .28);
+    box-shadow:0 0 0 .2rem rgba(15, 23, 42, .06);
+  }
+  .booking-sidebar .border.rounded.p-3.bg-light.mb-3{
+    border-radius:.5rem !important;
+    background:linear-gradient(180deg, #fbfcfc, #f7faf9) !important;
+  }
+  .booking-sidebar .form-check.form-switch{
+    padding:.1rem 0 .1rem 2.2rem;
+  }
+  .booking-sidebar .form-check-input{
+    width:1.9rem;
+    height:1rem;
+    margin-left:-2.2rem;
+    box-shadow:none;
+  }
+  .booking-sidebar .form-check-input:checked{
+    background-color:#111111;
+    border-color:#111111;
+  }
+  .payment-options{
+    display:grid;
+    gap:.55rem;
+  }
+  .payment-option{
+    display:block;
+    cursor:pointer;
+  }
+  .payment-option .form-check-input{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+  }
+  .payment-option-body{
+    display:flex;
+    flex-direction:column;
+    gap:.18rem;
+    padding:.78rem .82rem .78rem 2.55rem;
+    border-radius:.5rem;
+    border:1px solid rgba(15, 23, 42, .10);
+    background:linear-gradient(180deg, #ffffff, #fafcfc);
+    position:relative;
+    transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+  }
+  .payment-option-body::before{
+    content:"";
+    position:absolute;
+    left:.85rem;
+    top:.95rem;
+    width:.95rem;
+    height:.95rem;
+    border-radius:999px;
+    border:1.5px solid rgba(15, 23, 42, .22);
+    background:#fff;
+  }
+  .payment-option input:checked + .payment-option-body{
+    border-color:rgba(15, 23, 42, .34);
+    box-shadow:0 0 0 .2rem rgba(15, 23, 42, .05);
+    transform:translateY(-1px);
+  }
+  .payment-option input:checked + .payment-option-body::before{
+    border-color:#111111;
+    box-shadow:inset 0 0 0 4px #111111;
+  }
+  .payment-option-title{
+    color:#0f172a;
+    font-weight:800;
+    font-size:.95rem;
+  }
+  .payment-option-sub{
+    color:#64748b;
+    font-size:.8rem;
+  }
+  .booking-sidebar .btn{
+    min-height:2.7rem;
+    border-radius:.45rem;
+    font-weight:700;
+  }
+  .booking-sidebar .alert{
+    border-radius:.5rem;
+    border:1px solid rgba(15, 23, 42, .06);
+  }
+  .booking-sidebar .alert-success{
+    background:#f6f6f6;
+    color:#111111;
+    border-color:rgba(15, 23, 42, .10);
+  }
+  .booking-sidebar .text-primary{
+    color:#111111 !important;
+  }
+  .booking-layout .col-lg-8,
+  .booking-layout .col-lg-4{
+    min-width:0;
+  }
+  @media (max-width: 991.98px){
+    .booking-sidebar{
+      position:static;
+      top:auto;
+    }
+    .booking-section,
+    .booking-sidebar{
+      padding:1.2rem !important;
+    }
+  }
+
   /* Extra activities pills (clickable like Activities badges) */
+  .activity-section-heading{
+    display:flex;
+    align-items:end;
+    justify-content:space-between;
+    gap:1rem;
+  }
+  .activity-chip-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+    gap:.75rem;
+  }
+  .activity-chip{
+    display:flex;
+    align-items:center;
+    min-height:52px;
+    padding:.85rem 1rem;
+    border:1px solid rgba(15, 23, 42, .08);
+    border-radius:18px;
+    background:linear-gradient(180deg, #fff, #f8fafc);
+    color:#334155;
+    font-weight:600;
+  }
+  .itinerary-grid{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr);
+    gap:.65rem;
+    margin-bottom:0;
+    max-width:100%;
+  }
+  .itinerary-grid-item{
+    min-width:0;
+  }
+  .itinerary-route-card{
+    padding:1.1rem;
+    border:1px solid rgba(15, 23, 42, .08);
+    border-radius:1.4rem;
+    background:linear-gradient(180deg, #fff, #f8fcfc);
+    box-shadow:0 18px 38px rgba(15, 23, 42, .07);
+    margin-bottom:1.5rem;
+  }
+  .itinerary-day-shell{
+    display:grid;
+    gap:1rem;
+  }
+  .itinerary-day-nav{
+    display:flex;
+    align-items:center;
+    gap:.55rem;
+  }
+  .itinerary-day-pill{
+    min-width:112px;
+    padding:.55rem .95rem;
+    border-radius:999px;
+    border:1px solid rgba(15, 23, 42, .1);
+    background:#fff;
+    text-align:center;
+    font-weight:800;
+    color:#0f172a;
+  }
+  .itinerary-day-arrow{
+    width:40px;
+    height:40px;
+    border:none;
+    border-radius:999px;
+    background:#0f172a;
+    color:#fff;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    transition:opacity .2s ease;
+  }
+  .itinerary-day-arrow:disabled{
+    opacity:.35;
+    cursor:not-allowed;
+  }
+  .itinerary-days-stack{
+    display:grid;
+    gap:.8rem;
+  }
+  .itinerary-day-panel{
+    display:none;
+  }
+  .itinerary-day-panel.is-active{
+    display:block;
+  }
+  .itinerary-day-heading{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:1rem;
+    margin-bottom:.7rem;
+  }
+  .itinerary-day-title{
+    font-size:1rem;
+    color:#0f172a;
+    font-weight:800;
+  }
+  .tour-itinerary-map{
+    height:360px;
+    border-radius:1.2rem;
+    overflow:hidden;
+    border:1px solid rgba(15, 23, 42, .08);
+    background:
+      radial-gradient(circle at 18% 18%, rgba(42,157,143,.18), transparent 24%),
+      radial-gradient(circle at 84% 22%, rgba(233,196,106,.18), transparent 18%),
+      linear-gradient(180deg, #fdfffe, #eef7f3);
+    position:relative;
+  }
+  .tour-itinerary-map::after{
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    height:72px;
+    background:linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.78));
+    pointer-events:none;
+  }
+  .tour-itinerary-map svg{
+    width:100%;
+    height:100%;
+    display:block;
+  }
+  .itinerary-map-markers{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+  }
+  .itinerary-map-marker{
+    position:absolute;
+    width:58px;
+    height:58px;
+    border-radius:999px;
+    border:4px solid rgba(255,255,255,.96);
+    box-shadow:0 16px 30px rgba(15, 23, 42, .20);
+    background-size:cover;
+    background-position:center;
+    background-color:#d9ece8;
+    transform:translate(-50%, -50%);
+    cursor:pointer;
+    pointer-events:auto;
+    overflow:visible;
+  }
+  .itinerary-map-marker::before{
+    content:"";
+    position:absolute;
+    inset:-7px;
+    border-radius:999px;
+    border:2px solid rgba(var(--extras-accent-rgb), .26);
+  }
+  .itinerary-map-marker-number{
+    position:absolute;
+    right:-4px;
+    bottom:-4px;
+    min-width:24px;
+    height:24px;
+    padding:0 .35rem;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--extras-accent);
+    color:#fff;
+    font-size:.76rem;
+    font-weight:800;
+    box-shadow:0 10px 18px rgba(var(--extras-accent-rgb), .32);
+  }
+  .itinerary-map-marker-label{
+    position:absolute;
+    left:50%;
+    top:68px;
+    transform:translateX(-50%);
+    padding:.28rem .58rem;
+    border-radius:999px;
+    background:rgba(255,255,255,.94);
+    color:#7a4b00;
+    font-size:.72rem;
+    font-weight:800;
+    white-space:nowrap;
+    box-shadow:0 8px 18px rgba(15, 23, 42, .08);
+  }
+  .itinerary-map-marker.is-top .itinerary-map-marker-label{
+    top:auto;
+    bottom:68px;
+  }
+  .itinerary-route-summary{
+    display:flex;
+    flex-wrap:wrap;
+    gap:.5rem;
+  }
+  .itinerary-route-summary:empty{
+    display:none;
+  }
+  .itinerary-route-chip{
+    display:inline-flex;
+    align-items:center;
+    padding:.45rem .7rem;
+    border-radius:999px;
+    background:rgba(var(--extras-accent-rgb), .1);
+    color:#1f2937;
+    font-size:.8rem;
+    font-weight:700;
+  }
+  .itinerary-map-empty{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#4b5563;
+    font-weight:600;
+  }
+  .itinerary-section-spacer{
+    height:.2rem;
+  }
+  .itinerary-time-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:.4rem;
+  }
+  .itinerary-time-chip{
+    display:inline-flex;
+    align-items:center;
+    padding:.34rem .58rem;
+    border-radius:999px;
+    background:rgba(15, 23, 42, .05);
+    color:#314155;
+    font-size:.74rem;
+    font-weight:700;
+  }
+  .itinerary-time-chip.is-end{
+    background:rgba(var(--extras-accent-rgb), .1);
+    color:#17665d;
+  }
+  .itinerary-card{
+    position:relative;
+    isolation:isolate;
+    overflow:hidden;
+  }
+  .itinerary-card .card-body{
+    padding:.72rem .85rem .68rem 3.4rem;
+    display:flex;
+    flex-direction:column;
+    min-height:auto;
+  }
+  .itinerary-rail{
+    position:absolute;
+    top:0;
+    bottom:0;
+    left:31px;
+    width:2px;
+    background:linear-gradient(180deg, rgba(var(--extras-accent-rgb), .45), rgba(var(--extras-accent-rgb), .05));
+    z-index:0;
+  }
+  .itinerary-step{
+    position:absolute;
+    top:12px;
+    left:12px;
+    width:24px;
+    height:24px;
+    border-radius:999px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--extras-accent);
+    color:#fff;
+    font-size:.76rem;
+    font-weight:800;
+    box-shadow:0 10px 24px rgba(var(--extras-accent-rgb), .32);
+    z-index:2;
+  }
+  .activity-guide-card{
+    border-radius: 1.35rem;
+    border:1px solid rgba(15, 23, 42, .08) !important;
+    box-shadow:0 18px 40px rgba(15, 23, 42, .08) !important;
+  }
+  .extra-activity-card:hover .extra-activity-thumb img{
+    transform:scale(1.06);
+  }
+  .activity-guide-badge{
+    padding: .32rem .58rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,.92);
+    color: #1f2937;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+  .activity-guide-badge.is-extra{
+    background: rgba(var(--extras-accent-rgb), .92);
+    color: #fff;
+  }
+  .itinerary-card-top{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:space-between;
+    gap:.45rem;
+    padding-right:0;
+    margin-bottom:.25rem !important;
+  }
+  .itinerary-stop-title{
+    font-size:.92rem;
+    color:#132238;
+    line-height:1.25;
+    margin-bottom:.28rem !important;
+  }
+  .itinerary-distance-badge{
+    display:inline-flex;
+    align-items:center;
+    padding:.32rem .58rem;
+    border-radius:999px;
+    background:rgba(var(--extras-accent-rgb), .1);
+    color:#17665d;
+    font-size:.72rem;
+    font-weight:800;
+    line-height:1;
+  }
+  .itinerary-place{
+    display:inline-flex;
+    align-items:center;
+    gap:.45rem;
+    padding:.3rem .62rem;
+    border-radius:999px;
+    background:rgba(255, 215, 0, .14);
+    color:#7a4b00;
+    font-size:.76rem;
+    font-weight:700;
+    border:1px solid rgba(255, 196, 0, .28);
+    box-shadow:none;
+    max-width:100%;
+    align-self:flex-start;
+  }
+  .itinerary-card p.text-muted.small{
+    font-size:.78rem;
+    line-height:1.4;
+    margin-bottom:.3rem !important;
+  }
+  .itinerary-grid .activity-guide-card{
+    border-radius:1.2rem;
+  }
+  .itinerary-map-link{
+    border-radius:999px;
+    font-weight:700;
+  }
+  .itinerary-stop-actions{
+    margin-top:auto;
+  }
+  .itinerary-image-modal .modal-content{
+    border-radius:1.4rem;
+    overflow:hidden;
+  }
+  .itinerary-image-modal .modal-body{
+    padding:1rem 1rem 1.1rem;
+  }
+  .itinerary-image-modal img{
+    max-height:72vh;
+    object-fit:cover;
+  }
+  .activity-select-btn{
+    border-radius:999px;
+    font-weight:700;
+  }
+  .extra-activity-card{
+    cursor:pointer;
+    user-select:none;
+    text-decoration:none;
+  }
+  .extra-activity-card-inner{
+    border:1px solid rgba(15, 23, 42, .08);
+    border-radius:1.25rem;
+    overflow:hidden;
+    background:linear-gradient(180deg, #fff, #f8fafc);
+    box-shadow:0 14px 30px rgba(15, 23, 42, .06);
+    transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+  }
+  .extra-activity-card:hover .extra-activity-card-inner{
+    transform:translateY(-4px);
+    box-shadow:0 24px 48px rgba(15, 23, 42, .12);
+  }
+  .extra-activity-thumb{
+    position:relative;
+    aspect-ratio:16 / 10;
+    overflow:hidden;
+    background:linear-gradient(135deg, rgba(var(--extras-accent-rgb), .18), rgba(15, 23, 42, .08));
+  }
+  .extra-activity-thumb img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+    transition:transform .45s ease;
+  }
+  .extra-activity-price{
+    position:absolute;
+    top:12px;
+    right:12px;
+    padding:.45rem .7rem;
+    border-radius:999px;
+    background:rgba(255,255,255,.94);
+    color:#0f172a;
+    font-size:.78rem;
+    font-weight:800;
+  }
+  .activity-guide-media-link{
+    display:block;
+    width:100%;
+    height:100%;
+    position:relative;
+    color:inherit;
+    text-decoration:none;
+  }
+  .activity-guide-overlay{
+    position:absolute;
+    inset:auto 14px 14px 14px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:.55rem .8rem;
+    border-radius:999px;
+    background:rgba(15, 23, 42, .55);
+    color:#fff;
+    font-size:.82rem;
+    font-weight:700;
+    backdrop-filter:blur(8px);
+    opacity:0;
+    transform:translateY(10px);
+    transition:opacity .25s ease, transform .25s ease;
+  }
+  .extra-activity-thumb:hover .activity-guide-overlay{
+    opacity:1;
+    transform:translateY(0);
+  }
+  .extra-activity-check{
+    width:28px;
+    height:28px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:999px;
+    background:rgba(var(--extras-accent-rgb), .12);
+    color:transparent;
+    border:1px solid rgba(var(--extras-accent-rgb), .25);
+    transition:all .2s ease;
+    flex-shrink:0;
+  }
   .extra-activity-input{
     position: absolute;
     opacity: 0;
@@ -849,21 +1894,264 @@ async function openAndInitStripe(){
     height: 0;
     pointer-events: none;
   }
-  .extra-activity-pill{
-    cursor: pointer;
-    user-select: none;
-    transition: box-shadow .15s ease, border-color .15s ease, color .15s ease, background-color .15s ease;
+  .extra-activity-input:focus + .extra-activity-card .extra-activity-card-inner{
+    box-shadow:0 0 0 .2rem rgba(var(--extras-accent-rgb), .18);
   }
-  .extra-activity-input:focus + .extra-activity-pill{
-    box-shadow: 0 0 0 .15rem rgba(var(--extras-accent-rgb), .25);
+  .extra-activity-input:checked + .extra-activity-card .extra-activity-card-inner{
+    border-color:rgba(var(--extras-accent-rgb), .75);
+    box-shadow:0 0 0 .2rem rgba(var(--extras-accent-rgb), .16), 0 24px 48px rgba(15, 23, 42, .12);
+    background:linear-gradient(180deg, rgba(var(--extras-accent-rgb), .06), #fff);
   }
-  .extra-activity-input:checked + .extra-activity-pill{
-    border-color: var(--extras-accent) !important;
-    color: var(--extras-accent) !important;
-    background-color: rgba(var(--extras-accent-rgb), .08) !important;
-    box-shadow: 0 0 0 .15rem rgba(var(--extras-accent-rgb), .25);
+  .extra-activity-input:checked + .extra-activity-card .extra-activity-check{
+    color:#fff;
+    background:var(--extras-accent);
+    border-color:var(--extras-accent);
+  }
+  .extra-activity-card-readonly{
+    cursor:default;
   }
 </style>
+
+{{ itinerary_days|json_script:"itinerary-days-data" }}
+
+<script>
+  document.addEventListener('DOMContentLoaded', async function () {
+    const mapElement = document.getElementById('tour-itinerary-map');
+    const dataElement = document.getElementById('itinerary-days-data');
+    const activeDayLabel = document.getElementById('itinerary-active-day-label');
+    const prevDayButton = document.getElementById('itinerary-prev-day');
+    const nextDayButton = document.getElementById('itinerary-next-day');
+    const dayPanels = Array.from(document.querySelectorAll('.itinerary-day-panel'));
+    const placeholderImage = "{% static 'img/placeholder.jpg' %}";
+    const imageModalElement = document.getElementById('itineraryImageModal');
+    const imageModalLabel = document.getElementById('itineraryImageModalLabel');
+    const imageModalLocation = document.getElementById('itineraryImageModalLocation');
+    const imageModalPhoto = document.getElementById('itineraryImageModalPhoto');
+    const itineraryImageModal = imageModalElement && window.bootstrap ? new bootstrap.Modal(imageModalElement) : null;
+
+    if (!mapElement || !dataElement) return;
+
+    let itineraryDays = [];
+    try {
+      itineraryDays = JSON.parse(dataElement.textContent || '[]');
+    } catch (error) {
+      return;
+    }
+
+    itineraryDays = itineraryDays.filter((day) => Array.isArray(day.cards) && day.cards.length);
+    if (!itineraryDays.length) return;
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function bindMapMarkerModal() {
+      if (!itineraryImageModal || !mapElement || !imageModalPhoto) return;
+      mapElement.querySelectorAll('.itinerary-map-marker').forEach((marker) => {
+        marker.addEventListener('click', function () {
+          const imageUrl = marker.getAttribute('data-image-url') || placeholderImage;
+          const title = marker.getAttribute('data-title') || 'Itinerary stop';
+          const location = marker.getAttribute('data-location') || '';
+          imageModalPhoto.src = imageUrl;
+          imageModalPhoto.alt = title;
+          if (imageModalLabel) imageModalLabel.textContent = title;
+          if (imageModalLocation) imageModalLocation.textContent = location;
+          itineraryImageModal.show();
+        });
+      });
+    }
+
+    function getPlaceLabel(point) {
+      const raw = String(point.location || point.title || '').trim();
+      if (!raw) return '';
+      const firstPart = raw.split(',')[0].trim();
+      return firstPart || raw;
+    }
+
+    function renderRouteOverview(points) {
+      const validPoints = (points || []).filter((point) => typeof point.latitude === 'number' && typeof point.longitude === 'number');
+      const width = 1200;
+      const height = 520;
+      const paddingX = 120;
+      const topLane = 172;
+      const bottomLane = 332;
+
+      function escapeSvg(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      if (!validPoints.length) {
+        mapElement.innerHTML = '<div class="itinerary-map-empty">No mapped places for this day yet.</div>';
+        return;
+      }
+
+      if (validPoints.length === 1) {
+        const only = validPoints[0];
+        const onlyPlaceLabel = getPlaceLabel(only);
+        mapElement.innerHTML = `
+          <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-label="Tour itinerary overview">
+            <defs>
+              <radialGradient id="singleGlow" cx="50%" cy="46%" r="46%">
+                <stop offset="0%" stop-color="rgba(42,157,143,.18)" />
+                <stop offset="100%" stop-color="rgba(42,157,143,0)" />
+              </radialGradient>
+              <pattern id="singleGrid" width="48" height="48" patternUnits="userSpaceOnUse">
+                <path d="M 48 0 L 0 0 0 48" fill="none" stroke="rgba(15,23,42,.05)" stroke-width="1" />
+              </pattern>
+            </defs>
+            <rect x="0" y="0" width="${width}" height="${height}" fill="url(#singleGrid)" opacity=".9" />
+            <path d="M 160 338 C 360 338, 430 248, 598 248 S 860 248, 1038 198" fill="none" stroke="rgba(42,157,143,.10)" stroke-width="58" stroke-linecap="round" />
+            <circle cx="${width / 2}" cy="${height / 2}" r="168" fill="url(#singleGlow)" />
+          </svg>
+          <div class="itinerary-map-markers">
+            <button
+              type="button"
+              class="itinerary-map-marker"
+              style="top:50%;left:50%;background-image:url('${only.image_url || placeholderImage}');"
+              data-title="${escapeHtml(only.title || '')}"
+              data-location="${escapeHtml(only.location || '')}"
+              data-image-url="${escapeHtml(only.image_url || placeholderImage)}"
+              aria-label="Open image for ${escapeHtml(only.title || 'itinerary stop')}"
+            >
+              <span class="itinerary-map-marker-number">1</span>
+              ${onlyPlaceLabel ? `<span class="itinerary-map-marker-label">${escapeSvg(onlyPlaceLabel)}</span>` : ''}
+            </button>
+          </div>
+        `;
+        bindMapMarkerModal();
+        return;
+      }
+
+      const usableWidth = width - (paddingX * 2);
+      const stepGap = usableWidth / Math.max(validPoints.length - 1, 1);
+      const projected = validPoints.map((point, index) => {
+        const x = paddingX + (stepGap * index);
+        const waveOffset = (index % 2 === 0 ? 0 : -18) + (Math.sin(index * 0.9) * 10);
+        const y = (index % 2 === 0 ? bottomLane : topLane) + waveOffset;
+        return { x, y };
+      });
+
+      let routePath = `M ${projected[0].x} ${projected[0].y}`;
+      for (let i = 0; i < projected.length - 1; i += 1) {
+        const current = projected[i];
+        const next = projected[i + 1];
+        const midpointX = (current.x + next.x) / 2;
+        routePath += ` C ${midpointX} ${current.y}, ${midpointX} ${next.y}, ${next.x} ${next.y}`;
+      }
+
+      const markerButtons = projected.map((point, index) => {
+        const data = validPoints[index];
+        const imageUrl = data.image_url || placeholderImage;
+        const placeLabel = getPlaceLabel(data);
+        const topPercent = (point.y / height) * 100;
+        const leftPercent = (point.x / width) * 100;
+        return `
+          <button
+            type="button"
+            class="itinerary-map-marker ${point.y > 250 ? 'is-top' : ''}"
+            style="top:${topPercent}%;left:${leftPercent}%;background-image:url('${imageUrl}');"
+            data-title="${escapeHtml(data.title || '')}"
+            data-location="${escapeHtml(data.location || '')}"
+            data-image-url="${escapeHtml(imageUrl)}"
+            aria-label="Open image for ${escapeHtml(data.title || 'itinerary stop')}"
+          >
+            <span class="itinerary-map-marker-number">${index + 1}</span>
+            ${placeLabel ? `<span class="itinerary-map-marker-label">${escapeSvg(placeLabel)}</span>` : ''}
+          </button>
+        `;
+      }).join('');
+
+      const lineLabels = validPoints.slice(1).map((point, index) => {
+        const start = projected[index];
+        const end = projected[index + 1];
+        if (!start || !end) return '';
+        const distanceLabel = point.segment_summary || point.segment_distance || '';
+        if (!distanceLabel) return '';
+        const labelWidth = 170;
+        const labelHeight = 34;
+        const midX = (start.x + end.x) / 2;
+        const midY = (start.y + end.y) / 2;
+        const labelX = Math.max(22, Math.min(width - labelWidth - 22, midX - (labelWidth / 2)));
+        const labelY = midY + (index % 2 === 0 ? -52 : 18);
+        return `
+          <g>
+            <rect x="${labelX}" y="${labelY}" rx="17" ry="17" width="${labelWidth}" height="${labelHeight}" fill="rgba(255,255,255,.97)" stroke="rgba(42,157,143,.20)" />
+            <text x="${labelX + (labelWidth / 2)}" y="${labelY + 22}" text-anchor="middle" fill="#17665d" font-size="14" font-weight="800">${escapeSvg(distanceLabel)}</text>
+          </g>
+        `;
+      }).join('');
+
+      mapElement.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-label="Tour itinerary overview">
+          <defs>
+            <linearGradient id="routeLine" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#2a9d8f" />
+              <stop offset="100%" stop-color="#1f7f73" />
+            </linearGradient>
+            <linearGradient id="routeShadow" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="rgba(42,157,143,.14)" />
+              <stop offset="100%" stop-color="rgba(42,157,143,.05)" />
+            </linearGradient>
+            <pattern id="routeGrid" width="60" height="60" patternUnits="userSpaceOnUse">
+              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(15,23,42,.05)" stroke-width="1" />
+            </pattern>
+          </defs>
+          <rect x="0" y="0" width="${width}" height="${height}" fill="url(#routeGrid)" />
+          <path d="${routePath}" fill="none" stroke="url(#routeShadow)" stroke-width="58" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="${routePath}" fill="none" stroke="url(#routeLine)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="${routePath}" fill="none" stroke="rgba(255,255,255,.38)" stroke-width="3" stroke-dasharray="1 18" stroke-linecap="round" />
+          ${lineLabels}
+        </svg>
+        <div class="itinerary-map-markers">${markerButtons}</div>
+      `;
+      bindMapMarkerModal();
+    }
+
+    let activeDayIndex = 0;
+
+    function updateDayPanels(dayNumber) {
+      dayPanels.forEach((panel) => {
+        panel.classList.toggle('is-active', panel.getAttribute('data-itinerary-day') === String(dayNumber));
+      });
+    }
+
+    function renderActiveDay() {
+      const day = itineraryDays[activeDayIndex];
+      if (!day) return;
+      if (activeDayLabel) activeDayLabel.textContent = day.label || `Day ${day.day_number}`;
+      if (prevDayButton) prevDayButton.disabled = activeDayIndex === 0;
+      if (nextDayButton) nextDayButton.disabled = activeDayIndex === itineraryDays.length - 1;
+      updateDayPanels(day.day_number);
+      renderRouteOverview(day.map_points || []);
+    }
+
+    if (prevDayButton) {
+      prevDayButton.addEventListener('click', function () {
+        if (activeDayIndex <= 0) return;
+        activeDayIndex -= 1;
+        renderActiveDay();
+      });
+    }
+
+    if (nextDayButton) {
+      nextDayButton.addEventListener('click', function () {
+        if (activeDayIndex >= itineraryDays.length - 1) return;
+        activeDayIndex += 1;
+        renderActiveDay();
+      });
+    }
+
+    renderActiveDay();
+  });
+</script>
 
 <script>
   // ----------------------
