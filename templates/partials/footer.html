@@ -1,7 +1,7 @@
 <div class="container">
   <div class="row">
     <div class="col-md-4">
-      <h5>{{ brand_name }}</h5>
+      <h5>{{ footer_brand_name|default:brand_name }}</h5>
       <p>
         {% if country == 'ireland' %}
           Local, friendly Ireland tours — taxi-driver know-how, real places, zero stress.
@@ -25,6 +25,6 @@
   </div>
 
   <div class="row mt-4">
-    <div class="col-12 text-center small">© {% now "Y" %} {{ brand_name }}. All rights reserved.</div>
+    <div class="col-12 text-center small">&copy; {% now "Y" %} {{ footer_brand_name|default:brand_name }}. All rights reserved.</div>
   </div>
 </div>

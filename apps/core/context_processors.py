@@ -45,7 +45,7 @@ def sections_processor(request):
 
     # Brand/contact configuration per country
     brand_name = 'Basma'
-    support_email = 'info@basma.ma'
+    support_email = 'basmamoroccoexperience@gmail.com'
     whatsapp_number = '+212 643 092 852'
     whatsapp_wa_digits = '212643092852'
 
@@ -55,6 +55,11 @@ def sections_processor(request):
         # Display number requested by user; wa.me requires country code
         whatsapp_number = '0644061453'
         whatsapp_wa_digits = '353644061453'
+        footer_brand_name = brand_name
+        about_brand_name = brand_name
+    else:
+        footer_brand_name = 'Basma Morocco Experience'
+        about_brand_name = 'Basma Morocco Experience'
 
     whatsapp_link = f"https://wa.me/{whatsapp_wa_digits}"
 
@@ -150,6 +155,8 @@ def sections_processor(request):
         'has_promotion': has_promotion,
         'country': country,
         'brand_name': brand_name,
+        'footer_brand_name': footer_brand_name,
+        'about_brand_name': about_brand_name,
         'support_email': support_email,
         'whatsapp_number': whatsapp_number,
         'whatsapp_link': whatsapp_link,

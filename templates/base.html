@@ -52,16 +52,16 @@
 <div class="promo-train">
  <div class="promo-track">
   <span>
-    ✨ <strong class="promo-discount">EXCLUSIVE DISCOUNT</strong>
-    Save up to <strong>30%</strong> on handpicked {% if country == 'ireland' %}Ireland{% else %}Morocco{% endif %} tours {% if country == 'ireland' %}🇮🇪{% else %}🇲🇦{% endif %}
+    <strong class="promo-discount">Exclusive discount</strong>
+    Save up to <strong>30%</strong> on handpicked {% if country == 'ireland' %}Ireland{% else %}Morocco{% endif %} tours
   </span>
 
   <span>
-    ✨ Limited-time offer · Premium experiences · Best price guaranteed
+    Limited-time offer · Premium experiences · Best price guaranteed
   </span>
 
   <span>
-    ✨ Book today & travel with confidence · Trusted local experts
+    Book today with confidence · Trusted local experts
   </span>
 </div>
 
@@ -307,7 +307,48 @@ document.addEventListener('DOMContentLoaded', function () {
   const chatMessages = document.getElementById('chat-messages');
 
   const CHAT_OPEN_KEY = 'oma_chat_open_session';
+  const CHAT_SCOPE = '{{ country|default:"morocco" }}';
+  const CHAT_HISTORY_KEY = `oma_chat_history_${CHAT_SCOPE}`;
   let historyLoaded = false;
+
+  function collectChatHistory() {
+    return Array.from(chatMessages.querySelectorAll('.msg')).map((el) => ({
+      role: el.classList.contains('user') ? 'user' : 'bot',
+      message: el.textContent || '',
+    })).filter((item) => item.message.trim() !== '');
+  }
+
+  function saveChatHistory() {
+    try {
+      sessionStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(collectChatHistory()));
+    } catch (error) {}
+  }
+
+  function renderChatHistory(history) {
+    chatMessages.innerHTML = '';
+    history.forEach((item) => {
+      const msg = document.createElement('div');
+      msg.className = 'msg ' + (item.role === 'user' ? 'user' : 'bot');
+      msg.textContent = item.message || '';
+      chatMessages.appendChild(msg);
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    saveChatHistory();
+  }
+
+  function restoreChatHistory() {
+    try {
+      const raw = sessionStorage.getItem(CHAT_HISTORY_KEY);
+      if (!raw) return false;
+      const history = JSON.parse(raw);
+      if (!Array.isArray(history) || !history.length) return false;
+      renderChatHistory(history);
+      historyLoaded = true;
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
 
   function setChatEnabled(enabled) {
     if (!chatInput) return;
@@ -324,16 +365,13 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function setDefaultGreeting() {
-    chatMessages.innerHTML = '';
     const msg = document.createElement('div');
-    msg.className = 'msg bot';
     if (!CHAT_AUTHENTICATED) {
       msg.textContent = 'Welcome! Please log in to use the chat and to check booking availability.';
     } else {
       msg.textContent = 'Hello! Your virtual assistant is ready for {% if country == "ireland" %}Ireland{% else %}Morocco{% endif %}. You can ask in English or French about tours, booking, and travel tips.';
     }
-    chatMessages.appendChild(msg);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    renderChatHistory([{ role: 'bot', message: msg.textContent }]);
   }
 
   function setChatOpen(isOpen) {
@@ -350,14 +388,7 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(r => r.json())
       .then(data => {
         if (data.history && data.history.length > 0) {
-          chatMessages.innerHTML = '';
-          data.history.forEach(item => {
-            const msg = document.createElement('div');
-            msg.className = 'msg ' + item.role;
-            msg.textContent = item.message;
-            chatMessages.appendChild(msg);
-          });
-          chatMessages.scrollTop = chatMessages.scrollHeight;
+          renderChatHistory(data.history);
         } else {
           setDefaultGreeting();
         }
@@ -384,6 +415,7 @@ document.addEventListener('DOMContentLoaded', function () {
     msg.textContent = text;
     chatMessages.appendChild(msg);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    saveChatHistory();
     return msg;
   }
 
@@ -437,6 +469,7 @@ document.addEventListener('DOMContentLoaded', function () {
       addMessage(reply, 'bot');
 
       if (response.ok && data.reservation_id) {
+        saveChatHistory();
         setTimeout(() => { window.location.href = '{% url "reservations" %}'; }, 900);
       }
       return response.ok;
@@ -463,6 +496,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const reply = data.reply || data.error || 'Sorry — no reply.';
         botMsgEl.textContent = reply;
         botMsgEl.removeAttribute('data-streaming');
+        saveChatHistory();
 
         finalAction = data.action || null;
         // Backward-compat if older API shape
@@ -529,6 +563,7 @@ document.addEventListener('DOMContentLoaded', function () {
             fullText += payload.text;
             botMsgEl.textContent = fullText;
             chatMessages.scrollTop = chatMessages.scrollHeight;
+            saveChatHistory();
           }
 
           if (payload.type === 'final') {
@@ -538,6 +573,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             finalAction = payload.action || null;
             botMsgEl.removeAttribute('data-streaming');
+            saveChatHistory();
           }
         }
       };
@@ -567,6 +603,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!ok) {
         botMsgEl.textContent = 'Sorry — the assistant is unavailable right now.';
         botMsgEl.removeAttribute('data-streaming');
+        saveChatHistory();
       }
     }
 
@@ -645,7 +682,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ========= INIT ========= */
   setChatEnabled(CHAT_AUTHENTICATED);
-  setDefaultGreeting();
+  if (!restoreChatHistory()) {
+    setDefaultGreeting();
+  }
   const shouldOpen = sessionStorage.getItem(CHAT_OPEN_KEY) === 'true';
   setChatOpen(shouldOpen);
   if (shouldOpen) {
