@@ -13,9 +13,16 @@ def get_country_from_site(request):
 
     # Prefer host-based detection so maroc.local / ireland.local always win.
     host = request.get_host().split(':')[0].lower()
+    morocco_hosts = {
+        'maroc.local',
+        'maroc.lcoal',
+        'morocco.local',
+        'basmamoroccoexperience.com',
+        'www.basmamoroccoexperience.com',
+    }
 
     # Morocco must win for maroc.local (even if host contains other words)
-    if host in {'maroc.local', 'maroc.lcoal', 'morocco.local'} or 'maroc' in host or 'morocco' in host:
+    if host in morocco_hosts or 'maroc' in host or 'morocco' in host:
         return 'morocco'
 
     if 'ireland' in host:

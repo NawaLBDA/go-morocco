@@ -24,14 +24,29 @@ SECRET_KEY = os.environ.get(
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 # ✅ Dynamic ALLOWED_HOSTS based on environment
+DEFAULT_CUSTOM_DOMAINS = [
+    "basmamoroccoexperience.com",
+    "www.basmamoroccoexperience.com",
+]
 CUSTOM_DOMAIN = (os.environ.get("CUSTOM_DOMAIN") or "").strip()
+CUSTOM_DOMAINS = [
+    item.strip()
+    for item in (os.environ.get("CUSTOM_DOMAINS") or "").split(",")
+    if item.strip()
+]
+for domain in DEFAULT_CUSTOM_DOMAINS:
+    if domain not in CUSTOM_DOMAINS:
+        CUSTOM_DOMAINS.append(domain)
+if CUSTOM_DOMAIN and CUSTOM_DOMAIN not in CUSTOM_DOMAINS:
+    CUSTOM_DOMAINS.append(CUSTOM_DOMAIN)
 if os.environ.get("ENVIRONMENT") == "production":
     ALLOWED_HOSTS = [
         "go-morocco.onrender.com",
         ".onrender.com",
     ]
-    if CUSTOM_DOMAIN:
-        ALLOWED_HOSTS.append(CUSTOM_DOMAIN)
+    for domain in CUSTOM_DOMAINS:
+        if domain not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(domain)
 else:
     ALLOWED_HOSTS = [
         "go-morocco.onrender.com",
@@ -60,8 +75,10 @@ if DEBUG:
 CSRF_TRUSTED_ORIGINS = [
     "https://go-morocco.onrender.com",
 ]
-if CUSTOM_DOMAIN:
-    CSRF_TRUSTED_ORIGINS.append(f"https://{CUSTOM_DOMAIN}")
+for domain in CUSTOM_DOMAINS:
+    origin = f"https://{domain}"
+    if origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
 
 # Twilio / Robocall config
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
