@@ -265,6 +265,17 @@ class TourAdmin(admin.ModelAdmin):
 
 @admin.register(Reservation)
 class ReservationAdmin(admin.ModelAdmin):
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        # Keep ModelForm validation and persistence under the same calendar lock.
+        # This also gives the Django admin a normal form error on a conflict.
+        if request.method == 'POST':
+            tour_id = request.POST.get('tour')
+            if tour_id and tour_id.isdigit() and Tour.objects.filter(pk=tour_id, country='morocco').exists():
+                from apps.reservations.availability import lock_guide_calendar
+                with lock_guide_calendar():
+                    return super().changeform_view(request, object_id, form_url, extra_context)
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
     list_display = (
         'tour', 'user', 'num_persons',
         'start_date', 'end_date',

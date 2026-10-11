@@ -1125,7 +1125,7 @@ def ai_chat_stream(request):
                     "Maximum stay is 5 days. Can you choose a shorter date range?"
                 )
             else:
-                will_replace_existing = _user_has_overlapping_reservation(request.user, country, start_date_req, end_date_req)
+                will_replace_existing = country != 'morocco' and _user_has_overlapping_reservation(request.user, country, start_date_req, end_date_req)
                 tour, status, candidates = _select_tour_for_booking(country, message, booking_hint)
 
                 if not tour:
@@ -2023,7 +2023,7 @@ def _get_country_blocked_ranges(country: str, buffer_days: int = 0, exclude_user
             tour__country=country,
             status__in=active_statuses,
         )
-        if exclude_user and getattr(exclude_user, 'is_authenticated', False):
+        if country != 'morocco' and exclude_user and getattr(exclude_user, 'is_authenticated', False):
             reservations = reservations.exclude(user=exclude_user)
         reservations = reservations.order_by('start_date')
     except (OperationalError, ProgrammingError):
@@ -2076,12 +2076,12 @@ def _is_range_available(country: str, start_date: date, end_date: date, buffer_d
             start_date__lte=end_date,
             end_date__gte=window_start,
         )
-        if exclude_user and getattr(exclude_user, 'is_authenticated', False):
+        if country != 'morocco' and exclude_user and getattr(exclude_user, 'is_authenticated', False):
             qs = qs.exclude(user=exclude_user)
         return not qs.exists()
     except Exception:
-        # Fail-open for the assistant (don't wrongly claim "unavailable" on errors).
-        return True
+        # Never advertise Morocco dates as available when the calendar cannot be read.
+        return country != 'morocco'
 
 
 def _user_break_buffer_ok(user, country: str, start_date: date, buffer_days: int = 0) -> bool:
@@ -2857,7 +2857,7 @@ def tour_detail(request, tour_slug: str):
         tour__country=country,
         status__in=active_statuses,
     )
-    if request.user.is_authenticated:
+    if country != 'morocco' and request.user.is_authenticated:
         active_reservations = active_reservations.exclude(user=request.user)
 
     disabled_ranges = [
@@ -3114,7 +3114,7 @@ def ai_chat(request):
                     else "Maximum stay is 5 days. Can you choose a shorter date range?"
                 )
             else:
-                will_replace_existing = _user_has_overlapping_reservation(request.user, country, start_date_req, end_date_req)
+                will_replace_existing = country != 'morocco' and _user_has_overlapping_reservation(request.user, country, start_date_req, end_date_req)
                 tour, status, candidates = _select_tour_for_booking(country, message, booking_hint)
 
                 if not tour:
@@ -3638,6 +3638,14 @@ def about(request):
 
 
 def contact(request):
+    if get_country_from_site(request) == 'morocco':
+        from .forms import ContactInquiryForm
+        form = ContactInquiryForm(request.POST if request.method == 'POST' else None)
+        if request.method == 'POST' and form.is_valid():
+            form.save()
+            messages.success(request, 'Your message has been sent successfully!')
+            return redirect('contact')
+        return render(request, 'contact.html', {'contact_form': form})
     if request.method == 'POST':
         ContactMessage.objects.create(
             name=request.POST.get('name'),
@@ -3656,6 +3664,7 @@ def reservations(request):
     end_date_str = (request.GET.get('end_date') or '').strip()
 
     country = get_country_from_site(request)
+    availability_message = ''
 
     try:
         tours = Tour.objects.filter(country=country)
@@ -3696,6 +3705,7 @@ def reservations(request):
                     end_date__gte=start_date_val,
                 ).exists()
                 if has_conflict:
+                    availability_message = 'Your guide is already reserved for part of these dates across all Morocco destinations. Choose a different date range; changing destination will not free these dates.'
                     tours = Tour.objects.none()
             except (OperationalError, ProgrammingError):
                 tours = Tour.objects.none()
@@ -3717,6 +3727,7 @@ def reservations(request):
     return render(request, 'reservations.html', {
         'tours': tours,
         'country': country,
+        'availability_message': availability_message,
         'search_q': q,
         'search_start_date': start_date_str,
         'search_end_date': end_date_str,

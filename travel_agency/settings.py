@@ -28,6 +28,7 @@ DEFAULT_CUSTOM_DOMAINS = [
     "basmamoroccoexperience.com",
     "www.basmamoroccoexperience.com",
 ]
+MOROCCO_SITE_URL = os.environ.get('MOROCCO_SITE_URL', 'https://basmamoroccoexperience.com').rstrip('/')
 CUSTOM_DOMAIN = (os.environ.get("CUSTOM_DOMAIN") or "").strip()
 CUSTOM_DOMAINS = [
     item.strip()

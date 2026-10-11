@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("api/guide-availability/", views.guide_availability, name="guide_availability"),
     # ✅ create booking (POST)
     path("tour/<int:tour_id>/book/", views.book_tour, name="book_tour"),
     path("api/chat-book-tour/", views.chat_book_tour, name="chat_book_tour"),

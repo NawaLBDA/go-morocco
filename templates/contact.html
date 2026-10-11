@@ -46,6 +46,14 @@
             <li>cities / itinerary</li>
             <li>budget level (economy / mid-range / premium)</li>
           </ul>
+          {% if country == 'morocco' %}
+          <div class="contact-booking-link">
+            <i class="fa-regular fa-calendar-check mb-3" aria-hidden="true"></i>
+            <h2 class="h5">Ready to choose your dates?</h2>
+            <p class="small">A message is an enquiry, not a reservation. Choose a tour to check my shared guide calendar and request your trip.</p>
+            <a class="btn btn-primary" href="{% url 'reservations' %}">Find a tour <i class="fa-solid fa-arrow-right ms-2" aria-hidden="true"></i></a>
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -56,28 +64,34 @@
 
           <form method="post" class="contact-form-fields">
             {% csrf_token %}
+            {% if contact_form.errors %}
+            <div class="alert alert-danger" role="alert">
+              Please check the details below. Your message has been kept.
+              <ul class="mb-0 mt-2">{% for field in contact_form %}{% for error in field.errors %}<li><a href="#contact-{{ field.name }}">{{ field.label }}: {{ error }}</a></li>{% endfor %}{% endfor %}</ul>
+            </div>
+            {% endif %}
 
             <div class="row">
               <div class="col-md-6 mb-3">
-                <label class="form-label">Name</label>
-                <input name="name" class="form-control" autocomplete="name" required>
+                <label class="form-label" for="contact-name">Name</label>
+                <input id="contact-name" name="name" class="form-control" autocomplete="name" value="{{ contact_form.name.value|default_if_none:'' }}" maxlength="150" required>
               </div>
 
               <div class="col-md-6 mb-3">
-                <label class="form-label">Email</label>
-                <input type="email" name="email" class="form-control" autocomplete="email" required>
+                <label class="form-label" for="contact-email">Email</label>
+                <input id="contact-email" type="email" name="email" class="form-control" autocomplete="email" value="{{ contact_form.email.value|default_if_none:'' }}" maxlength="254" required>
               </div>
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Subject</label>
-              <input name="subject" class="form-control" placeholder="Quote / Question / Booking">
+              <label class="form-label" for="contact-subject">Subject</label>
+              <input id="contact-subject" name="subject" class="form-control" value="{{ contact_form.subject.value|default_if_none:'' }}" maxlength="200" placeholder="Quote / Question / Booking">
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Message</label>
-              <textarea name="message" class="form-control" rows="6" required
-                        placeholder="{% if country == 'ireland' %}Example: 2 days, Dublin + Cliffs of Moher, 2 people...{% else %}Example: 7 days, Marrakech + Sahara, 2 people, mid-range budget...{% endif %}"></textarea>
+              <label class="form-label" for="contact-message">Message</label>
+              <textarea id="contact-message" name="message" class="form-control" rows="6" required
+                        placeholder="{% if country == 'ireland' %}Example: 2 days, Dublin + Cliffs of Moher, 2 people...{% else %}Example: 7 days, Marrakech + Sahara, 2 people, mid-range budget...{% endif %}">{{ contact_form.message.value|default_if_none:'' }}</textarea>
             </div>
 
             <div class="d-flex flex-wrap gap-2 align-items-center">

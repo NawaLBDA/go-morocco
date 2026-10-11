@@ -5,6 +5,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  {% if country == 'morocco' %}
+    {% include 'partials/morocco_seo.html' %}
+  {% else %}
   <meta name="description" content="{% block meta_description %}{{ meta_description|default:'' }}{% endblock %}">
   <meta name="theme-color" content="{% if country == 'ireland' %}#6d28d9{% else %}#2a9d8f{% endif %}">
   {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
@@ -26,6 +29,7 @@
   {% if og_image_url %}<meta name="twitter:image" content="{{ og_image_url }}">{% endif %}
 
   <title>{% block title %}{% if country == 'ireland' %}Ireland Discover with {{ brand_name }}{% else %}{{ brand_name }} | Morocco Experiences{% endif %}{% endblock %}</title>
+  {% endif %}
 
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -41,6 +45,9 @@
   <link rel="stylesheet" href="{% static 'css/style.css' %}?v={{ static_version }}">
 
   {% block extra_head %}{% endblock %}
+  {% if country == 'morocco' %}
+    <link rel="stylesheet" href="{% static 'css/morocco-layout.css' %}?v={{ static_version }}">
+  {% endif %}
 </head>
 
 <body class="site-body layout-root theme-{{ country|default:'morocco' }}" data-page="{% block page %}default{% endblock %}">
@@ -70,7 +77,7 @@
 
 
 <!-- ================= NAVBAR ================= -->
-<nav id="site-navbar" class="navbar navbar-expand-lg navbar-dark navbar-main">
+<nav id="site-navbar" class="navbar {% if country == 'morocco' %}navbar-expand-xxl{% else %}navbar-expand-lg{% endif %} navbar-dark navbar-main">
   <div class="container px-4">
 
     <!-- BRAND -->
@@ -102,7 +109,7 @@
       <!-- LEFT LINKS -->
       <ul class="navbar-nav me-auto align-items-center">
         <li class="nav-item">
-          <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{% url 'home' %}">Home</a>
+          <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">Home</a>
         </li>
 
         {% if not user.is_authenticated or not user.is_staff %}

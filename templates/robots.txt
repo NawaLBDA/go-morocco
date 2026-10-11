@@ -1,4 +1,16 @@
 User-agent: *
+{% if local_preview %}Disallow: /
+{% elif morocco_robots %}Allow: /
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /api/
+Disallow: /morocco/admin/
+Disallow: /morocco/dashboard/
+Disallow: /morocco/api/
+
+Sitemap: {{ sitemap_url }}
+{% else %}
 Allow: /
 
 Sitemap: {{ request.scheme }}://{{ request.get_host }}{% url 'sitemap' %}
+{% endif %}

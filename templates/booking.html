@@ -32,6 +32,9 @@
         </div>
 
         <div class="d-flex align-items-center gap-2">
+          {% if country == 'morocco' %}
+          <a class="btn btn-primary" href="#tour-booking-card">{% if reservation %}Your reservation{% else %}Choose dates{% endif %} <i class="fa-solid fa-arrow-down ms-1" aria-hidden="true"></i></a>
+          {% endif %}
           {% if tour.is_promotion and tour.discount_percent > 0 %}
             <span class="badge text-bg-danger">Promo -{{ tour.discount_percent }}%</span>
           {% endif %}
@@ -326,7 +329,7 @@
 
     <!-- RIGHT BOOKING CARD -->
     <div class="col-lg-4">
-      <div class="card p-4 shadow-sm border-0 booking-sidebar booking-surface">
+      <div id="tour-booking-card" class="card p-4 shadow-sm border-0 booking-sidebar booking-surface scroll-target">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h4 class="fw-bold mb-0">Booking</h4>
           <span class="badge rounded-pill text-bg-light border">
@@ -487,7 +490,12 @@
 {% else %}
 
   <!-- ✅ BOOKING FORM (no reservation yet) -->
-  <form method="post" id="booking-form" action="{% url 'book_tour' tour.id %}">
+  <form method="post" id="booking-form" action="{% url 'book_tour' tour.id %}" {% if country == 'morocco' %}data-availability-url="{% url 'guide_availability' %}" data-authenticated="{{ user.is_authenticated|yesno:'true,false' }}" data-login-url="{% url 'login' %}"{% endif %}>
+    {% if country == 'morocco' %}
+      {% include 'partials/morocco_booking_rules.html' %}
+      <p id="guide-availability-status" class="availability-status small" role="status" aria-live="polite">Select your dates to check your guide's availability.</p>
+      <details class="guide-calendar-details mb-3"><summary>Unavailable dates across all Morocco tours</summary><ul id="guide-blocked-dates" class="small mt-2 mb-0"></ul></details>
+    {% endif %}
     {% csrf_token %}
 
 {% if tour.is_promotion and tour.discount_percent > 0 and tour.promo_price %}
@@ -508,11 +516,11 @@
       <div class="booking-input-grid mt-3">
         <input type="text" id="start_date" name="start_date"
                class="form-control booking-date"
-               placeholder="Start date" autocomplete="off" required>
+               placeholder="Start date" aria-label="Start date" autocomplete="off" required>
 
         <input type="text" id="end_date" name="end_date"
                class="form-control booking-date"
-               placeholder="End date" autocomplete="off" required>
+               placeholder="End date" aria-label="End date" autocomplete="off" required>
       </div>
     </div>
 
@@ -582,7 +590,7 @@
     </div>
 
     <button id="confirmCashBtn" class="btn btn-primary w-100">
-      Confirm booking
+      {% if country == 'morocco' %}Request this tour{% else %}Confirm booking{% endif %}
     </button>
 
     <a class="btn btn-outline-success w-100 mt-2" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
@@ -661,10 +669,15 @@
   </div>
 </div>
 
+{% if country != 'morocco' %}
 <script src="https://js.stripe.com/v3/"></script>
+{% elif reservation.status == 'booked' and reservation.payment_method == 'card' and reservation.payment_status != 'paid' %}
+<script src="https://js.stripe.com/v3/" defer></script>
+{% endif %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
+  if (document.body.classList.contains("theme-morocco")) return;
   const startInput   = document.getElementById("start_date");
   const endInput     = document.getElementById("end_date");
   const personsInput = document.getElementById("persons");
@@ -2347,7 +2360,7 @@ async function openAndInitStripe(){
 
     // Auto-submit when requested and the form is complete.
     // Note: booking is always pending admin validation.
-    if (bookingForm && (autobook === '1' || autobook === 'true')) {
+    if (!document.body.classList.contains('theme-morocco') && bookingForm && (autobook === '1' || autobook === 'true')) {
       // Wait a tick so Litepicker + pricing handlers settle.
       setTimeout(() => {
         const dateWarning = document.getElementById('dateWarning');
@@ -2369,4 +2382,8 @@ async function openAndInitStripe(){
   });
 </script>
 
+{% if country == 'morocco' %}
+  {{ disabled_ranges|json_script:"guide-disabled-ranges" }}
+  <script src="{% static 'js/morocco-booking.js' %}?v={{ static_version }}" defer></script>
+{% endif %}
 {% endblock %}

@@ -372,6 +372,11 @@ class ChatMessage(models.Model):
 # =========================
 # Reservation (BOOKING)
 # =========================
+class GuideCalendar(models.Model):
+    """Lock row for the independent guide's shared booking calendar."""
+    country = models.CharField(max_length=50, unique=True)
+
+
 class Reservation(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
@@ -435,6 +440,19 @@ class Reservation(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.tour.title} ({self.status})"
+
+    def clean(self):
+        super().clean()
+        from apps.reservations.availability import validate_reservation
+        validate_reservation(self)
+
+    def save(self, *args, **kwargs):
+        if self.tour_id and self.tour.country == 'morocco':
+            from apps.reservations.availability import lock_guide_calendar, validate_reservation
+            with lock_guide_calendar():
+                validate_reservation(self)
+                return super().save(*args, **kwargs)
+        return super().save(*args, **kwargs)
 
 
     @property

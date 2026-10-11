@@ -598,6 +598,8 @@ document.addEventListener("DOMContentLoaded", function(){
   let auto = null;
   function startAuto(){
     if (slides.length < 2) return;
+    if (document.body.classList.contains('theme-morocco') && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (auto) clearInterval(auto);
     auto = setInterval(nextSlide, 6000);
   }
   function stopAuto(){

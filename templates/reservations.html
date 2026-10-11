@@ -18,6 +18,9 @@
           Ready to discover Morocco beyond the ordinary?
         {% endif %}
       </p>
+      {% if country == 'morocco' %}
+      <a href="#find-your-tour" class="btn btn-primary mt-2">Find my tour <i class="fa-solid fa-arrow-down ms-2" aria-hidden="true"></i></a>
+      {% endif %}
 
       <div class="d-flex flex-wrap gap-2 mt-3 quick-chips">
         <span class="badge rounded-pill text-bg-light border"><i class="fa-solid fa-bolt me-1 text-primary"></i>Fast replies</span>
@@ -78,7 +81,10 @@
   </div>
 </section>
 
-<section class="container my-5 reservations-tours">
+<section id="find-your-tour" class="container my-5 reservations-tours scroll-target">
+  {% if country == 'morocco' %}
+    {% include 'partials/morocco_booking_rules.html' %}
+  {% endif %}
   <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
     <div>
       <h2 class="fw-bold mb-1">Available Tours</h2>
@@ -87,15 +93,18 @@
 
     <form method="get" class="row g-2 reservations-search" style="min-width: min(100%, 760px);">
       <div class="col-12 col-md-4">
-         <input name="q" class="form-control" value="{{ search_q|default:'' }}"
+         {% if country == 'morocco' %}<label for="tour-query" class="form-label small">Destination or tour</label>{% endif %}
+         <input id="tour-query" name="q" class="form-control" value="{{ search_q|default:'' }}"
            placeholder="Destination or tour name" aria-label="Destination or tour name">
       </div>
       <div class="col-6 col-md-3">
-        <input type="date" name="start_date" class="form-control"
+        {% if country == 'morocco' %}<label for="search-start" class="form-label small">Start date</label>{% endif %}
+        <input id="search-start" type="date" name="start_date" class="form-control"
            value="{{ search_start_date|default:'' }}" aria-label="Start date">
       </div>
       <div class="col-6 col-md-3">
-        <input type="date" name="end_date" class="form-control"
+        {% if country == 'morocco' %}<label for="search-end" class="form-label small">End date</label>{% endif %}
+        <input id="search-end" type="date" name="end_date" class="form-control"
            value="{{ search_end_date|default:'' }}" aria-label="End date">
       </div>
       <div class="col-12 col-md-2">
@@ -111,6 +120,9 @@
     </form>
   </div>
 
+  {% if country == 'morocco' and availability_message %}
+    <div class="alert alert-warning" role="status">{{ availability_message }}</div>
+  {% endif %}
   {% if tours %}
     <div class="list-group shadow-sm reservations-list">
       {% for tour in tours %}
@@ -157,7 +169,7 @@
                   <span class="text-muted small">/ night</span>
                 </div>
 
-                <a class="btn btn-primary" href="{% url 'tour_detail' tour.slug %}">
+                <a class="btn btn-primary" href="{% url 'tour_detail' tour.slug %}{% if country == 'morocco' %}?start_date={{ search_start_date|urlencode }}&amp;end_date={{ search_end_date|urlencode }}{% endif %}">
                   View & Book <i class="fa-solid fa-arrow-right ms-1"></i>
                 </a>
               </div>

@@ -6,8 +6,8 @@ from django.db.utils import OperationalError, ProgrammingError
 from django.templatetags.static import static as static_url
 
 def get_country_from_site(request):
-    # 1) Explicit override via middleware/session (Render single-domain support)
-    override = getattr(request, 'site_country', None) or request.session.get('site_country')
+    # An explicit country URL takes precedence over host and session defaults.
+    override = getattr(request, 'site_country', None)
     if override in {'morocco', 'ireland'}:
         return override
 
@@ -27,6 +27,11 @@ def get_country_from_site(request):
 
     if 'ireland' in host:
         return 'ireland'
+
+    # On a neutral host, retain the last explicitly selected country.
+    override = request.session.get('site_country')
+    if override in {'morocco', 'ireland'}:
+        return override
 
     # Fallback: user profile (only when host does not indicate a country)
     if request.user.is_authenticated:

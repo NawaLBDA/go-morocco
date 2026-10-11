@@ -2,8 +2,8 @@
 {% block page %}blog{% endblock %}
 {% block content %}
 
-<section class="container my-5">
-  <div class="row align-items-center g-4 mb-4">
+<section class="container my-5 experiences-page">
+  <div class="row align-items-center g-4 mb-4 experiences-intro">
     <div class="col-lg-8">
       <span class="text-uppercase text-primary fw-semibold small">OUR EXPERIENCES</span>
       <h1 class="fw-bold mt-2">
@@ -37,7 +37,7 @@
               <i class="fa-regular fa-calendar me-1"></i>
               {{ post.created_at|date:'d M Y' }}
             </div>
-            <h3 class="fw-bold h5">{{ post.title }}</h3>
+            <h3 class="fw-bold h5">{% if country == 'morocco' %}<a class="experience-title-link" href="{% url 'blog_detail' post.slug %}">{{ post.title }}</a>{% else %}{{ post.title }}{% endif %}</h3>
             <p class="text-muted mb-3">
               {{ post.content|striptags|truncatewords:22 }}
             </p>
@@ -54,6 +54,12 @@
       </div>
     {% endfor %}
   </div>
+  {% if country == 'morocco' %}
+  <div class="journey-cta">
+    <div><span class="small text-uppercase fw-semibold">Your next chapter</span><h2 class="h4 mt-2 mb-0">Turn inspiration into your own Morocco journey.</h2></div>
+    <a class="btn btn-primary" href="{% url 'reservations' %}">Explore tours <i class="fa-solid fa-arrow-right ms-2" aria-hidden="true"></i></a>
+  </div>
+  {% endif %}
 </section>
 
 {% endblock %}

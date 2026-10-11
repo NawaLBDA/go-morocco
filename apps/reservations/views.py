@@ -1,12 +1,17 @@
 from decimal import Decimal
 import json
 import csv
+from urllib.parse import urlencode
 import stripe
 from datetime import datetime, timedelta, date
 from django.conf import settings
 from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.views.decorators.cache import never_cache
+from .availability import active_reservations, UNAVAILABLE_MESSAGE
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import redirect, render, get_object_or_404
+from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
@@ -83,7 +88,14 @@ def _recalculate_total_for_reservation(
     return total, base_price, transport_add, hotel_add, extras_total
 
 
-def _create_pending_reservation(
+def _create_pending_reservation(**kwargs):
+    try:
+        return _create_pending_reservation_checked(**kwargs)
+    except ValidationError as exc:
+        return None, ' '.join(exc.messages), None, 409
+
+
+def _create_pending_reservation_checked(
     *,
     user,
     tour: Tour,
@@ -118,7 +130,9 @@ def _create_pending_reservation(
         status__in=active_statuses,
         start_date__lte=end_date,
         end_date__gte=start_date,
-    ).exclude(user=user)
+    )
+    if tour.country != 'morocco':
+        candidates = candidates.exclude(user=user)
 
     def _overlaps(a_start, a_end, b_start, b_end):
         return a_start <= b_end and a_end >= b_start
@@ -142,7 +156,7 @@ def _create_pending_reservation(
             continue
 
     extras_qs = TourExtraActivity.objects.filter(tour=tour, is_active=True)
-    if extra_ids:
+    if extra_ids or tour.country == 'morocco':
         extras_qs = extras_qs.filter(id__in=extra_ids)
     extras = list(extras_qs.order_by("id"))
 
@@ -173,7 +187,7 @@ def _create_pending_reservation(
             tour__country=tour.country,
         ).exclude(status__in=["cancelled", "rejected"]).order_by("-created_at")
 
-        replaced_existing = existing_qs.exists()
+        replaced_existing = tour.country != 'morocco' and existing_qs.exists()
         if replaced_existing:
             existing_qs.update(status="cancelled")
 
@@ -319,7 +333,9 @@ def tour_detail(request, tour_id):
     active_reservations = Reservation.objects.filter(
         tour__country=country,
         status__in=active_statuses,
-    ).exclude(user=request.user)
+    )
+    if country != 'morocco':
+        active_reservations = active_reservations.exclude(user=request.user)
 
     disabled_ranges = [
         {
@@ -381,186 +397,18 @@ def book_tour(request, tour_id):
     )
     if error_message:
         messages.error(request, error_message)
+        if country == 'morocco':
+            query = urlencode({'start_date': start, 'end_date': end, 'persons': persons})
+            return redirect(reverse('tour_detail', args=[tour.slug]) + '?' + query)
         return redirect("tour_detail", tour_slug=tour.slug)
 
     if info_message:
         messages.info(request, info_message)
     if reservation:
         messages.success(request, "Booking request submitted. Waiting for admin validation.")
+    if country == "morocco":
+        return redirect("tour_detail", tour_slug=tour.slug)
     return redirect("home")
-
-    start = request.POST.get("start_date")
-    end = request.POST.get("end_date")
-    try:
-        persons = int(request.POST.get("persons", 1))
-    except Exception:
-        persons = 1
-    persons = max(1, persons)
-    payment_method = (request.POST.get("payment_method") or "").strip().lower()
-    if payment_method not in {"cash", "card"}:
-        messages.error(request, "Please select a payment method.")
-        return redirect("tour_detail", tour_slug=tour.slug)
-
-    try:
-        start_date = datetime.strptime(start, "%Y-%m-%d").date()
-        end_date = datetime.strptime(end, "%Y-%m-%d").date()
-    except:
-        messages.error(request, "Invalid date format")
-        return redirect("tour_detail", tour_slug=tour.slug)
-
-    nights = (end_date - start_date).days
-    if nights <= 0:
-        messages.error(request, "Invalid date range")
-        return redirect("tour_detail", tour_slug=tour.slug)
-
-    # ✅ business rule: reservations must not exceed 5 days
-    max_nights = 5
-    if nights > max_nights:
-        messages.error(request, f"Maximum allowed duration is {max_nights} days.")
-        return redirect("tour_detail", tour_slug=tour.slug)
-
-    # ✅ per-user break rule: enforce a 3-day pause after the user's last reservation in this country.
-    buffer_days = 0
-    try:
-        last_user_res = (
-            Reservation.objects.filter(user=request.user, tour__country=tour.country)
-            .exclude(status__in=["cancelled", "rejected"])
-            .order_by('-end_date')
-            .only('end_date')
-            .first()
-        )
-    except Exception:
-        last_user_res = None
-
-    if last_user_res and getattr(last_user_res, 'end_date', None):
-        try:
-            min_start = last_user_res.end_date + timedelta(days=buffer_days)
-            if start_date < min_start:
-                messages.error(
-                    request,
-                    f"❌ Please leave a {buffer_days}-day break after your last trip. Earliest start: {min_start.isoformat()}."
-                )
-                return redirect("tour_detail", tour_slug=tour.slug)
-        except Exception:
-            pass
-
-    # ✅ single-group rule:
-    # Block ANY overlap with other active reservations across the same country,
-    # plus a buffer after the existing trip for reset/prep.
-    buffer_days = 0
-    active_statuses = ["pending", "booked"]
-    window_start = start_date - timedelta(days=buffer_days)
-    window_end = end_date + timedelta(days=buffer_days)
-
-    candidates = Reservation.objects.filter(
-        tour__country=tour.country,
-        status__in=active_statuses,
-        start_date__lte=window_end,
-        end_date__gte=window_start,
-    ).exclude(user=request.user)
-
-    def _overlaps(a_start, a_end, b_start, b_end):
-        return a_start <= b_end and a_end >= b_start
-
-    for r in candidates.order_by('start_date'):
-        blocked_start = r.start_date
-        blocked_end = r.end_date + timedelta(days=buffer_days)
-        if _overlaps(start_date, end_date, blocked_start, blocked_end):
-            messages.error(
-                request,
-                "❌ These dates are unavailable (our group is already booked). "
-                "Please choose another date range."
-            )
-            return redirect("tour_detail", tour_slug=tour.slug)
-
-    # =====================
-    # Pricing
-    # =====================
-    base_price = Decimal(tour.price_per_night or 0)
-    # Promo applies to base only.
-    if tour.is_promotion and (tour.discount_percent or 0) > 0:
-        discount = (Decimal(100) - Decimal(tour.discount_percent)) / Decimal(100)
-        base_price = (base_price * discount).quantize(Decimal("0.01"))
-
-    full_package = bool(request.POST.get('full_package'))
-    include_transport = bool(request.POST.get('include_transport'))
-    include_hotel = bool(request.POST.get('include_hotel'))
-    if full_package:
-        include_transport = True
-        include_hotel = True
-
-    transport_price = Decimal(getattr(tour, 'transport_price_per_night', None) or 0)
-    hotel_price = Decimal(getattr(tour, 'hotel_price_per_night', None) or 0)
-    transport_add = transport_price if include_transport else Decimal('0')
-    hotel_add = hotel_price if include_hotel else Decimal('0')
-
-    # Extra activities
-    extra_ids = request.POST.getlist('extra_activity_ids')
-    extras_qs = TourExtraActivity.objects.filter(tour=tour, is_active=True)
-    if extra_ids:
-        extras_qs = extras_qs.filter(id__in=extra_ids)
-    extras = list(extras_qs.order_by('id'))
-
-    extras_total = Decimal('0')
-    selected_extras_payload = []
-    for e in extras:
-        price = Decimal(e.price or 0)
-        line = price * Decimal(persons) * (Decimal(nights) if e.is_per_night else Decimal('1'))
-        extras_total += line
-        selected_extras_payload.append({
-            'id': int(e.id),
-            'title': e.title,
-            'price': str(price),
-            'is_per_night': bool(e.is_per_night),
-        })
-    extras_total = extras_total.quantize(Decimal('0.01'))
-
-    nightly_total = (base_price + transport_add + hotel_add) * Decimal(nights) * Decimal(persons)
-    total = (nightly_total + extras_total).quantize(Decimal('0.01'))
-
-    # ✅ 10% discount for 5+ persons (applies to the whole booking)
-    if persons >= 5:
-        total = (total * Decimal("0.90")).quantize(Decimal("0.01"))
-
-    # ✅ single-group: user can only have one active reservation per country.
-    # If they submit new dates, cancel any previous active reservation in this country.
-    existing_qs = Reservation.objects.filter(
-        user=request.user,
-        tour__country=tour.country,
-    ).exclude(status__in=["cancelled", "rejected"]).order_by('-created_at')
-
-    if existing_qs.exists():
-        existing_qs.update(status="cancelled")
-        messages.info(request, "ℹ️ Your previous booking was updated with new dates.")
-
-    Reservation.objects.create(
-        user=request.user,
-        tour=tour,
-        start_date=start_date,
-        end_date=end_date,
-        num_persons=persons,
-        total_price=total,
-
-        full_package=full_package,
-        include_transport=include_transport,
-        include_hotel=include_hotel,
-        selected_extra_activities=selected_extras_payload,
-        extras_total=extras_total,
-        base_price_per_night=base_price,
-        transport_price_per_night=transport_add,
-        hotel_price_per_night=hotel_add,
-
-        # ✅ ALWAYS pending
-        status="pending",
-
-        payment_method=payment_method,      # cash | transfer
-        payment_status="unpaid",            # unpaid until paid
-        stripe_payment_intent=""            # empty for now
-    )
-
-    messages.success(request, "✅ Booking request submitted. Waiting for admin validation.")
-    return redirect("home")
-
 
 # ============================================================
 # ✅ Stripe Intent creation ONLY AFTER admin validation
@@ -890,7 +738,11 @@ def admin_update_reservation(request, id):
     r.guest_phone = guest_phone
     r.admin_note = admin_note
 
-    r.save()
+    try:
+        r.save()
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+        return redirect('admin_reservations')
     messages.success(request, '✅ Reservation updated.')
     return redirect('admin_reservations')
 
@@ -929,7 +781,11 @@ def validate_reservation(request, id):
 
     r = get_object_or_404(Reservation, id=id)
     r.status = "booked"
-    r.save()
+    try:
+        r.save()
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+        return redirect('admin_reservations')
     messages.success(request, "✅ Reservation validated.")
     return redirect("admin_reservations")
 
@@ -1000,3 +856,32 @@ def admin_cancel_reservation(request, id):
         messages.info(request, "Cannot cancel this reservation.")
 
     return redirect("admin_reservations")
+
+
+@never_cache
+@require_http_methods(['GET'])
+def guide_availability(request):
+    """Public dates only; never expose reservation or traveler information."""
+    if get_country_from_site(request) != 'morocco':
+        return JsonResponse({'error': 'Not available on this site.'}, status=404)
+    ranges = list(active_reservations().filter(end_date__gte=date.today()).order_by(
+        'start_date',
+    ).values('start_date', 'end_date'))
+    payload = {'blocked_ranges': [
+        {'from': item['start_date'].isoformat(), 'to': item['end_date'].isoformat()}
+        for item in ranges
+    ]}
+    start_raw, end_raw = request.GET.get('start_date'), request.GET.get('end_date')
+    if start_raw or end_raw:
+        try:
+            start, end = date.fromisoformat(start_raw or ''), date.fromisoformat(end_raw or '')
+        except ValueError:
+            return JsonResponse({'error': 'Choose a start and end date.'}, status=400)
+        if start < date.today() or end <= start or (end - start).days > 5:
+            return JsonResponse({'error': 'Choose future dates, with an end date after the start and a maximum duration of 5 nights.'}, status=400)
+        payload['available'] = not any(
+            item['start_date'] <= end and item['end_date'] >= start for item in ranges
+        )
+        payload['message'] = ('These dates are available to request. Your guide will confirm your booking.'
+                              if payload['available'] else UNAVAILABLE_MESSAGE)
+    return JsonResponse(payload)
