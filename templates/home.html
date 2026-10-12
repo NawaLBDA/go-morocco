@@ -77,6 +77,7 @@
       <p class="lead mb-4 hero-tagline reveal">{{ hero_subtitle|default:"Authentic journeys, expertly planned" }}</p>
     {% endif %}
 
+    {% now "Y-m-d" as today_date %}
     <form method="get" class="row g-3 hero-search justify-content-center reveal mt-4" aria-label="Search tours">
       <div class="col-md-5">
         <input name="q" class="form-control form-control-lg"
@@ -86,14 +87,16 @@
       </div>
 
       <div class="col-md-3">
-        <input type="date" name="start_date" class="form-control form-control-lg"
-               value="{{ search_start_date|default:'' }}"
+        {% if country == 'morocco' %}<label for="search-start-date" class="search-date-label">Start date</label>{% endif %}
+        <input id="search-start-date" type="date" name="start_date" class="form-control form-control-lg"
+               {% if country == 'morocco' %}value="{{ search_start_date|default:today_date }}"{% if not search_start_date %} data-default-today="true"{% endif %}{% else %}value="{{ search_start_date|default:'' }}"{% endif %}
                aria-label="Start date">
       </div>
 
       <div class="col-md-3">
-        <input type="date" name="end_date" class="form-control form-control-lg"
-               value="{{ search_end_date|default:'' }}"
+        {% if country == 'morocco' %}<label for="search-end-date" class="search-date-label">End date</label>{% endif %}
+        <input id="search-end-date" type="date" name="end_date" class="form-control form-control-lg"
+               {% if country == 'morocco' %}value="{{ search_end_date|default:today_date }}"{% if not search_end_date %} data-default-today="true"{% endif %}{% else %}value="{{ search_end_date|default:'' }}"{% endif %}
                aria-label="End date (optional)">
       </div>
 
@@ -620,7 +623,7 @@ document.addEventListener("DOMContentLoaded", function(){
 </script>
 
 <script>
-  // Date UX: default start date to today and keep end date >= start date.
+  // Use the visitor's local date for Morocco defaults; preserve selected dates.
   document.addEventListener('DOMContentLoaded', function () {
     const today = new Date();
     const pad = (n) => String(n).padStart(2, '0');
@@ -628,6 +631,10 @@ document.addEventListener("DOMContentLoaded", function(){
 
     const start = document.querySelector('input[name="start_date"]');
     const end = document.querySelector('input[name="end_date"]');
+
+    [start, end].forEach((input) => {
+      if (input && input.dataset.defaultToday === 'true') input.value = iso;
+    });
 
     if (start) {
       start.min = iso;

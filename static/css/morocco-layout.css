@@ -81,6 +81,7 @@ body.theme-morocco[data-page="home"] .hero-home { min-height: min(820px, 90svh);
 .theme-morocco .hero-search {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
   gap: .65rem;
   max-width: 100%;
   margin-inline: auto;
@@ -91,7 +92,10 @@ body.theme-morocco[data-page="home"] .hero-home { min-height: min(820px, 90svh);
   box-shadow: 0 16px 40px #102c3533;
 }
 .theme-morocco .hero-search > * { width: auto; padding: 0; margin: 0; }
-.theme-morocco .hero-search :where(.form-control, .btn) { height: 100%; min-height: 50px; font-size: 1rem; }
+.theme-morocco .hero-search :where(.form-control, .btn) { min-height: 50px; font-size: 1rem; }
+.theme-morocco .hero-search .search-date-label { display: block; margin-bottom: .35rem; color: #17324a; text-align: left; font-size: .875rem; font-weight: 600; }
+.theme-morocco .hero-search input[type="date"] { display: block; width: 100%; min-width: 0; color: #0f172a; color-scheme: light; }
+.theme-morocco .hero-search input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .theme-morocco .hero-search .form-control { border-color: #dce3e1; background: #f8faf9; }
 .theme-morocco .hero-feature { font-size: .875rem; font-weight: 500; padding: .5rem .85rem; }
 .theme-morocco .hero-feature i { flex-shrink: 0; }
