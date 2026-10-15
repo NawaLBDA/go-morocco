@@ -43,13 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const count = nights();
     if (!Number.isFinite(count) || count < 1) return 'End date must be after start date.';
     if (start.value < isoToday) return 'Choose a start date today or later.';
-    if (count > 5) return 'Maximum allowed duration is 5 nights. Please choose a shorter date range.';
     if (!Number.isInteger(Number(persons.value)) || Number(persons.value) < 1) return 'Enter at least one traveler.';
     return '';
   }
   function price() {
     const count = nights(), travelers = Number(persons.value);
-    if (localError()) {
+    if (!Number.isFinite(count) || count < 1 || !Number.isInteger(travelers) || travelers < 1) {
       total.textContent = '—';
       days.textContent = '—';
       return;
@@ -106,7 +105,13 @@ document.addEventListener('DOMContentLoaded', () => {
       selectForward: true, lockDaysInclusivity: '[]', disallowLockDaysInRange: true,
       lockDays: blocked.map(range => [range.from, range.to]),
     });
-    picker.on('selected', changed);
+    picker.on('selected', (first, last) => {
+      if (first && last) {
+        start.value = first.format('YYYY-MM-DD');
+        end.value = last.format('YYYY-MM-DD');
+      }
+      changed();
+    });
   } else {
     start.type = end.type = 'date';
     start.min = end.min = isoToday;

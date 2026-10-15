@@ -121,7 +121,7 @@ def _create_pending_reservation_checked(
         return None, "Invalid date range.", None, 400
 
     max_nights = 5
-    if nights > max_nights:
+    if tour.country != 'morocco' and nights > max_nights:
         return None, f"Maximum allowed duration is {max_nights} days.", None, 400
 
     active_statuses = ["pending", "booked"]
@@ -877,8 +877,8 @@ def guide_availability(request):
             start, end = date.fromisoformat(start_raw or ''), date.fromisoformat(end_raw or '')
         except ValueError:
             return JsonResponse({'error': 'Choose a start and end date.'}, status=400)
-        if start < date.today() or end <= start or (end - start).days > 5:
-            return JsonResponse({'error': 'Choose future dates, with an end date after the start and a maximum duration of 5 nights.'}, status=400)
+        if start < date.today() or end <= start:
+            return JsonResponse({'error': 'Choose a start date today or later, with an end date after the start.'}, status=400)
         payload['available'] = not any(
             item['start_date'] <= end and item['end_date'] >= start for item in ranges
         )

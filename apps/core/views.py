@@ -1117,7 +1117,7 @@ def ai_chat_stream(request):
                     if lang == 'fr' else
                     "End date must be after start date. Can you resend the dates (from … to …)?"
                 )
-            elif requested_nights > 5:
+            elif country != 'morocco' and requested_nights > 5:
                 computed_hints_lines.append("Booking rule: maximum stay is 5 days. Ask for a shorter date range.")
                 deterministic_text = (
                     "La durée maximale est de 11 nuits. Peux-tu choisir des dates plus courtes ?"
@@ -1581,7 +1581,7 @@ def _strip_welcome_banner(text: str, country_label: str) -> str:
 
 def _build_booking_rules_context() -> str:
     return (
-        "Booking rules: maximum stay is 5 days. "
+        "Booking rules: Ireland stays have a maximum of 5 nights; Morocco requests can be longer, subject to guide availability. "
         "Single-group rule: if there is any pending/booked reservation in a country, other tours in that country are unavailable for overlapping dates. "
         "There is no extra buffer after a reservation. "
         "Currency: all prices shown to users are in USD. "
@@ -3107,7 +3107,7 @@ def ai_chat(request):
                     "La date de fin doit être après la date de début. Tu peux me redonner les dates (du … au …) ?" if lang == 'fr'
                     else "End date must be after start date. Can you resend the dates (from … to …)?"
                 )
-            elif requested_nights > 5:
+            elif country != 'morocco' and requested_nights > 5:
                 computed_hints_lines.append("Booking rule: maximum stay is 5 days. Ask for a shorter date range.")
                 deterministic_text = (
                     "La durée maximale est de 11 nuits. Peux-tu choisir des dates plus courtes ?" if lang == 'fr'

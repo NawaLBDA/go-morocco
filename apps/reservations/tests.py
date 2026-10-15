@@ -148,9 +148,30 @@ class GuideCalendarTests(CalendarFixtures, TestCase):
 
     def test_api_invalid_dates_and_country(self):
         for start, end in [('invalid', 'invalid'), (self.day.isoformat(), self.day.isoformat()),
-                           (self.day.isoformat(), (self.day + timedelta(days=6)).isoformat())]:
+                           ((date.today() - timedelta(days=1)).isoformat(), self.day.isoformat())]:
             self.assertEqual(self.client.get('/morocco/api/guide-availability/', {'start_date': start, 'end_date': end}).status_code, 400)
         self.assertEqual(self.client.get('/ireland/api/guide-availability/').status_code, 404)
+
+    def test_long_morocco_trip_prices_and_reserves_entire_calendar(self):
+        end = self.day + timedelta(days=10)
+        query = {'start_date': self.day.isoformat(), 'end_date': end.isoformat()}
+        response = self.client.get('/morocco/api/guide-availability/', query)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['available'])
+        reservation, error, _, status = self.book(end=end)
+        self.assertIsNone(error)
+        self.assertEqual(status, 200)
+        self.assertEqual(reservation.total_price, 2000)
+        response = self.client.get('/morocco/api/guide-availability/', query)
+        self.assertFalse(response.json()['available'])
+        _, _, _, status = self.book(user=self.other, tour=self.other_tour,
+            start=end - timedelta(days=1), end=end + timedelta(days=1))
+        self.assertEqual(status, 409)
+
+    def test_ireland_duration_limit_is_unchanged(self):
+        reservation, _, _, status = self.book(tour=self.ireland, end=self.day + timedelta(days=6))
+        self.assertIsNone(reservation)
+        self.assertEqual(status, 400)
 
     def test_search_explains_global_conflict_and_preserves_dates(self):
         response = self.client.get('/morocco/reservations/', {
