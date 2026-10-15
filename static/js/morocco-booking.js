@@ -2,7 +2,22 @@
 document.addEventListener('DOMContentLoaded', () => {
   const choice = document.getElementById('departure-choice');
   choice?.addEventListener('change', () => {
-    if (choice.value) choice.form.requestSubmit();
+    if (!choice.value) return;
+    const url = new URL(location.href);
+    url.searchParams.set('departure_id', choice.value);
+    const travelers = choice.form.querySelector('[name="persons"]');
+    const payment = choice.form.querySelector('[name="payment_method"]:checked');
+    if (travelers) url.searchParams.set('persons', travelers.value);
+    if (payment) url.searchParams.set('payment_method', payment.value);
+    url.searchParams.delete('autobook');
+    url.searchParams.delete('start_date');
+    url.searchParams.delete('end_date');
+    url.searchParams.delete('extra_activity_ids');
+    document.querySelectorAll('.extra-activity-toggle:checked').forEach(extra => {
+      url.searchParams.append('extra_activity_ids', extra.value);
+    });
+    url.hash = 'booking-form';
+    location.assign(url.href);
   });
   const form = document.getElementById('booking-form');
   if (!form?.dataset.availabilityUrl) return;
