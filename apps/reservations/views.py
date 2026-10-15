@@ -46,8 +46,9 @@ def _recalculate_total_for_reservation(
     include_transport: bool,
     include_hotel: bool,
     selected_extra_activities: list,
+    charge_days: int | None = None,
 ) -> tuple[Decimal, Decimal, Decimal, Decimal, Decimal]:
-    nights = max(0, (end_date - start_date).days)
+    nights = charge_days if charge_days is not None else max(0, (end_date - start_date).days)
     persons = max(1, int(persons or 1))
 
     base_price = Decimal(tour.price_per_night or 0)
@@ -90,6 +91,10 @@ def _recalculate_total_for_reservation(
 
 def _create_pending_reservation(**kwargs):
     try:
+        if kwargs['tour'].country == 'morocco':
+            from .availability import lock_guide_calendar
+            with lock_guide_calendar():
+                return _create_pending_reservation_checked(**kwargs)
         return _create_pending_reservation_checked(**kwargs)
     except ValidationError as exc:
         return None, ' '.join(exc.messages), None, 409
@@ -107,6 +112,7 @@ def _create_pending_reservation_checked(
     include_transport: bool,
     include_hotel: bool,
     extra_activity_ids: list[int] | None,
+    departure_id=None,
 ):
     payment_method = (payment_method or "").strip().lower()
     if payment_method not in {"cash", "card"}:
@@ -116,8 +122,12 @@ def _create_pending_reservation_checked(
         return None, "Start date cannot be in the past.", None, 400
 
     persons = max(1, int(persons or 1))
+    departure = None
+    if tour.country == 'morocco':
+        from .departures import resolve_departure
+        departure = resolve_departure(tour, start_date, end_date, departure_id)
     nights = (end_date - start_date).days
-    if nights <= 0:
+    if nights < 0 or (nights == 0 and tour.country != 'morocco'):
         return None, "Invalid date range.", None, 400
 
     max_nights = 5
@@ -159,6 +169,9 @@ def _create_pending_reservation_checked(
     if extra_ids or tour.country == 'morocco':
         extras_qs = extras_qs.filter(id__in=extra_ids)
     extras = list(extras_qs.order_by("id"))
+    if departure:
+        active_numbers = set(departure.program_days.filter(is_visible=True).values_list('day_number', flat=True))
+        extras = [extra for extra in extras if not extra.insert_into_itinerary or extra.itinerary_day_number in active_numbers]
 
     selected_extras_payload = [
         {
@@ -179,6 +192,7 @@ def _create_pending_reservation_checked(
         include_transport=include_transport,
         include_hotel=include_hotel,
         selected_extra_activities=selected_extras_payload,
+        charge_days=departure.active_days if departure else None,
     )
 
     with transaction.atomic():
@@ -194,6 +208,9 @@ def _create_pending_reservation_checked(
         reservation = Reservation.objects.create(
             user=user,
             tour=tour,
+            departure=departure,
+            priced_per_day=bool(departure),
+            booked_days=departure.active_days if departure else None,
             start_date=start_date,
             end_date=end_date,
             num_persons=persons,
@@ -260,6 +277,7 @@ def chat_book_tour(request):
         include_transport=_bool_from_any(payload.get("include_transport")),
         include_hotel=_bool_from_any(payload.get("include_hotel")),
         extra_activity_ids=payload.get("extra_activity_ids") or [],
+        departure_id=payload.get('departure_id'),
     )
 
     lang = str(payload.get("lang") or "en").strip().lower()
@@ -394,11 +412,12 @@ def book_tour(request, tour_id):
         include_transport=_bool_from_post(request.POST.get("include_transport")),
         include_hotel=_bool_from_post(request.POST.get("include_hotel")),
         extra_activity_ids=request.POST.getlist("extra_activity_ids"),
+        departure_id=request.POST.get('departure_id'),
     )
     if error_message:
         messages.error(request, error_message)
         if country == 'morocco':
-            query = urlencode({'start_date': start, 'end_date': end, 'persons': persons})
+            query = urlencode({'departure_id': request.POST.get('departure_id', ''), 'start_date': start, 'end_date': end, 'persons': persons})
             return redirect(reverse('tour_detail', args=[tour.slug]) + '?' + query)
         return redirect("tour_detail", tour_slug=tour.slug)
 
@@ -673,7 +692,7 @@ def admin_update_reservation(request, id):
         return redirect('admin_reservations')
 
     nights = (end_date - start_date).days
-    if nights <= 0:
+    if nights < 0 or (nights == 0 and not r.priced_per_day):
         messages.error(request, 'Invalid date range.')
         return redirect('admin_reservations')
 
@@ -713,6 +732,7 @@ def admin_update_reservation(request, id):
         include_transport=include_transport,
         include_hotel=include_hotel,
         selected_extra_activities=r.selected_extra_activities,
+        charge_days=r.booked_days if r.priced_per_day else None,
     )
 
     r.start_date = start_date
@@ -877,8 +897,17 @@ def guide_availability(request):
             start, end = date.fromisoformat(start_raw or ''), date.fromisoformat(end_raw or '')
         except ValueError:
             return JsonResponse({'error': 'Choose a start and end date.'}, status=400)
-        if start < date.today() or end <= start:
-            return JsonResponse({'error': 'Choose a start date today or later, with an end date after the start.'}, status=400)
+        if start < date.today() or end < start:
+            return JsonResponse({'error': 'Choose a start date today or later, with an end date on or after the start.'}, status=400)
+        if request.GET.get('departure_id'):
+            from .departures import resolve_departure
+            try:
+                departure = resolve_departure(
+                    get_object_or_404(Tour, pk=request.GET.get('tour_id'), country='morocco'),
+                    start, end, request.GET['departure_id'])
+                payload['days'] = departure.active_days
+            except (ValidationError, ValueError) as exc:
+                return JsonResponse({'error': str(exc.messages[0]) if isinstance(exc, ValidationError) else 'Invalid departure.'}, status=400)
         payload['available'] = not any(
             item['start_date'] <= end and item['end_date'] >= start for item in ranges
         )

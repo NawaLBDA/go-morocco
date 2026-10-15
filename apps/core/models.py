@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils.text import slugify
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 
 from cloudinary.models import CloudinaryField
 
@@ -140,6 +142,8 @@ class Tour(models.Model):
     image = CloudinaryField('image', blank=True, null=True)
 
     price_per_night = models.DecimalField(max_digits=8, decimal_places=2)
+    max_days = models.PositiveIntegerField(default=5, validators=[MinValueValidator(1)],
+        help_text="Morocco: maximum days per departure, including arrival and departure days. Increase this before adding longer departures.")
     description = models.TextField(blank=True)
 
     transport = models.CharField(max_length=255, blank=True)
@@ -168,6 +172,12 @@ class Tour(models.Model):
 
     country = models.CharField(max_length=50, default='morocco')
 
+    def clean(self):
+        super().clean()
+        if self.pk and self.max_days and self.country == 'morocco':
+            if any(departure.duration_days > self.max_days for departure in self.departures.filter(is_published=True)):
+                raise ValidationError({'max_days': 'An existing published departure exceeds this limit. Update or unpublish it first.'})
+
     def __str__(self):
         return self.title
 
@@ -181,6 +191,72 @@ class Tour(models.Model):
                 i += 1
             self.slug = slug
         super().save(*args, **kwargs)
+
+
+class TourDeparture(models.Model):
+    tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='departures')
+    start_date = models.DateField()
+    end_date = models.DateField(help_text="For a one-day tour, use the same start and end date.")
+    is_published = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['start_date', 'end_date', 'pk']
+        constraints = [models.UniqueConstraint(fields=['tour', 'start_date', 'end_date'], name='unique_tour_departure')]
+
+    @property
+    def duration_days(self):
+        return (self.end_date - self.start_date).days + 1
+
+    @property
+    def active_days(self):
+        return self.program_days.filter(is_visible=True).count()
+
+    def save(self, *args, **kwargs):
+        creating = self._state.adding
+        super().save(*args, **kwargs)
+        if creating:
+            for number in range(1, self.duration_days + 1):
+                day = self.program_days.create(day_number=number)
+                day.activities.set(self.tour.activity_cards.filter(day_number=number, is_active=True))
+
+    def __str__(self):
+        return f"{self.tour} | {self.start_date} to {self.end_date}"
+
+    def clean(self):
+        super().clean()
+        if not self.start_date or not self.end_date or not self.tour_id:
+            return
+        if self.end_date < self.start_date:
+            raise ValidationError({'end_date': 'End date cannot be before start date.'})
+        if self.duration_days > self.tour.max_days:
+            raise ValidationError({'end_date': f'This tour allows {self.tour.max_days} days. Increase Maximum days in the tour settings first.'})
+        if self.pk:
+            if self.program_days.filter(day_number__gt=self.duration_days).exists():
+                raise ValidationError('Remove programme days beyond the new departure duration first.')
+            if self.reservations.filter(status__in=['pending', 'booked']).exclude(
+                start_date=self.start_date, end_date=self.end_date, tour_id=self.tour_id).exists():
+                raise ValidationError('This departure has reservations. Create a new departure instead of changing its dates or tour.')
+
+
+class DepartureDay(models.Model):
+    departure = models.ForeignKey(TourDeparture, on_delete=models.CASCADE, related_name='program_days')
+    day_number = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    title = models.CharField(max_length=200, blank=True)
+    is_visible = models.BooleanField(default=True, verbose_name="Include this day",
+        help_text="Disabled days are excluded from the programme, billable duration and price. The guide remains reserved for the whole departure window.")
+    activities = models.ManyToManyField('TourActivity', blank=True, related_name='departure_days')
+
+    class Meta:
+        ordering = ['day_number', 'pk']
+        constraints = [models.UniqueConstraint(fields=['departure', 'day_number'], name='unique_departure_program_day')]
+
+    def __str__(self):
+        return f"Day {self.day_number}: {self.title}"
+
+    def clean(self):
+        super().clean()
+        if self.departure_id and self.day_number and self.day_number > self.departure.duration_days:
+            raise ValidationError({'day_number': 'This day is outside the departure dates.'})
 
 
 class TourActivity(models.Model):
@@ -399,6 +475,9 @@ class Reservation(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reservations')
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='reservations')
+    departure = models.ForeignKey(TourDeparture, on_delete=models.PROTECT, null=True, blank=True, related_name='reservations')
+    priced_per_day = models.BooleanField(default=False, editable=False)
+    booked_days = models.PositiveIntegerField(null=True, blank=True, editable=False)
 
     start_date = models.DateField()
     end_date = models.DateField()
@@ -458,6 +537,10 @@ class Reservation(models.Model):
     @property
     def nights(self):
         return max(0, (self.end_date - self.start_date).days)
+
+    @property
+    def duration_days(self):
+        return self.booked_days if self.booked_days is not None else (self.nights + 1 if self.priced_per_day else self.nights)
 # =========================
 # Country Content
 # =========================

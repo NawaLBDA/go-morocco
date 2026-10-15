@@ -27,8 +27,13 @@ def validate_reservation(reservation):
         return
     if not reservation.start_date or not reservation.end_date:
         return
-    if reservation.end_date <= reservation.start_date:
-        raise ValidationError('End date must be after start date.')
+    if reservation.end_date < reservation.start_date:
+        raise ValidationError('End date cannot be before start date.')
+    if reservation.departure_id:
+        departure = reservation.departure
+        if (departure.tour_id != reservation.tour_id or departure.start_date != reservation.start_date
+                or departure.end_date != reservation.end_date):
+            raise ValidationError('Reservation dates and tour must match the selected departure.')
     if reservation.status in ACTIVE_STATUSES and has_conflict(
         reservation.start_date, reservation.end_date, exclude_id=reservation.pk,
     ):

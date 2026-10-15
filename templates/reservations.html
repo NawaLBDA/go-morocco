@@ -166,7 +166,7 @@
                   {% else %}
                     {{ tour.price_per_night }} $
                   {% endif %}
-                  <span class="text-muted small">/ night</span>
+                  <span class="text-muted small">{% if country == 'morocco' %}per day{% else %}/ night{% endif %}</span>
                 </div>
 
                 <a class="btn btn-primary" href="{% url 'tour_detail' tour.slug %}{% if country == 'morocco' %}?start_date={{ search_start_date|urlencode }}&amp;end_date={{ search_end_date|urlencode }}{% endif %}">

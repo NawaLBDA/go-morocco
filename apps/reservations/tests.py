@@ -8,7 +8,7 @@ from django.db import close_old_connections
 from django.test import TestCase, TransactionTestCase, override_settings, skipUnlessDBFeature
 from django.urls import reverse
 
-from apps.core.models import ContactMessage, Destination, GuideCalendar, Reservation, Tour, TourExtraActivity
+from apps.core.models import ContactMessage, Destination, GuideCalendar, Reservation, Tour, TourExtraActivity, TourDeparture
 from apps.core.views import _is_range_available
 from .views import _create_pending_reservation
 
@@ -25,6 +25,10 @@ class CalendarFixtures:
         GuideCalendar.objects.get_or_create(country='morocco')
 
     def book(self, *, user=None, tour=None, start=None, end=None):
+        chosen_tour = tour or self.tour
+        if chosen_tour.country == 'morocco':
+            TourDeparture.objects.get_or_create(tour=chosen_tour, start_date=start or self.day,
+                end_date=end or self.day + timedelta(days=3), defaults={'is_published': True})
         return _create_pending_reservation(
             user=user or self.user, tour=tour or self.tour,
             start_date=start or self.day, end_date=end or self.day + timedelta(days=3),
@@ -147,12 +151,14 @@ class GuideCalendarTests(CalendarFixtures, TestCase):
         self.assertEqual(len(detail.context['disabled_ranges']), 1)
 
     def test_api_invalid_dates_and_country(self):
-        for start, end in [('invalid', 'invalid'), (self.day.isoformat(), self.day.isoformat()),
+        for start, end in [('invalid', 'invalid'), (self.day.isoformat(), (self.day - timedelta(days=1)).isoformat()),
                            ((date.today() - timedelta(days=1)).isoformat(), self.day.isoformat())]:
             self.assertEqual(self.client.get('/morocco/api/guide-availability/', {'start_date': start, 'end_date': end}).status_code, 400)
         self.assertEqual(self.client.get('/ireland/api/guide-availability/').status_code, 404)
 
     def test_long_morocco_trip_prices_and_reserves_entire_calendar(self):
+        self.tour.max_days = 19
+        self.tour.save()
         end = self.day + timedelta(days=10)
         query = {'start_date': self.day.isoformat(), 'end_date': end.isoformat()}
         response = self.client.get('/morocco/api/guide-availability/', query)
@@ -161,7 +167,7 @@ class GuideCalendarTests(CalendarFixtures, TestCase):
         reservation, error, _, status = self.book(end=end)
         self.assertIsNone(error)
         self.assertEqual(status, 200)
-        self.assertEqual(reservation.total_price, 2000)
+        self.assertEqual(reservation.total_price, 2200)
         response = self.client.get('/morocco/api/guide-availability/', query)
         self.assertFalse(response.json()['available'])
         _, _, _, status = self.book(user=self.other, tour=self.other_tour,
@@ -202,7 +208,7 @@ class GuideCalendarTests(CalendarFixtures, TestCase):
         reservation, error, _, _ = self.book()
         self.assertIsNone(error)
         self.assertEqual(reservation.selected_extra_activities, [])
-        self.assertEqual(reservation.total_price, 600)
+        self.assertEqual(reservation.total_price, 800)
 
     def test_contact_invalid_input_preserves_message_and_does_not_save(self):
         response = self.client.post('/morocco/contact/', {

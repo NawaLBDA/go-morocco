@@ -13,6 +13,7 @@ from .models import (
     TourExtraActivity,
     TourActivity,
     TourItineraryLeg,
+    TourDeparture, DepartureDay,
 )
 from django.forms.models import BaseInlineFormSet
 
@@ -227,6 +228,12 @@ class TourExtraActivityInline(admin.StackedInline):
         'is_active',
     )
 
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        if obj is None or obj.country == 'morocco':
+            formset.form.base_fields['is_per_night'].label = 'Charge per included day'
+        return formset
+
 
 class TourActivityInline(admin.StackedInline):
     model = TourActivity
@@ -255,12 +262,120 @@ class TourItineraryLegInline(admin.TabularInline):
     )
 
 
+class TourDepartureFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        for form in self.forms:
+            data = form.cleaned_data
+            if not data or data.get('DELETE'):
+                continue
+            start, end = data.get('start_date'), data.get('end_date')
+            if start and end and (end - start).days + 1 > self.instance.max_days:
+                raise forms.ValidationError(f'Departures must be at most {self.instance.max_days} days. Increase the tour maximum first.')
+
+
+class TourDepartureInline(admin.TabularInline):
+    model = TourDeparture
+    formset = TourDepartureFormSet
+    extra = 0
+    show_change_link = True
+    fields = ('start_date', 'end_date', 'is_published')
+    verbose_name_plural = 'Scheduled departures — save, then open a departure to choose its daily activities'
+
+
+class DepartureDayForm(forms.ModelForm):
+    class Meta:
+        model = DepartureDay
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        departure_tour_id = kwargs.pop('departure_tour_id', None)
+        super().__init__(*args, **kwargs)
+        if departure_tour_id or self.instance.departure_id:
+            tour_id = departure_tour_id or self.instance.departure.tour_id
+            self.fields['activities'].queryset = TourActivity.objects.filter(tour_id=tour_id)
+        else:
+            self.fields['activities'].queryset = TourActivity.objects.none()
+
+    def clean(self):
+        data = super().clean()
+        if self.instance.departure_id and data.get('activities'):
+            if data['activities'].exclude(tour=self.instance.departure.tour).exists():
+                raise forms.ValidationError('Choose activities from this tour only.')
+        return data
+
+
+class DepartureDayFormSet(BaseInlineFormSet):
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        kwargs['departure_tour_id'] = self.instance.tour_id
+        return kwargs
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        included = 0
+        for form in self.forms:
+            data = form.cleaned_data
+            if not data or data.get('DELETE'):
+                continue
+            if data.get('day_number', 0) > self.instance.duration_days:
+                raise forms.ValidationError('Programme days must fall within the departure dates.')
+            included += bool(data.get('is_visible'))
+        if self.instance.is_published and not included:
+            raise forms.ValidationError('A published departure must include at least one day.')
+        if self.instance.pk and self.instance.reservations.filter(status__in=['pending', 'booked']).exists():
+            if any(form.has_changed() for form in self.forms):
+                raise forms.ValidationError('This departure is already reserved. Create a new departure to change its programme.')
+
+
+class DepartureDayInline(admin.StackedInline):
+    model = DepartureDay
+    form = DepartureDayForm
+    formset = DepartureDayFormSet
+    extra = 0
+    filter_horizontal = ('activities',)
+    fields = ('day_number', 'title', 'is_visible', 'activities')
+
+
+class GuideScheduleAdmin(admin.ModelAdmin):
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        if request.method == 'POST':
+            from apps.reservations.availability import lock_guide_calendar
+            with lock_guide_calendar():
+                return super().changeform_view(request, object_id, form_url, extra_context)
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+
+@admin.register(TourDeparture)
+class TourDepartureAdmin(GuideScheduleAdmin):
+    list_display = ('tour', 'start_date', 'end_date', 'active_days', 'is_published')
+    list_filter = ('is_published', 'tour')
+    inlines = [DepartureDayInline]
+
+    def get_readonly_fields(self, request, obj=None):
+        return ('tour',) if obj else ()
+
+
 @admin.register(Tour)
-class TourAdmin(admin.ModelAdmin):
+class TourAdmin(GuideScheduleAdmin):
     list_display = ('title', 'destination', 'price_per_night', 'is_promotion', 'discount_percent')
     list_filter = ('destination', 'is_promotion')
     search_fields = ('title', 'description', 'transport', 'hotel', 'activities', 'included', 'not_included')
-    inlines = [TourActivityInline, TourItineraryLegInline, TourExtraActivityInline]
+    inlines = [TourActivityInline, TourItineraryLegInline, TourExtraActivityInline, TourDepartureInline]
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if obj is None or obj.country == 'morocco':
+            form.base_fields['price_per_night'].label = 'Price per person / day'
+            form.base_fields['max_days'].label = 'Maximum days per departure'
+            for name in ('transport_price_per_night', 'hotel_price_per_night'):
+                form.base_fields[name].label = name.replace('_price_per_night', '').title() + ' price per person / day'
+                form.base_fields[name].help_text = 'Optional add-on price per included day per person.'
+        return form
 
 
 @admin.register(Reservation)

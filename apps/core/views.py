@@ -255,9 +255,9 @@ def _list_tours_reply(country: str, lang: str, limit: int = 6) -> str:
         dest_name = getattr(t.destination, 'name', '') or ''
         header = f"{t.title} ({dest_name})" if dest_name else t.title
         if lang == 'fr':
-            lines.append(f"- {header} — {t.price_per_night} par nuit.")
+            lines.append(f"- {header} — {t.price_per_night} par {'jour' if t.country == 'morocco' else 'nuit'}.")
         else:
-            lines.append(f"- {header} — {t.price_per_night} per night.")
+            lines.append(f"- {header} — {t.price_per_night} per {'day' if t.country == 'morocco' else 'night'}.")
 
     if lang == 'fr':
         lines.append("Dis-moi la ville + tes dates + le nombre de personnes, et je vérifie la disponibilité.")
@@ -802,8 +802,30 @@ def _build_activity_gallery_cards(tour: Tour) -> list[dict]:
     return cards
 
 
-def _build_itinerary_days(tour: Tour, selected_extra_ids: list[int] | None = None) -> list[dict]:
+def _build_itinerary_days(tour: Tour, selected_extra_ids: list[int] | None = None, departure=None) -> list[dict]:
     activity_cards = [card for card in _build_activity_gallery_cards(tour) if not card.get('is_extra')]
+    if departure:
+        cards_by_id = {card['activity_id']: card for card in activity_cards}
+        days = []
+        for day in departure.program_days.filter(is_visible=True).prefetch_related('activities'):
+            cards = []
+            for activity in day.activities.filter(tour=tour, is_active=True):
+                if activity.pk in cards_by_id:
+                    cards.append({**cards_by_id[activity.pk], 'day_number': day.day_number})
+            selected_ids = {card['activity_id'] for card in cards}
+            for card in cards:
+                if card.get('segment_from_activity_id') not in selected_ids:
+                    for key in list(card):
+                        if key.startswith('segment_'):
+                            card[key] = None if key.endswith('_id') else ''
+            actual_date = departure.start_date + timedelta(days=day.day_number - 1)
+            days.append({'day_number': day.day_number,
+                         'label': f"{actual_date:%d %b %Y}" + (f" — {day.title}" if day.title else ''),
+                         'cards': cards, 'map_points': []})
+        active_numbers = {day['day_number'] for day in days}
+        extras = [_serialize_extra_itinerary_option(extra) for extra in tour.extra_activities.filter(is_active=True)
+                  if extra.itinerary_day_number in active_numbers]
+        return _apply_selected_extras_to_itinerary_days(days, extras, selected_extra_ids)
     if not activity_cards:
         return []
 
@@ -1110,7 +1132,7 @@ def ai_chat_stream(request):
                     deterministic_text = "How many people is it for?"
         else:
             requested_nights = max(0, (end_date_req - start_date_req).days)
-            if requested_nights <= 0:
+            if end_date_req < start_date_req or (requested_nights == 0 and country != 'morocco'):
                 computed_hints_lines.append("Invalid date range: end_date must be after start_date. Ask the user to correct dates.")
                 deterministic_text = (
                     "La date de fin doit être après la date de début. Tu peux me redonner les dates (du … au …) ?"
@@ -1581,7 +1603,7 @@ def _strip_welcome_banner(text: str, country_label: str) -> str:
 
 def _build_booking_rules_context() -> str:
     return (
-        "Booking rules: Ireland stays have a maximum of 5 nights; Morocco requests can be longer, subject to guide availability. "
+        "Booking rules: Ireland stays have a maximum of 5 nights. Morocco visitors must choose an administrator-published departure on the tour page; never invent available dates. Morocco prices are per person per included day, and one-day trips are allowed. "
         "Single-group rule: if there is any pending/booked reservation in a country, other tours in that country are unavailable for overlapping dates. "
         "There is no extra buffer after a reservation. "
         "Currency: all prices shown to users are in USD. "
@@ -2140,6 +2162,9 @@ def _user_has_overlapping_reservation(user, country: str, start_date: date, end_
 def _suggest_available_ranges(country: str, nights: int = 5, horizon_days: int = 120, limit: int = 4, buffer_days: int = 0):
     """Suggest next available continuous date ranges for a given stay length."""
     country = _normalize_country(country)
+    if country == 'morocco':
+        from apps.reservations.departures import available_departure_ranges
+        return available_departure_ranges(limit=limit)
     # Let users book far in the future; suggestions should cover more than ~4 months.
     horizon_days = max(int(horizon_days), 365)
     nights = max(1, min(int(nights), 11))
@@ -2175,6 +2200,9 @@ def _suggest_available_ranges_near(
 ):
     """Suggest available ranges near an anchor date (useful for far-future requests)."""
     country = _normalize_country(country)
+    if country == 'morocco':
+        from apps.reservations.departures import available_departure_ranges
+        return available_departure_ranges(anchor=anchor, limit=limit)
     if not anchor:
         return []
     nights = max(1, min(int(nights), 11))
@@ -2271,7 +2299,7 @@ def _build_country_catalog_context(country: str, user_message: str) -> str:
         for t in tours:
             dest_name = getattr(t.destination, 'name', '') or ''
             promo = f" (promo -{t.discount_percent}%)" if getattr(t, 'is_promotion', False) and getattr(t, 'discount_percent', 0) else ""
-            line = f"- Tour #{t.id}: {t.title} — {dest_name} — {t.price_per_night} per night{promo}."
+            line = f"- Tour #{t.id}: {t.title} — {dest_name} — {t.price_per_night} per {'day' if t.country == 'morocco' else 'night'}{promo}."
             if t.transport:
                 line += f" Transport: {t.transport}."
             if t.hotel:
@@ -2440,7 +2468,7 @@ def _filter_navigation_action(
         return action
 
     requested_nights = max(0, (end_date_req - start_date_req).days)
-    if requested_nights > 5 or (not _is_range_available(country, start_date_req, end_date_req, buffer_days=0, exclude_user=exclude_user)):
+    if (country != 'morocco' and requested_nights > 5) or (not _is_range_available(country, start_date_req, end_date_req, buffer_days=0, exclude_user=exclude_user)):
         action.pop('navigate', None)
         action.pop('prefill', None)
         return action
@@ -2604,9 +2632,9 @@ def _format_tour_info_reply(
 
         if 'price' in intents:
             if lang == 'fr':
-                line = f"- {header}: {t.price_per_night} USD par nuit."
+                line = f"- {header}: {t.price_per_night} USD par {'jour' if t.country == 'morocco' else 'nuit'}."
             else:
-                line = f"- {header}: {t.price_per_night} USD per night."
+                line = f"- {header}: {t.price_per_night} USD per {'day' if t.country == 'morocco' else 'night'}."
             if getattr(t, 'is_promotion', False) and getattr(t, 'discount_percent', 0):
                 if lang == 'fr':
                     line += f" Promo: -{t.discount_percent}%."
@@ -2672,9 +2700,9 @@ def _format_tour_info_reply(
                     # If the user asked about activities (not price), still provide the price as a helpful factual detail.
                     if 'price' not in intents and getattr(t, 'price_per_night', None) is not None:
                         if lang == 'fr':
-                            line += f" Prix actuel: {t.price_per_night} par nuit."
+                            line += f" Prix actuel: {t.price_per_night} par {'jour' if t.country == 'morocco' else 'nuit'}."
                         else:
-                            line += f" Current price: {t.price_per_night} per night."
+                            line += f" Current price: {t.price_per_night} per {'day' if t.country == 'morocco' else 'night'}."
                     if include_admin_hint:
                         try:
                             admin_url = reverse('admin:core_tour_change', args=[t.id])
@@ -2833,12 +2861,19 @@ def tour_detail(request, tour_slug: str):
 
     reservation = None
     if request.user.is_authenticated:
-        reservation = Reservation.objects.filter(
+        reservations = Reservation.objects.filter(
             user=request.user,
             tour=tour
-        ).exclude(status__in=["rejected", "cancelled", "completed"]).order_by("-created_at").first()
+        ).exclude(status__in=["rejected", "cancelled", "completed"]).order_by("-created_at")
+        requested_departure = request.GET.get('departure_id', '')
+        if country == 'morocco' and requested_departure:
+            reservations = reservations.filter(departure_id=int(requested_departure)) if requested_departure.isdigit() else reservations.none()
+        reservation = reservations.first()
 
     selected_extra_ids: list[int] = []
+    if country == 'morocco' and not reservation:
+        requested_extras = [int(value) for value in request.GET.getlist('extra_activity_ids') if value.isdigit()]
+        selected_extra_ids = list(tour.extra_activities.filter(is_active=True, pk__in=requested_extras).values_list('pk', flat=True))
     if reservation:
         for item in getattr(reservation, 'selected_extra_activities', []) or []:
             try:
@@ -2876,8 +2911,18 @@ def tour_detail(request, tour_slug: str):
     extra_activities = list(tour.extra_activities.filter(is_active=True).order_by('id'))
     extra_itinerary_options = [_serialize_extra_itinerary_option(extra) for extra in extra_activities]
     activity_gallery_cards = _build_activity_gallery_cards(tour)
-    itinerary_days = _build_itinerary_days(tour, selected_extra_ids=selected_extra_ids)
+    from apps.reservations.departures import departure_context
+    scheduled = departure_context(request, tour, reservation)
+    selected_departure = scheduled.get('selected_departure')
+    itinerary_days = _build_itinerary_days(tour, selected_extra_ids=selected_extra_ids, departure=selected_departure)
+    if country == 'morocco' and not selected_departure:
+        itinerary_days = []
+    if country == 'morocco':
+        active_numbers = {day['day_number'] for day in itinerary_days}
+        extra_activities = [extra for extra in extra_activities if not extra.insert_into_itinerary or extra.itinerary_day_number in active_numbers]
+        extra_itinerary_options = [_serialize_extra_itinerary_option(extra) for extra in extra_activities]
     return render(request, "booking.html", {
+        **scheduled,
         "tour": tour,
         "reservation": reservation,
         "disabled_ranges": disabled_ranges,
@@ -3101,7 +3146,7 @@ def ai_chat(request):
                     deterministic_text = "How many people is it for?"
         else:
             requested_nights = max(0, (end_date_req - start_date_req).days)
-            if requested_nights <= 0:
+            if end_date_req < start_date_req or (requested_nights == 0 and country != 'morocco'):
                 computed_hints_lines.append("Invalid date range: end_date must be after start_date. Ask the user to correct dates.")
                 deterministic_text = (
                     "La date de fin doit être après la date de début. Tu peux me redonner les dates (du … au …) ?" if lang == 'fr'
@@ -3476,7 +3521,7 @@ def generate_fallback_reply(message, country, lang: str | None = None):
                 sug_txt = " ; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
                 return (
                     "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes. "
-                    "Exemples de périodes disponibles (5 nuits) : " + sug_txt + "."
+                    + ("Dates de départ publiées : " if country == 'morocco' else "Exemples de périodes disponibles (5 nuits) : ") + sug_txt + "."
                 )
             return "Bien sûr. Donne-moi tes dates exactes et le nombre de personnes, et je vérifie la disponibilité."
 
@@ -3484,7 +3529,7 @@ def generate_fallback_reply(message, country, lang: str | None = None):
             sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
             return (
                 "Sure — tell me your exact dates and number of people. "
-                "Examples of available windows (5 nights): " + sug_txt + "."
+                + ("Published departure dates: " if country == 'morocco' else "Examples of available windows (5 nights): ") + sug_txt + "."
             )
         return "Sure — tell me your exact dates and number of people and I’ll check availability."
 
@@ -3552,7 +3597,7 @@ def parse_actions(message, country):
     if booking_intent:
         if start_date and end_date and persons:
             requested_nights = max(0, (end_date - start_date).days)
-            if requested_nights <= 5 and _is_range_available(country, start_date, end_date, buffer_days=0):
+            if (country == 'morocco' or requested_nights <= 5) and _is_range_available(country, start_date, end_date, buffer_days=0):
                 tour, status, _candidates = _select_tour_for_booking(country, message, parsed_dest)
                 if tour and status == 'ok':
                     action['navigate'] = reverse('tour_detail', args=[tour.slug])
