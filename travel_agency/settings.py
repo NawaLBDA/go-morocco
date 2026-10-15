@@ -121,7 +121,7 @@ if CHAT_FORCE_LANGUAGE not in {"", "en", "fr"}:
 # APPLICATIONS
 # ==============================
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    'apps.core.admin_site.CountryAdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
