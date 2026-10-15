@@ -31,6 +31,15 @@ class ScheduledDepartureTests(TestCase):
         args.update(changes)
         return _create_pending_reservation(**args)
 
+    def test_morocco_accepts_bank_transfer_and_rejects_card(self):
+        reservation, error, _, status = self.book(payment_method='card')
+        self.assertIsNone(reservation)
+        self.assertEqual(status, 400)
+        reservation, error, _, status = self.book(payment_method='transfer')
+        self.assertIsNone(error)
+        self.assertEqual(reservation.payment_method, 'transfer')
+        self.assertEqual(reservation.payment_status, 'unpaid')
+
     def test_default_five_days_and_configurable_nineteen(self):
         self.assertEqual(self.tour.max_days, 5)
         self.departure.full_clean()
@@ -121,7 +130,9 @@ class ScheduledDepartureTests(TestCase):
     def test_page_uses_departures_and_only_the_selected_programme(self):
         path = '/morocco/tour/' + self.tour.slug + '/'
         response = self.client.get(path)
-        self.assertContains(response, 'Choose your departure')
+        self.assertContains(response, 'id="departure-choice"')
+        self.assertContains(response, 'Bank transfer')
+        self.assertNotContains(response, 'https://js.stripe.com/v3/')
         self.assertNotContains(response, 'Unavailable dates across all Morocco tours')
         self.assertNotContains(response, 'Maximum allowed duration')
         self.assertNotContains(response, 'Nights')

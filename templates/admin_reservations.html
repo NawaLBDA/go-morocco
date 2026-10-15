@@ -197,7 +197,8 @@
               <select class="form-select" name="payment_method" id="editPaymentMethod">
                 <option value="">—</option>
                 <option value="cash">Cash</option>
-                <option value="card">Card</option>
+                {% if country != 'morocco' %}<option value="card">Card</option>{% endif %}
+                <option value="transfer">Bank transfer</option>
               </select>
             </div>
             <div class="col-md-4">

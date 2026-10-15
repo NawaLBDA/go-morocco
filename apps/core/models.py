@@ -471,6 +471,7 @@ class Reservation(models.Model):
     PAYMENT_CHOICES = (
         ('cash', 'Cash'),
         ('card', 'Card Payment'),
+        ('transfer', 'Bank transfer'),
     )
 
     PAYMENT_STATUS = (

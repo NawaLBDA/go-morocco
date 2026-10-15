@@ -115,7 +115,7 @@ def _create_pending_reservation_checked(
     departure_id=None,
 ):
     payment_method = (payment_method or "").strip().lower()
-    if payment_method not in {"cash", "card"}:
+    if payment_method not in ({"cash", "transfer"} if tour.country == "morocco" else {"cash", "card"}):
         return None, "Please select a payment method.", None, 400
 
     if start_date < date.today():
@@ -438,6 +438,9 @@ def create_payment_intent_for_reservation(request, reservation_id):
     r = get_object_or_404(Reservation, id=reservation_id, user=request.user)
 
     # ✅ Only if booked + card + unpaid
+    if r.tour.country == "morocco":
+        return JsonResponse({"error": "Please arrange bank transfer with your guide after validation."}, status=400)
+
     if r.status != "booked":
         return JsonResponse({"error": "Booking not validated yet."}, status=400)
 
