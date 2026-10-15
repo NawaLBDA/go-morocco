@@ -1,11 +1,19 @@
 {% extends "base.html" %}
 {% block page %}admin-reservations{% endblock %}
+{% block extra_head %}
+<style>
+.admin-reservations-table { min-width: 1050px; }
+.admin-reservations-table th, .admin-reservations-table td { word-break: normal; overflow-wrap: normal; }
+.reservation-actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: nowrap; gap: 6px; min-width: max-content; }
+.reservation-actions .reservation-action { display: inline-flex; justify-content: center; align-items: center; flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 10px; white-space: nowrap; }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container my-5">
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
     <div>
-      <h2 class="mb-0">Reservations</h2>
-      <div class="text-muted small">{{ reservations_count|default:reservations|length }} items</div>
+      <h2 class="mb-0">{{ country|title }} reservations</h2>
+      <div class="text-muted small">{{ reservations_count }} items</div>
     </div>
   </div>
 
@@ -26,11 +34,11 @@
       </div>
 
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0 admin-reservations-table">
           <thead>
             <tr class="table-light">
               <th style="width:34px">
-                <input class="form-check-input" type="checkbox" id="select-all"
+                <input class="form-check-input" type="checkbox" id="select-all" aria-label="Select all reservations"
                        onclick="document.querySelectorAll('input[name=reservation_ids]').forEach(cb => cb.checked = this.checked);">
               </th>
               <th style="width:90px">#</th>
@@ -48,7 +56,7 @@
           {% for r in reservations %}
             <tr>
               <td>
-                <input class="form-check-input" type="checkbox" name="reservation_ids" value="{{ r.id }}">
+                <input class="form-check-input" type="checkbox" name="reservation_ids" value="{{ r.id }}" aria-label="Select reservation {{ r.id }}">
               </td>
               <td>{{ r.id }}</td>
               <td>
@@ -82,14 +90,14 @@
               </td>
 
               <td>
-                <div class="d-flex justify-content-end gap-2">
+                <div class="reservation-actions">
                   <button
                     type="button"
-                    class="btn btn-outline-secondary btn-sm"
-                    title="Edit"
+                    class="btn btn-outline-secondary btn-sm reservation-action"
+                    title="Edit" aria-label="Edit reservation {{ r.id }}"
                     data-bs-toggle="modal"
                     data-bs-target="#editReservationModal"
-                    data-id="{{ r.id }}"
+                    data-id="{{ r.id }}" data-scheduled="{{ r.departure_id|yesno:'1,0' }}"
                     data-start_date="{{ r.start_date|date:'Y-m-d' }}"
                     data-end_date="{{ r.end_date|date:'Y-m-d' }}"
                     data-num_persons="{{ r.num_persons }}"
@@ -104,35 +112,27 @@
                     data-guest_phone="{{ r.guest_phone|default_if_none:''|escape }}"
                     data-admin_note="{{ r.admin_note|default_if_none:''|escape }}"
                   >
-                    Edit
+                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
                   </button>
 
                   {% if r.status == 'pending' %}
-                    <a href="{% url 'validate_reservation' r.id %}" class="btn btn-outline-success btn-sm" title="Validate">
-                      Validate
-                    </a>
-                    <a href="{% url 'reject_reservation' r.id %}" class="btn btn-outline-danger btn-sm" title="Reject">
-                      Reject
-                    </a>
+                    <button type="submit" formaction="{% url 'validate_reservation' r.id %}" class="btn btn-outline-success btn-sm reservation-action" title="Validate" aria-label="Validate reservation {{ r.id }}"><i class="fa-solid fa-check" aria-hidden="true"></i></button>
+                    <button type="submit" formaction="{% url 'reject_reservation' r.id %}" class="btn btn-outline-danger btn-sm reservation-action" title="Reject" aria-label="Reject reservation {{ r.id }}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                   {% endif %}
 
                   {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
                     {% if r.payment_status != 'paid' %}
-                      <a href="{% url 'mark_paid_reservation' r.id %}" class="btn btn-outline-primary btn-sm" title="Mark paid">
-                        Mark paid
-                      </a>
+                      <button type="submit" formaction="{% url 'mark_paid_reservation' r.id %}" class="btn btn-outline-primary btn-sm reservation-action" title="Mark paid" aria-label="Mark paid reservation {{ r.id }}"><i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i></button>
                     {% endif %}
                   {% endif %}
 
                   {% if r.status == 'booked' and r.payment_status != 'paid' %}
-                    <a href="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-outline-warning btn-sm" title="Cancel">
-                      Cancel
-                    </a>
+                    <button type="submit" formaction="{% url 'admin_cancel_reservation' r.id %}" class="btn btn-outline-warning btn-sm reservation-action" title="Cancel" aria-label="Cancel reservation {{ r.id }}"><i class="fa-solid fa-ban" aria-hidden="true"></i></button>
                   {% endif %}
 
                   <button
                     type="submit"
-                    class="btn btn-outline-danger btn-sm"
+                    class="btn btn-outline-danger btn-sm reservation-action"
                     title="Delete"
                     aria-label="Delete"
                     formaction="{% url 'delete_reservation' r.id %}"
@@ -273,6 +273,8 @@
 
       document.getElementById('editStartDate').value = button.getAttribute('data-start_date') || '';
       document.getElementById('editEndDate').value = button.getAttribute('data-end_date') || '';
+      document.getElementById('editStartDate').readOnly = button.dataset.scheduled === '1';
+      document.getElementById('editEndDate').readOnly = button.dataset.scheduled === '1';
       document.getElementById('editNumPersons').value = button.getAttribute('data-num_persons') || '1';
 
       document.getElementById('editStatus').value = button.getAttribute('data-status') || 'pending';

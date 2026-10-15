@@ -10,6 +10,7 @@ from cloudinary.models import CloudinaryField
 # Destination
 # =========================
 class Destination(models.Model):
+    country = models.CharField(max_length=50, default='morocco')
     name = models.CharField(max_length=150)
     image = models.ImageField(upload_to='img/destinations/', blank=True, null=True)
     description = models.TextField(blank=True)
@@ -98,6 +99,7 @@ class BlogComment(models.Model):
 # Contact
 # =========================
 class ContactMessage(models.Model):
+    country = models.CharField(max_length=50, blank=True, default='')
     name = models.CharField(max_length=150)
     email = models.EmailField()
     subject = models.CharField(max_length=200, blank=True)
@@ -112,6 +114,7 @@ class ContactMessage(models.Model):
 # Promotion
 # =========================
 class Promotion(models.Model):
+    country = models.CharField(max_length=50, default='morocco')
     name = models.CharField(max_length=120)
     percent = models.PositiveIntegerField(default=0)
     active = models.BooleanField(default=False)
@@ -212,12 +215,17 @@ class TourDeparture(models.Model):
         return self.program_days.filter(is_visible=True).count()
 
     def save(self, *args, **kwargs):
-        creating = self._state.adding
         super().save(*args, **kwargs)
-        if creating:
-            for number in range(1, self.duration_days + 1):
-                day = self.program_days.create(day_number=number)
-                day.activities.set(self.tour.activity_cards.filter(day_number=number, is_active=True))
+        self.sync_programme()
+
+    def sync_programme(self):
+        """Dates follow the tour's numbered itinerary; reserved programmes stay fixed."""
+        if self.reservations.filter(status__in=['pending', 'booked', 'completed']).exists():
+            return
+        self.program_days.filter(day_number__gt=self.duration_days).delete()
+        for number in range(1, self.duration_days + 1):
+            day, _ = self.program_days.get_or_create(day_number=number)
+            day.activities.set(self.tour.activity_cards.filter(day_number=number, is_active=True))
 
     def __str__(self):
         return f"{self.tour} | {self.start_date} to {self.end_date}"
@@ -231,8 +239,6 @@ class TourDeparture(models.Model):
         if self.duration_days > self.tour.max_days:
             raise ValidationError({'end_date': f'This tour allows {self.tour.max_days} days. Increase Maximum days in the tour settings first.'})
         if self.pk:
-            if self.program_days.filter(day_number__gt=self.duration_days).exists():
-                raise ValidationError('Remove programme days beyond the new departure duration first.')
             if self.reservations.filter(status__in=['pending', 'booked']).exclude(
                 start_date=self.start_date, end_date=self.end_date, tour_id=self.tour_id).exists():
                 raise ValidationError('This departure has reservations. Create a new departure instead of changing its dates or tour.')

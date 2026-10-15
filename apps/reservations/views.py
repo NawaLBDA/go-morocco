@@ -479,7 +479,7 @@ def cancel_reservation(request, id):
         messages.info(request, "Please contact us to cancel your reservation.")
         return redirect("home")
 
-    r = get_object_or_404(Reservation, id=id)
+    r = get_object_or_404(Reservation, id=id, tour__country=get_country_from_site(request))
 
     today = date.today()
     # ✅ cannot cancel if booked/completed OR date passed
@@ -644,7 +644,7 @@ def admin_reservations(request):
         'user',
         'tour',
         'tour__destination',
-    ).all().order_by("-created_at")
+    ).filter(tour__country=get_country_from_site(request)).order_by("-created_at")
 
     if request.method == 'POST':
         action = (request.POST.get('action') or '').strip()
@@ -682,7 +682,7 @@ def admin_update_reservation(request, id):
     if not request.user.is_staff:
         return redirect("home")
 
-    r = get_object_or_404(Reservation.objects.select_related('tour'), id=id)
+    r = get_object_or_404(Reservation.objects.select_related('tour'), id=id, tour__country=get_country_from_site(request))
 
     try:
         start_date = datetime.strptime(request.POST.get('start_date') or '', '%Y-%m-%d').date()
@@ -773,7 +773,7 @@ def delete_reservation(request, id):
     if not request.user.is_staff:
         return redirect("home")
 
-    r = get_object_or_404(Reservation, id=id)
+    r = get_object_or_404(Reservation, id=id, tour__country=get_country_from_site(request))
     r.delete()
     messages.success(request, '✅ Reservation deleted.')
     return redirect('admin_reservations')
@@ -785,7 +785,7 @@ def download_reservation_report(request, id):
     if not request.user.is_staff:
         return redirect("home")
 
-    qs = Reservation.objects.select_related('user', 'tour', 'tour__destination').filter(id=id)
+    qs = Reservation.objects.select_related('user', 'tour', 'tour__destination').filter(id=id, tour__country=get_country_from_site(request))
     r = get_object_or_404(qs, id=id)
 
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -795,11 +795,12 @@ def download_reservation_report(request, id):
 
 
 @login_required
+@require_POST
 def validate_reservation(request, id):
     if not request.user.is_staff:
         return redirect("home")
 
-    r = get_object_or_404(Reservation, id=id)
+    r = get_object_or_404(Reservation, id=id, tour__country=get_country_from_site(request))
     r.status = "booked"
     try:
         r.save()
@@ -811,11 +812,12 @@ def validate_reservation(request, id):
 
 
 @login_required
+@require_POST
 def reject_reservation(request, id):
     if not request.user.is_staff:
         return redirect("home")
 
-    r = get_object_or_404(Reservation, id=id)
+    r = get_object_or_404(Reservation, id=id, tour__country=get_country_from_site(request))
     r.status = "rejected"
     r.save()
     messages.error(request, "❌ Reservation rejected.")
@@ -823,11 +825,12 @@ def reject_reservation(request, id):
 
 
 @login_required
+@require_POST
 def mark_paid_reservation(request, id):
     if not request.user.is_staff:
         return redirect("home")
 
-    r = get_object_or_404(Reservation, id=id)
+    r = get_object_or_404(Reservation, id=id, tour__country=get_country_from_site(request))
 
     # ✅ allow manual marking for cash and transfer methods
     if (r.payment_method in ["cash", "transfer"]) and r.payment_status != "paid":
@@ -861,11 +864,12 @@ def stripe_webhook(request):
 
     return JsonResponse({"status": "ok"})
 @login_required
+@require_POST
 def admin_cancel_reservation(request, id):
     if not request.user.is_staff:
         return redirect("home")
 
-    r = get_object_or_404(Reservation, id=id)
+    r = get_object_or_404(Reservation, id=id, tour__country=get_country_from_site(request))
 
     # ✅ Admin can cancel ONLY booked + unpaid
     if r.status == "booked" and r.payment_status != "paid":

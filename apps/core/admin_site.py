@@ -1,5 +1,6 @@
 from django.contrib.admin import AdminSite
 from django.contrib.admin.apps import AdminConfig
+from django.urls import reverse
 
 
 class CountryAdminSite(AdminSite):
@@ -11,9 +12,12 @@ class CountryAdminSite(AdminSite):
         self.site_header = f'{country.title()} administration'
         self.site_title = self.site_header
         self.index_title = f'Manage {country.title()}'
+        self.site_url = f'/{country}/'
 
     def each_context(self, request):
-        return {**super().each_context(request), 'admin_country': self.country}
+        return {**super().each_context(request), 'admin_country': self.country,
+                'morocco_admin_url': reverse('admin:index', current_app='admin'),
+                'ireland_admin_url': reverse('ireland_admin:index')}
 
 
 class CountryAdminConfig(AdminConfig):

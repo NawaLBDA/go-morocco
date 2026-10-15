@@ -10,6 +10,12 @@
 .aligned input:not([type=checkbox]):not([type=radio]), .aligned select, .aligned textarea { max-width: 100%; box-sizing: border-box; }
 .inline-group { margin-top: 24px; border-radius: 10px; overflow: hidden; }
 .inline-related h3 { padding: 14px 12px; }
+.programme-note { padding: 16px 20px; border: 1px solid var(--hairline-color); background: var(--darkened-bg); }
+.programme-note ol { max-height: 240px; overflow-y: auto; padding-left: 24px; }
+.programme-note li, .programme-summary li { padding: 4px 0; }
+.programme-summary { margin: 4px 0; padding-left: 18px; }
+.aligned .file-upload { display: grid; gap: 8px; max-width: 100%; }
+.aligned .file-upload a { overflow-wrap: anywhere; }
 .departure-activities { display: grid; gap: .5rem; max-height: 280px; overflow: auto; padding: 12px; border: 1px solid var(--hairline-color); border-radius: 8px; min-width: min(280px, 100%); }
 .departure-activities label { float: none !important; width: auto !important; display: flex !important; align-items: center; gap: .6rem; padding: .35rem 0 !important; }
 .departure-activities input { flex-shrink: 0; }

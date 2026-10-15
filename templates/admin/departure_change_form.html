@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+{% block form_top %}
+{{ block.super }}
+{{ departure_tour_metadata|json_script:"departure-tour-data" }}
+<div class="module programme-note" data-current-tour="{{ departure_current_tour }}" id="departure-programme-note">
+  <p><strong>One itinerary, automatically applied to your dates.</strong> Day 1 uses the tour's Day 1 activities, Day 2 uses Day 2, and so on. Edit activities in <strong>Tour itinerary</strong>.</p>
+  {% if add %}<p>Choose the tour and start date. The end date is calculated automatically; you can shorten it. After saving, you can exclude individual days from this departure.</p>{% endif %}
+  <div id="departure-programme-preview" aria-live="polite"></div>
+</div>
+{% endblock %}

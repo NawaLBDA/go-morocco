@@ -1,7 +1,10 @@
 from decimal import Decimal, InvalidOperation
+from datetime import timedelta
 
 from django.contrib import admin
 from django import forms
+from django.db.models import Q
+from django.utils.html import format_html, format_html_join
 from .models import (
     Destination, DestinationImage,
     Tour, Reservation,
@@ -14,6 +17,7 @@ from .models import (
     TourActivity,
     TourItineraryLeg,
     TourDeparture, DepartureDay,
+    CountryContent,
 )
 from django.forms.models import BaseInlineFormSet
 
@@ -53,6 +57,7 @@ class TourActivityAdminForm(forms.ModelForm):
         model = TourActivity
         fields = '__all__'
         widgets = {
+            'description': forms.Textarea(attrs={'rows': 3, 'cols': 60}),
             'latitude': forms.HiddenInput(),
             'longitude': forms.HiddenInput(),
         }
@@ -189,19 +194,57 @@ class TourItineraryLegInlineFormSet(BaseInlineFormSet):
         return kwargs
 
 
+class CountryScopedAdmin(admin.ModelAdmin):
+    country_lookup = 'country'
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(**{self.country_lookup: self.admin_site.country})
+
+    def get_form(self, request, obj=None, **kwargs):
+        base_form = super().get_form(request, obj, **kwargs)
+        if self.country_lookup != 'country':
+            return base_form
+        country = self.admin_site.country
+        class SiteForm(base_form):
+            def __init__(self, *args, **form_kwargs):
+                super().__init__(*args, **form_kwargs)
+                if self.instance._state.adding:
+                    self.instance.country = country
+        return SiteForm
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        if self.country_lookup == 'country' and 'country' not in fields:
+            fields.append('country')
+        return fields
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        model = db_field.remote_field.model
+        if model in (Destination, Tour):
+            kwargs['queryset'] = model.objects.filter(country=self.admin_site.country)
+        elif model == TourDeparture:
+            kwargs['queryset'] = model.objects.filter(tour__country=self.admin_site.country)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        if self.country_lookup == 'country':
+            obj.country = self.admin_site.country
+        return super().save_model(request, obj, form, change)
+
+
 class DestinationImageInline(admin.TabularInline):
     model = DestinationImage
     extra = 3
 
 
 @admin.register(Destination)
-class DestinationAdmin(admin.ModelAdmin):
+class DestinationAdmin(CountryScopedAdmin):
     list_display = ('name',)
     inlines = [DestinationImageInline]
 
 
 @admin.register(Information)
-class InformationAdmin(admin.ModelAdmin):
+class InformationAdmin(CountryScopedAdmin):
     list_display = ('title', 'country', 'created_at')
     search_fields = ('title', 'content')
     list_filter = ('country',)
@@ -215,6 +258,7 @@ class ChatMessageAdmin(admin.ModelAdmin):
 
 
 class TourExtraActivityInline(admin.StackedInline):
+    classes = ('collapse',)
     model = TourExtraActivity
     form = TourExtraActivityAdminForm
     extra = 1
@@ -250,6 +294,7 @@ class TourActivityInline(admin.StackedInline):
 
 
 class TourItineraryLegInline(admin.TabularInline):
+    classes = ('collapse',)
     model = TourItineraryLeg
     form = TourItineraryLegAdminForm
     formset = TourItineraryLegInlineFormSet
@@ -276,13 +321,34 @@ class TourDepartureFormSet(BaseInlineFormSet):
                 raise forms.ValidationError(f'Departures must be at most {self.instance.max_days} days. Increase the tour maximum first.')
 
 
+class TourDepartureAdminForm(forms.ModelForm):
+    end_date = forms.DateField(required=False, widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+        help_text='Calculated from the start date and the tour maximum. You may shorten the period, including to one day.')
+
+    class Meta:
+        model = TourDeparture
+        fields = '__all__'
+        widgets = {'start_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'})}
+
+    class Media:
+        js = ('admin/js/departure_dates.js',)
+
+    def clean(self):
+        data = super().clean()
+        tour = data.get('tour') or (self.instance.tour if self.instance.tour_id else None)
+        if data.get('start_date') and not data.get('end_date') and tour:
+            data['end_date'] = data['start_date'] + timedelta(days=tour.max_days - 1)
+        return data
+
+
 class TourDepartureInline(admin.TabularInline):
     model = TourDeparture
+    form = TourDepartureAdminForm
     formset = TourDepartureFormSet
     extra = 0
     show_change_link = True
     fields = ('start_date', 'end_date', 'is_published')
-    verbose_name_plural = 'Scheduled departures — save, then open a departure to choose its daily activities'
+    verbose_name_plural = 'Scheduled departures — programme generated from the numbered tour itinerary'
 
 
 class DepartureDayForm(forms.ModelForm):
@@ -293,6 +359,8 @@ class DepartureDayForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         departure_tour_id = kwargs.pop('departure_tour_id', None)
         super().__init__(*args, **kwargs)
+        if 'activities' not in self.fields:
+            return
         if departure_tour_id or self.instance.departure_id:
             tour_id = departure_tour_id or self.instance.departure.tour_id
             self.fields['activities'].queryset = TourActivity.objects.filter(tour_id=tour_id)
@@ -308,6 +376,17 @@ class DepartureDayForm(forms.ModelForm):
 
 
 class DepartureDayFormSet(BaseInlineFormSet):
+    auto_programme = False
+
+    def total_form_count(self):
+        count = super().total_form_count()
+        if (self.auto_programme and self.is_bound and self.instance.pk
+                and self.instance.start_date and self.instance.end_date):
+            # Parent dates are validated first. Ignore trailing rows removed by a
+            # shorter departure; TourDeparture.sync_programme prunes them on save.
+            count = min(count, self.get_queryset().filter(day_number__lte=self.instance.duration_days).count())
+        return count
+
     def get_form_kwargs(self, index):
         kwargs = super().get_form_kwargs(index)
         kwargs['departure_tour_id'] = self.instance.tour_id
@@ -332,16 +411,37 @@ class DepartureDayFormSet(BaseInlineFormSet):
                 raise forms.ValidationError('This departure is already reserved. Create a new departure to change its programme.')
 
 
-class DepartureDayInline(admin.StackedInline):
+class DepartureDayInline(admin.TabularInline):
     model = DepartureDay
     form = DepartureDayForm
     formset = DepartureDayFormSet
     extra = 0
-    filter_horizontal = ('activities',)
-    fields = ('day_number', 'title', 'is_visible', 'activities')
+    can_delete = False
+    readonly_fields = ('day_number', 'calendar_date', 'planned_activities')
+    fields = ('day_number', 'calendar_date', 'planned_activities', 'is_visible')
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        formset.auto_programme = True
+        return formset
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description='Date')
+    def calendar_date(self, obj):
+        return obj.departure.start_date + timedelta(days=obj.day_number - 1)
+
+    @admin.display(description='Activities from Tour itinerary')
+    def planned_activities(self, obj):
+        activities = obj.activities.all()
+        if not activities:
+            return 'No activities yet. Add them to this day in the tour itinerary.'
+        return format_html('<ul class="programme-summary">{}</ul>', format_html_join('', '<li>{} {}</li>',
+            ((activity.start_time.strftime('%H:%M') if activity.start_time else '', activity.title) for activity in activities)))
 
 
-class GuideScheduleAdmin(admin.ModelAdmin):
+class GuideScheduleAdmin(CountryScopedAdmin):
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         if request.method == 'POST':
             from apps.reservations.availability import lock_guide_calendar
@@ -352,9 +452,31 @@ class GuideScheduleAdmin(admin.ModelAdmin):
 
 @admin.register(TourDeparture)
 class TourDepartureAdmin(GuideScheduleAdmin):
+    country_lookup = 'tour__country'
+    form = TourDepartureAdminForm
+    change_form_template = 'admin/departure_change_form.html'
+    fields = ('tour', 'start_date', 'end_date', 'is_published')
     list_display = ('tour', 'start_date', 'end_date', 'active_days', 'is_published')
-    list_filter = ('is_published', 'tour')
+    list_filter = ('is_published', ('tour', admin.RelatedOnlyFieldListFilter))
     inlines = [DepartureDayInline]
+
+    def get_inlines(self, request, obj=None):
+        return self.inlines if obj else []
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        data = {}
+        for tour in Tour.objects.filter(country=self.admin_site.country).prefetch_related('activity_cards'):
+            programme = {}
+            for activity in tour.activity_cards.all():
+                if activity.is_active:
+                    programme.setdefault(str(activity.day_number), []).append(activity.title)
+            data[str(tour.pk)] = {'days': tour.max_days, 'programme': programme}
+        return super().changeform_view(request, object_id, form_url,
+            {**(extra_context or {}), 'departure_tour_metadata': data})
+
+    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+        context['departure_current_tour'] = obj.tour_id if obj else ''
+        return super().render_change_form(request, context, add, change, form_url, obj)
 
     def get_readonly_fields(self, request, obj=None):
         return ('tour',) if obj else ()
@@ -363,9 +485,20 @@ class TourDepartureAdmin(GuideScheduleAdmin):
 @admin.register(Tour)
 class TourAdmin(GuideScheduleAdmin):
     list_display = ('title', 'destination', 'price_per_night', 'is_promotion', 'discount_percent')
-    list_filter = ('destination', 'is_promotion')
+    list_filter = (('destination', admin.RelatedOnlyFieldListFilter), 'is_promotion')
     search_fields = ('title', 'description', 'transport', 'hotel', 'activities', 'included', 'not_included')
     inlines = [TourActivityInline, TourItineraryLegInline, TourExtraActivityInline, TourDepartureInline]
+    fieldsets = (
+        ('Tour essentials', {'fields': ('country', 'title', 'destination', 'image', 'description', 'price_per_night', 'max_days')}),
+        ('What is included', {'fields': ('included', 'not_included', 'activities'), 'classes': ('collapse',)}),
+        ('Transport and accommodation', {'fields': ('transport', 'transport_price_per_night', 'hotel', 'hotel_price_per_night'), 'classes': ('collapse',)}),
+        ('Promotion and address', {'fields': ('is_promotion', 'discount_percent', 'slug'), 'classes': ('collapse',)}),
+    )
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        for departure in form.instance.departures.all():
+            departure.sync_programme()
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
@@ -379,7 +512,8 @@ class TourAdmin(GuideScheduleAdmin):
 
 
 @admin.register(Reservation)
-class ReservationAdmin(admin.ModelAdmin):
+class ReservationAdmin(CountryScopedAdmin):
+    country_lookup = 'tour__country'
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         # Keep ModelForm validation and persistence under the same calendar lock.
         # This also gives the Django admin a normal form error on a conflict.
@@ -405,7 +539,7 @@ class ReservationAdmin(admin.ModelAdmin):
 
 
 @admin.register(Section)
-class SectionAdmin(admin.ModelAdmin):
+class SectionAdmin(CountryScopedAdmin):
     list_display = ('title', 'slug', 'order', 'show_in_nav')
     prepopulated_fields = {'slug': ('title',)}
 
@@ -416,18 +550,34 @@ class BlogImageInline(admin.TabularInline):
 
 
 @admin.register(BlogPost)
-class BlogPostAdmin(admin.ModelAdmin):
+class BlogPostAdmin(CountryScopedAdmin):
     list_display = ('title', 'created_at')
     prepopulated_fields = {'slug': ('title',)}
     inlines = [BlogImageInline]
 
 
 @admin.register(Promotion)
-class PromotionAdmin(admin.ModelAdmin):
+class PromotionAdmin(CountryScopedAdmin):
     list_display = ('name', 'percent', 'active', 'apply_to_all')
 
 
 @admin.register(ContactMessage)
-class ContactMessageAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'subject', 'created_at')
+class ContactMessageAdmin(CountryScopedAdmin):
+    list_display = ('name', 'email', 'subject', 'message_site', 'created_at')
     readonly_fields = ('created_at',)
+
+    def get_queryset(self, request):
+        # Historical messages did not record their website; do not assign them by guesswork.
+        return admin.ModelAdmin.get_queryset(self, request).filter(Q(country=self.admin_site.country) | Q(country=''))
+
+    @admin.display(description='Website')
+    def message_site(self, obj):
+        return obj.country.title() if obj.country else 'Unassigned legacy message'
+
+
+@admin.register(CountryContent)
+class CountryContentAdmin(CountryScopedAdmin):
+    list_display = ('country', 'hero_title')
+
+    def has_add_permission(self, request):
+        return super().has_add_permission(request) and not self.get_queryset(request).exists()

@@ -5,7 +5,7 @@
 {% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/country_admin.css' %}">{% endblock %}
 {% block nav-global %}
 <nav class="admin-country-switch" aria-label="Administration website">
-  <a href="{% url 'admin:index' %}" {% if admin_country == 'morocco' %}aria-current="page"{% endif %}>Morocco</a>
-  <a href="{% url 'ireland_admin:index' %}" {% if admin_country == 'ireland' %}aria-current="page"{% endif %}>Ireland</a>
+  <a href="{{ morocco_admin_url }}" {% if admin_country == 'morocco' %}aria-current="page"{% endif %}>Morocco</a>
+  <a href="{{ ireland_admin_url }}" {% if admin_country == 'ireland' %}aria-current="page"{% endif %}>Ireland</a>
 </nav>
 {% endblock %}

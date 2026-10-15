@@ -4,13 +4,13 @@ Le visiteur choisit un départ publié. Il ne saisit plus librement les dates de
 
 ## Configurer un tour
 
-1. Dans `/admin/`, ouvrir **Tours**, puis le tour concerné.
+1. Dans `/admin/` (Maroc), ouvrir **Tours**, puis le tour concerné. L'Irlande possède son espace séparé `/ireland-admin/`, accessible par le bouton **Ireland**.
 2. Renseigner le **prix par personne et par jour**.
 3. Régler **Maximum days per departure** : 5 par défaut, modifiable à 6, 19 ou une autre durée. Les dates de début et de fin sont incluses dans cette limite.
 4. Ajouter les activités dans **Tour itinerary**, avec leurs descriptions, lieux, horaires et images. Elles constituent la liste d'activités disponibles pour ce tour.
-5. Dans **Scheduled departures**, ajouter les dates de début et de fin. Pour une seule journée, saisir la même date dans les deux champs. Enregistrer d'abord le départ comme brouillon.
-6. Ouvrir le lien du départ enregistré, ou passer par **Tour departures** dans l'admin. Une ligne de programme est créée pour chaque date, initialement remplie avec les activités du même jour du tour.
-7. Pour chaque jour, sélectionner les activités et éventuellement un titre. Décocher **Include this day** pour retirer ce jour du séjour, de la durée facturée et du prix.
+5. Dans **Scheduled departures** ou **Tour departures**, choisir le tour et la date de début. La fin est calculée automatiquement : début le 10 avec un maximum de 5 jours → fin le 14. Vous pouvez raccourcir la période ; pour une seule journée, saisir la même date dans les deux champs.
+6. Le programme est généré automatiquement depuis **Tour itinerary** : les activités numérotées 1 sont affectées à la date de début, celles numérotées 2 au lendemain, etc. Il n'y a plus de journées ni d'activités à ressaisir dans le départ.
+7. Après enregistrement, ouvrir le départ pour consulter son tableau de journées. Décocher **Include this day** pour retirer ce jour du séjour, de la durée facturée et du prix. Pour changer les activités, modifier **Tour itinerary** du tour : les départs sans réservation sont synchronisés à l'enregistrement.
 8. Cocher **Is published** et enregistrer. Au moins un jour doit être inclus. Le départ apparaît alors sur la page publique du tour s'il n'est pas passé.
 
 Les départs ne sont pas récurrents : chaque plage possède des dates complètes (jour, mois, année). Ajouter plusieurs départs pour proposer plusieurs périodes et programmes.
@@ -30,5 +30,9 @@ La migration `0032` ajoute les réglages et les départs. Elle ne crée pas de d
 
 En local : `python manage.py migrate`, puis `python manage.py runserver`.
 Le démarrage Render configuré dans le dépôt exécute déjà les migrations.
+
+La migration `0033` sépare également les destinations et promotions par site. Une destination auparavant partagée reçoit deux fiches indépendantes, en conservant les images. Les anciens messages de contact sans site enregistré restent explicitement marqués **Unassigned legacy message** ; les nouveaux messages sont rattachés à leur site. Les comptes utilisateurs restent communs aux deux administrations.
+
+La page **Admin Reservations** ne montre et n'exporte que les réservations du site courant. Ses actions utilisent des icônes avec infobulles : crayon (modifier), coche (valider), croix (rejeter), billet (paiement reçu), interdiction (annuler), corbeille (supprimer avec confirmation).
 
 Les réservations antérieures conservent leurs prix et leur mode de calcul historiques. Le site Irlande conserve son fonctionnement de réservation existant.
