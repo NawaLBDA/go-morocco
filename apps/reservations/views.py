@@ -644,7 +644,7 @@ def admin_reservations(request):
         return redirect("home")
 
     reservations_qs = Reservation.objects.select_related(
-        'user',
+        'user', 'user__profile',
         'tour',
         'tour__destination',
     ).filter(tour__country=get_country_from_site(request)).order_by("-created_at")

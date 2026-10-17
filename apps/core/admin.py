@@ -11,7 +11,7 @@ from .models import (
     Section,
     BlogPost, BlogImage,
     Promotion,
-    ContactMessage,
+    ContactMessage, ContactEmailSettings,
     Information, ChatMessage,
     TourExtraActivity,
     TourActivity,
@@ -573,6 +573,28 @@ class ContactMessageAdmin(CountryScopedAdmin):
     @admin.display(description='Website')
     def message_site(self, obj):
         return obj.country.title() if obj.country else 'Unassigned legacy message'
+
+
+@admin.register(ContactEmailSettings)
+class ContactEmailSettingsAdmin(CountryScopedAdmin):
+    list_display = ('country', 'recipient_email')
+    fields = ('country', 'recipient_email', 'outgoing_email_status')
+    readonly_fields = ('outgoing_email_status',)
+
+    @admin.display(description='Outgoing email')
+    def outgoing_email_status(self, obj):
+        from django.conf import settings
+        if settings.EMAIL_BACKEND in (
+            'django.core.mail.backends.console.EmailBackend',
+            'django.core.mail.backends.locmem.EmailBackend',
+            'django.core.mail.backends.dummy.EmailBackend',
+            'django.core.mail.backends.filebased.EmailBackend',
+        ):
+            return 'Email delivery is disabled: configure an outgoing email provider on the server. Contact messages are still saved in admin.'
+        return 'Delivery uses the server email provider. Set a verified DEFAULT_FROM_EMAIL sender; changing the recipient does not change the sender.'
+
+    def has_add_permission(self, request):
+        return super().has_add_permission(request) and not self.get_queryset(request).exists()
 
 
 @admin.register(CountryContent)

@@ -98,6 +98,18 @@ class BlogComment(models.Model):
 # =========================
 # Contact
 # =========================
+class ContactEmailSettings(models.Model):
+    country = models.CharField(max_length=50, unique=True, default='morocco')
+    recipient_email = models.EmailField(help_text='Contact form notifications are sent to this address. Outgoing email must also be configured on the server.')
+
+    class Meta:
+        verbose_name = 'Contact email settings'
+        verbose_name_plural = 'Contact email settings'
+
+    def __str__(self):
+        return f'{self.country.title()} contact email'
+
+
 class ContactMessage(models.Model):
     country = models.CharField(max_length=50, blank=True, default='')
     name = models.CharField(max_length=150)

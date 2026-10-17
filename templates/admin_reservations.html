@@ -42,7 +42,8 @@
                        onclick="document.querySelectorAll('input[name=reservation_ids]').forEach(cb => cb.checked = this.checked);">
               </th>
               <th style="width:90px">#</th>
-              <th>User</th>
+              <th>Full name / Account</th>
+              <th>Phone</th>
               <th>Tour</th>
               <th>Dates</th>
               <th>Total</th>
@@ -60,8 +61,10 @@
               </td>
               <td>{{ r.id }}</td>
               <td>
-                <div>{{ r.user.username }}</div>
+                <div>{{ r.user.get_full_name|default:r.user.username }}</div>
+                <div class="text-muted small">{{ r.user.username }}</div>
               </td>
+              <td class="text-nowrap">{{ r.user.profile.phone|default:'Not provided' }}</td>
               <td>
                 <div>{{ r.tour.title }}</div>
               </td>
@@ -108,8 +111,10 @@
                     data-include_transport="{{ r.include_transport|yesno:'1,0' }}"
                     data-include_hotel="{{ r.include_hotel|yesno:'1,0' }}"
                     data-booking_for_other="{{ r.booking_for_other|yesno:'1,0' }}"
-                    data-guest_full_name="{{ r.guest_full_name|default_if_none:''|escape }}"
-                    data-guest_phone="{{ r.guest_phone|default_if_none:''|escape }}"
+                    data-account_name="{{ r.user.get_full_name|default:r.user.username|escape }}"
+                    data-account_phone="{{ r.user.profile.phone|default:''|escape }}"
+                    data-guest_full_name="{% if r.guest_full_name %}{{ r.guest_full_name|escape }}{% elif not r.booking_for_other %}{{ r.user.get_full_name|default:r.user.username|escape }}{% endif %}"
+                    data-guest_phone="{% if r.guest_phone %}{{ r.guest_phone|escape }}{% elif not r.booking_for_other %}{{ r.user.profile.phone|default:''|escape }}{% endif %}"
                     data-admin_note="{{ r.admin_note|default_if_none:''|escape }}"
                   >
                     <i class="fa-solid fa-pen" aria-hidden="true"></i>
@@ -145,7 +150,7 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="9" class="text-center text-muted py-5">No reservations found.</td>
+              <td colspan="10" class="text-center text-muted py-5">No reservations found.</td>
             </tr>
           {% endfor %}
           </tbody>
@@ -233,11 +238,15 @@
             </div>
 
             <div class="col-md-6">
-              <label class="form-label">Guest full name</label>
+              <label class="form-label" for="editAccountName">Account holder full name</label>
+              <input class="form-control mb-3" id="editAccountName" readonly>
+              <label class="form-label" for="editGuestFullName">Guest full name</label>
               <input type="text" class="form-control" name="guest_full_name" id="editGuestFullName">
             </div>
             <div class="col-md-6">
-              <label class="form-label">Guest phone</label>
+              <label class="form-label" for="editAccountPhone">Account holder phone</label>
+              <input class="form-control mb-3" id="editAccountPhone" readonly>
+              <label class="form-label" for="editGuestPhone">Guest phone</label>
               <input type="text" class="form-control" name="guest_phone" id="editGuestPhone">
             </div>
 
@@ -287,6 +296,8 @@
       document.getElementById('editIncludeHotel').checked = (button.getAttribute('data-include_hotel') === '1');
       document.getElementById('editBookingForOther').checked = (button.getAttribute('data-booking_for_other') === '1');
 
+      document.getElementById('editAccountName').value = button.getAttribute('data-account_name') || '';
+      document.getElementById('editAccountPhone').value = button.getAttribute('data-account_phone') || '';
       document.getElementById('editGuestFullName').value = button.getAttribute('data-guest_full_name') || '';
       document.getElementById('editGuestPhone').value = button.getAttribute('data-guest_phone') || '';
       document.getElementById('editAdminNote').value = button.getAttribute('data-admin_note') || '';

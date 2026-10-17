@@ -3683,27 +3683,17 @@ def about(request):
 
 
 def contact(request):
-    if get_country_from_site(request) == 'morocco':
-        from .forms import ContactInquiryForm
-        form = ContactInquiryForm(request.POST if request.method == 'POST' else None)
-        if request.method == 'POST' and form.is_valid():
-            enquiry = form.save(commit=False)
-            enquiry.country = 'morocco'
-            enquiry.save()
-            messages.success(request, 'Your message has been sent successfully!')
-            return redirect('contact')
-        return render(request, 'contact.html', {'contact_form': form})
-    if request.method == 'POST':
-        ContactMessage.objects.create(
-            country=get_country_from_site(request),
-            name=request.POST.get('name'),
-            email=request.POST.get('email'),
-            subject=request.POST.get('subject', ''),
-            message=request.POST.get('message')
-        )
-        messages.success(request, '✅ Your message has been sent successfully!')
+    from .forms import ContactInquiryForm
+    from .contact_email import notify_contact
+    form = ContactInquiryForm(request.POST if request.method == 'POST' else None)
+    if request.method == 'POST' and form.is_valid():
+        enquiry = form.save(commit=False)
+        enquiry.country = get_country_from_site(request)
+        enquiry.save()
+        notify_contact(enquiry)
+        messages.success(request, 'Your message has been received successfully!')
         return redirect('contact')
-    return render(request, 'contact.html')
+    return render(request, 'contact.html', {'contact_form': form})
 
 
 def reservations(request):
