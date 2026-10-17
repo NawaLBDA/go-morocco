@@ -15,3 +15,5 @@ twilio
 openai
 huggingface-hub
 requests
+
+openpyxl==3.1.5

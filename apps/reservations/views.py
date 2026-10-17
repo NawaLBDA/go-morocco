@@ -6,6 +6,9 @@ import stripe
 from datetime import datetime, timedelta, date
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
+from django.core.paginator import Paginator
+from .excel import reservations_excel
 from django.core.exceptions import ValidationError
 from django.views.decorators.cache import never_cache
 from .availability import active_reservations, UNAVAILABLE_MESSAGE
@@ -649,6 +652,21 @@ def admin_reservations(request):
         'tour__destination',
     ).filter(tour__country=get_country_from_site(request)).order_by("-created_at")
 
+    query = (request.GET.get('q') or request.POST.get('q') or '').strip()
+    if query:
+        matching = (Q(user__first_name__icontains=query) | Q(user__last_name__icontains=query)
+                    | Q(user__username__icontains=query) | Q(user__email__icontains=query)
+                    | Q(user__profile__phone__icontains=query) | Q(tour__title__icontains=query)
+                    | Q(tour__destination__name__icontains=query) | Q(status__icontains=query)
+                    | Q(guest_full_name__icontains=query) | Q(guest_phone__icontains=query))
+        full_name = Q()
+        for word in query.split():
+            full_name &= Q(user__first_name__icontains=word) | Q(user__last_name__icontains=word)
+        matching |= full_name
+        if query.isdigit():
+            matching |= Q(pk=int(query))
+        reservations_qs = reservations_qs.filter(matching)
+
     if request.method == 'POST':
         action = (request.POST.get('action') or '').strip()
         selected_ids = request.POST.getlist('reservation_ids')
@@ -667,14 +685,17 @@ def admin_reservations(request):
 
         if action == 'download_report':
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f'reservations_report_{ts}.csv'
-            return _reservations_to_csv_response(selected_qs, filename)
+            filename = f'reservations_report_{ts}.xlsx'
+            return reservations_excel(selected_qs, filename)
 
         messages.info(request, 'Choose an action to apply.')
         return redirect('admin_reservations')
 
+    page = Paginator(reservations_qs, 7).get_page(request.GET.get('page'))
     return render(request, "admin_reservations.html", {
-        "reservations": reservations_qs,
+        "reservations": page,
+        "page_obj": page,
+        "search_query": query,
         "reservations_count": reservations_qs.count(),
     })
 
@@ -717,13 +738,13 @@ def admin_update_reservation(request, id):
     if payment_status not in {c[0] for c in Reservation.PAYMENT_STATUS}:
         payment_status = r.payment_status
 
-    full_package = _bool_from_post(request.POST.get('full_package'))
-    include_transport = _bool_from_post(request.POST.get('include_transport'))
-    include_hotel = _bool_from_post(request.POST.get('include_hotel'))
-    booking_for_other = _bool_from_post(request.POST.get('booking_for_other'))
+    full_package = r.full_package
+    include_transport = r.include_transport
+    include_hotel = r.include_hotel
+    booking_for_other = r.booking_for_other
 
-    guest_full_name = (request.POST.get('guest_full_name') or '').strip()
-    guest_phone = (request.POST.get('guest_phone') or '').strip()
+    guest_full_name = (request.POST.get('guest_full_name', r.guest_full_name) or '').strip()
+    guest_phone = (request.POST.get('guest_phone', r.guest_phone) or '').strip()
     admin_note = (request.POST.get('admin_note') or '').strip()
 
     total, base_price, transport_add, hotel_add, extras_total = _recalculate_total_for_reservation(
@@ -793,8 +814,8 @@ def download_reservation_report(request, id):
 
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f'reservation_{r.id}_report_{ts}.xlsx'
-    filename = f'reservation_{r.id}_report_{ts}.csv'
-    return _reservations_to_csv_response(qs, filename)
+    filename = f'reservation_{r.id}_report_{ts}.xlsx'
+    return reservations_excel(qs, filename)
 
 
 @login_required
