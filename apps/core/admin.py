@@ -11,7 +11,7 @@ from .models import (
     Section,
     BlogPost, BlogImage,
     Promotion,
-    ContactMessage, ContactEmailSettings,
+    ContactMessage, ContactEmailSettings, BookingNotificationSettings, BookingNotification,
     Information, ChatMessage,
     TourExtraActivity,
     TourActivity,
@@ -303,7 +303,7 @@ class TourItineraryLegInline(admin.TabularInline):
     verbose_name_plural = "Itinerary route segments"
     fields = (
         'from_activity', 'to_activity', 'distance_label',
-        'transport_mode', 'transport_label', 'display_order', 'is_active',
+        'display_order', 'is_active',
     )
 
 
@@ -486,12 +486,11 @@ class TourDepartureAdmin(GuideScheduleAdmin):
 class TourAdmin(GuideScheduleAdmin):
     list_display = ('title', 'destination', 'price_per_night', 'is_promotion', 'discount_percent')
     list_filter = (('destination', admin.RelatedOnlyFieldListFilter), 'is_promotion')
-    search_fields = ('title', 'description', 'transport', 'hotel', 'activities', 'included', 'not_included')
+    search_fields = ('title', 'description', 'activities', 'included', 'not_included')
     inlines = [TourActivityInline, TourItineraryLegInline, TourExtraActivityInline, TourDepartureInline]
     fieldsets = (
         ('Tour essentials', {'fields': ('country', 'title', 'destination', 'image', 'description', 'price_per_night', 'max_days')}),
         ('What is included', {'fields': ('included', 'not_included', 'activities'), 'classes': ('collapse',)}),
-        ('Transport and accommodation', {'fields': ('transport', 'transport_price_per_night', 'hotel', 'hotel_price_per_night'), 'classes': ('collapse',)}),
         ('Promotion and address', {'fields': ('is_promotion', 'discount_percent', 'slug'), 'classes': ('collapse',)}),
     )
 
@@ -505,9 +504,6 @@ class TourAdmin(GuideScheduleAdmin):
         if obj is None or obj.country == 'morocco':
             form.base_fields['price_per_night'].label = 'Price per person / day'
             form.base_fields['max_days'].label = 'Maximum days per departure'
-            for name in ('transport_price_per_night', 'hotel_price_per_night'):
-                form.base_fields[name].label = name.replace('_price_per_night', '').title() + ' price per person / day'
-                form.base_fields[name].help_text = 'Optional add-on price per included day per person.'
         return form
 
 
@@ -515,6 +511,7 @@ class TourAdmin(GuideScheduleAdmin):
 class ReservationAdmin(CountryScopedAdmin):
     country_lookup = 'tour__country'
     readonly_fields = ('account_deaf_status',)
+    exclude = ('full_package', 'include_transport', 'include_hotel', 'transport_price_per_night', 'hotel_price_per_night')
 
     @admin.display(description='Deaf (account holder)')
     def account_deaf_status(self, obj):
@@ -537,7 +534,6 @@ class ReservationAdmin(CountryScopedAdmin):
     list_display = (
         'tour', 'user', 'account_deaf_status', 'num_persons',
         'start_date', 'end_date',
-        'full_package', 'include_transport', 'include_hotel',
         'extras_total',
         'total_price', 'status',
         'payment_method', 'payment_status',
@@ -547,7 +543,6 @@ class ReservationAdmin(CountryScopedAdmin):
     search_fields = ('user__username', 'user__email', 'tour__title', 'guest_full_name', 'guest_phone')
 
 
-@admin.register(Section)
 class SectionAdmin(CountryScopedAdmin):
     list_display = ('title', 'slug', 'order', 'show_in_nav')
     prepopulated_fields = {'slug': ('title',)}
@@ -606,9 +601,40 @@ class ContactEmailSettingsAdmin(CountryScopedAdmin):
         return super().has_add_permission(request) and not self.get_queryset(request).exists()
 
 
-@admin.register(CountryContent)
 class CountryContentAdmin(CountryScopedAdmin):
     list_display = ('country', 'hero_title')
 
     def has_add_permission(self, request):
         return super().has_add_permission(request) and not self.get_queryset(request).exists()
+
+
+@admin.register(BookingNotificationSettings)
+class BookingNotificationSettingsAdmin(CountryScopedAdmin):
+    list_display = ('country',)
+    fields = ('country', 'email_recipients', 'whatsapp_recipients', 'whatsapp_content_sid', 'server_configuration')
+    readonly_fields = ('server_configuration',)
+
+    @admin.display(description='Server configuration')
+    def server_configuration(self, obj):
+        from django.conf import settings
+        whatsapp_ready = all([settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN, settings.TWILIO_WHATSAPP_FROM])
+        return f'Email backend: {settings.EMAIL_BACKEND}. WhatsApp server credentials: {"configured" if whatsapp_ready else "missing"}. Provider acceptance does not confirm delivery; check Booking notifications for each attempt.'
+    def has_add_permission(self, request):
+        return super().has_add_permission(request) and not self.get_queryset(request).exists()
+
+
+@admin.register(BookingNotification)
+class BookingNotificationAdmin(CountryScopedAdmin):
+    country_lookup = 'reservation__tour__country'
+    list_display = ('reservation', 'channel', 'recipient', 'status', 'created_at')
+    list_filter = ('channel', 'status')
+    readonly_fields = ('reservation', 'channel', 'recipient', 'status', 'error', 'provider_reference', 'created_at')
+    actions = ('retry_notifications',)
+    def has_add_permission(self, request):
+        return False
+    @admin.action(description='Retry pending or failed notifications')
+    def retry_notifications(self, request, queryset):
+        from apps.reservations.notifications import deliver_notification
+        for notice in queryset.filter(status__in=['pending', 'failed']):
+            deliver_notification(notice.pk)
+        self.message_user(request, 'Notification attempts finished. Review each status and error.')

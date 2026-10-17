@@ -2,6 +2,17 @@
 {% load widget_tweaks %}
 {% block page %}auth{% endblock %}
 
+{% block extra_head %}
+<style>
+.deaf-toggle-row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 14px; border:1px solid #d9e3e5; border-radius:12px; }
+.deaf-toggle-row label { margin:0!important; }
+.auth-card #register-is-deaf { appearance:none; -webkit-appearance:none; position:relative; float:none; flex:0 0 46px; width:46px!important; height:26px!important; min-height:0; padding:0!important; margin:0!important; border:0; border-radius:20px; background:#85949b; cursor:pointer; }
+.auth-card #register-is-deaf::after { content:''; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:white; transition:transform .15s; }
+.auth-card #register-is-deaf:checked { background:#23796d; }
+.auth-card #register-is-deaf:checked::after { transform:translateX(20px); }
+.auth-card #register-is-deaf:focus-visible { outline:3px solid #b4dcd6; outline-offset:3px; }
+</style>
+{% endblock %}
 {% block content %}
 <section class="auth-hero">
   <div class="auth-overlay"></div>
@@ -87,10 +98,9 @@
               <input type="text" name="postal_code" class="form-control" required>
             </div>
 
-            <div class="form-check mb-3">
-              <input type="checkbox" name="is_deaf" id="register-is-deaf" class="form-check-input" {% if request.POST.is_deaf == 'on' %}checked{% endif %} aria-describedby="deaf-help">
-              <label class="form-check-label" for="register-is-deaf">I am Deaf (optional)</label>
-              <div id="deaf-help" class="form-text">Share this with the guide to help prepare communication for your tour.</div>
+            <div class="deaf-toggle-row mb-3">
+              <label for="register-is-deaf">Deaf <span class="text-muted small">(optional)</span></label>
+              <input type="checkbox" role="switch" name="is_deaf" id="register-is-deaf" {% if request.POST.is_deaf == 'on' %}checked{% endif %}>
             </div>
 
             <!-- PASSWORD -->

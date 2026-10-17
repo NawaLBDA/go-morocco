@@ -27,7 +27,7 @@ class RegistrationAccessibilityTests(TestCase):
         data['password2'] = 'different'
         response = self.client.post('/morocco/register/', data)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'class="form-check-input" checked')
+        self.assertContains(response, 'id="register-is-deaf" checked')
         self.assertFalse(User.objects.filter(username='traveler').exists())
 
     def test_admin_sees_account_status_even_for_another_guest(self):

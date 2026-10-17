@@ -436,7 +436,9 @@ def _hf_router_chat_completion_full_text(
             err = r.json()
         except Exception:
             err = {'error': r.text}
-        raise RuntimeError(f"HF router error {r.status_code}: {err}")
+        error = RuntimeError("Hugging Face request rejected")
+        error.status_code = r.status_code
+        raise error
     data = r.json() or {}
     try:
         return str(data['choices'][0]['message']['content'] or '').strip()
@@ -473,13 +475,15 @@ def _hf_router_chat_completion_stream(
         'stream': True,
     }
 
-    with requests.post(url, headers=headers, json=payload, stream=True, timeout=(10, 120)) as r:
+    with requests.post(url, headers=headers, json=payload, stream=True, timeout=(5, 20)) as r:
         if r.status_code >= 400:
             try:
                 err = r.json()
             except Exception:
                 err = {'error': r.text}
-            raise RuntimeError(f"HF router error {r.status_code}: {err}")
+            error = RuntimeError("Hugging Face request rejected")
+            error.status_code = r.status_code
+            raise error
 
         for raw_line in r.iter_lines(decode_unicode=True):
             if not raw_line:
@@ -1369,17 +1373,6 @@ def ai_chat_stream(request):
     def event_stream():
         full_text_parts: list[str] = []
 
-        llm_available = bool(getattr(settings, 'HF_API_TOKEN', '') or getattr(settings, 'OPENAI_API_KEY', ''))
-        if not llm_available:
-            # Requirement: do not serve canned/deterministic replies when no model is configured.
-            msg = (
-                "Assistant IA non configuré pour le moment (clé modèle manquante). Réessaie plus tard."
-                if lang == 'fr' else
-                "AI assistant is not configured right now (missing model key). Please try again later."
-            )
-            yield _sse_pack({'type': 'final', 'text': msg, 'action': action or {}, 'model': None})
-            return
-
         if getattr(settings, 'CHAT_DEBUG', False):
             yield _sse_pack({
                 'type': 'debug',
@@ -1390,114 +1383,17 @@ def ai_chat_stream(request):
                 'session_memory': session_memory,
             })
 
-        # We always prefer the model for responses (no canned replies).
-
-        # Prefer HuggingFace streaming when configured.
-        used_model = None
+        from .assistant_service import stream_answer, unavailable_answer
+        used_model = 'configured-provider'
         try:
-            if settings.HF_API_TOKEN:
-                hf_model = getattr(settings, 'HF_MODEL', None) or 'Qwen/Qwen2.5-7B-Instruct:fastest'
-                hf_fallback = getattr(settings, 'HF_FALLBACK_MODEL', None) or ''
-                max_tokens = int(getattr(settings, 'HF_MAX_NEW_TOKENS', 300) or 300)
-                temperature = float(getattr(settings, 'HF_TEMPERATURE', 0.7) or 0.7)
-                top_p = float(getattr(settings, 'HF_TOP_P', 0.95) or 0.95)
-
-                def _run_stream(model_to_use: str):
-                    for token_text in _hf_router_chat_completion_stream(
-                        model_to_use,
-                        settings.HF_API_TOKEN,
-                        system_prompt,
-                        message,
-                        max_tokens=max_tokens,
-                        temperature=temperature,
-                        top_p=top_p,
-                    ):
-                        token_text = _redact_secrets(token_text)
-                        if not token_text:
-                            continue
-                        full_text_parts.append(token_text)
-                        yield _sse_pack({'type': 'delta', 'text': token_text})
-
-                used_model = hf_model
-                try:
-                    yield from _run_stream(hf_model)
-                except Exception as e:
-                    msg = str(e or '').lower()
-                    if (not hf_fallback) and ('model_not_supported' in msg) and (HF_ROUTER_DEFAULT_MODEL != hf_model):
-                        used_model = HF_ROUTER_DEFAULT_MODEL
-                        yield from _run_stream(HF_ROUTER_DEFAULT_MODEL)
-                    elif hf_fallback and hf_fallback != hf_model:
-                        used_model = hf_fallback
-                        yield from _run_stream(hf_fallback)
-                    else:
-                        raise
-
-            elif (not settings.HF_API_TOKEN) and settings.OPENAI_API_KEY:
-                used_model = getattr(settings, 'OPENAI_MODEL', None) or 'gpt-4o'
-                client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": message},
-                ]
-
-                response = client.chat.completions.create(
-                    model=used_model,
-                    messages=messages,
-                    max_tokens=300,
-                    temperature=0.7,
-                    stream=True,
-                )
-                for event in response:
-                    try:
-                        delta = event.choices[0].delta
-                        token_text = getattr(delta, 'content', None)
-                    except Exception:
-                        token_text = None
-                    if not token_text:
-                        continue
-                    full_text_parts.append(token_text)
-                    yield _sse_pack({'type': 'delta', 'text': token_text})
-            else:
-                # No model configured.
-                if lang == 'fr':
-                    fallback = "Le chatbot n’est pas configuré (clé HuggingFace/OpenAI manquante). Ajoute HF_API_TOKEN (et HF_MODEL) sur le serveur."
-                else:
-                    fallback = "Chat assistant isn’t configured (missing HuggingFace/OpenAI key). Set HF_API_TOKEN (and HF_MODEL) on the server."
-                full_text_parts.append(fallback)
-                yield _sse_pack({'type': 'delta', 'text': fallback})
-
-        except Exception as e:
-            logging.exception('[ai_chat_stream] streaming exception')
-
-            err = None
-            # Common case in this project: OpenAI key present but quota exhausted.
-            try:
-                is_rate_limit = isinstance(e, getattr(openai, 'RateLimitError', Exception))
-            except Exception:
-                is_rate_limit = False
-            msg = str(e or '').lower()
-            if is_rate_limit or 'insufficient_quota' in msg or 'exceeded your current quota' in msg:
-                if lang == 'fr':
-                    err = (
-                        "Le quota OpenAI est dépassé sur le serveur. "
-                        "Pour avoir un chat vraiment génératif + streaming, configure HuggingFace: HF_API_TOKEN et HF_MODEL."
-                    )
-                else:
-                    err = (
-                        "OpenAI quota is exceeded on the server. "
-                        "For a real generative + streaming chat, configure HuggingFace: set HF_API_TOKEN and HF_MODEL."
-                    )
-
-            if not err:
-                if lang == 'fr':
-                    err = "Désolé - le modèle IA a eu un problème. Réessaie dans un instant."
-                else:
-                    err = "Sorry - the AI model had an issue. Please try again in a moment."
-
-            err = _redact_secrets(err)
-
-            full_text_parts = [err]
-            yield _sse_pack({'type': 'delta', 'text': err})
+            for token_text in stream_answer(system_prompt, message):
+                token_text = _redact_secrets(token_text)
+                full_text_parts.append(token_text)
+                yield _sse_pack({'type': 'delta', 'text': token_text})
+        except RuntimeError:
+            fallback = unavailable_answer(country, lang)
+            full_text_parts = [fallback]
+            yield _sse_pack({'type': 'delta', 'text': fallback})
 
         final_text = _redact_secrets(''.join(full_text_parts).strip())
 
@@ -2999,8 +2895,6 @@ def ai_chat(request):
         }, status=200)
 
     llm_available = bool(getattr(settings, 'HF_API_TOKEN', '') or getattr(settings, 'OPENAI_API_KEY', ''))
-    if not llm_available:
-        return JsonResponse({'error': 'AI assistant not configured.'}, status=503)
 
     country = _normalize_country(get_country_from_site(request) or 'morocco')
     country_label = _country_label(country)
@@ -3397,59 +3291,13 @@ def ai_chat(request):
         if recent_lines:
             system_prompt = system_prompt + "\n\nRecent conversation (context):\n" + "\n".join(recent_lines[-session_history_max:])
 
-    try:
-        if bot_reply is None:
-            if settings.HF_API_TOKEN:
-                hf_model = getattr(settings, 'HF_MODEL', None) or 'Qwen/Qwen2.5-7B-Instruct:fastest'
-                hf_fallback = getattr(settings, 'HF_FALLBACK_MODEL', None) or ''
-
-                def _run_full(model_to_use: str) -> str:
-                    return _hf_router_chat_completion_full_text(
-                        model_to_use,
-                        settings.HF_API_TOKEN,
-                        system_prompt,
-                        message,
-                        max_tokens=int(getattr(settings, 'HF_MAX_NEW_TOKENS', 250) or 250),
-                        temperature=float(getattr(settings, 'HF_TEMPERATURE', 0.7) or 0.7),
-                        top_p=float(getattr(settings, 'HF_TOP_P', 0.95) or 0.95),
-                    )
-
-                try:
-                    bot_reply = _run_full(hf_model)
-                    used_model = hf_model
-                except Exception as e:
-                    msg = str(e or '').lower()
-                    if (not hf_fallback) and ('model_not_supported' in msg) and (HF_ROUTER_DEFAULT_MODEL != hf_model):
-                        bot_reply = _run_full(HF_ROUTER_DEFAULT_MODEL)
-                        used_model = HF_ROUTER_DEFAULT_MODEL
-                    elif hf_fallback and hf_fallback != hf_model:
-                        bot_reply = _run_full(hf_fallback)
-                        used_model = hf_fallback
-                    else:
-                        raise
-
-            elif settings.OPENAI_API_KEY:
-                used_model = getattr(settings, 'OPENAI_MODEL', None) or 'gpt-4o'
-                client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": message},
-                ]
-                response = client.chat.completions.create(
-                    model=used_model,
-                    messages=messages,
-                    max_tokens=300,
-                    temperature=0.7,
-                )
-                bot_reply = response.choices[0].message.content.strip()
-            else:
-                return JsonResponse({'error': 'AI assistant not configured.'}, status=503)
-
-        # else: bot_reply is deterministic (no model call)
-
-    except Exception:
-        logging.exception('[ai_chat] Model exception')
-        return JsonResponse({'error': 'AI assistant unavailable.'}, status=503)
+    if bot_reply is None:
+        from .assistant_service import stream_answer, unavailable_answer
+        try:
+            bot_reply = ''.join(stream_answer(system_prompt, message))
+            used_model = 'configured-provider'
+        except RuntimeError:
+            bot_reply = unavailable_answer(country, lang)
 
     bot_reply = _redact_secrets(str(bot_reply or '').strip())
     if not welcome_enabled:

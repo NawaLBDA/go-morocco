@@ -96,9 +96,9 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN", "")
 # Default to a chat/instruct model compatible with HuggingFace's router (OpenAI-compatible chat completions).
 # Override with HF_MODEL in the environment.
-HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen2.5-7B-Instruct:fastest")
+HF_MODEL = os.environ.get("HF_MODEL", "Qwen/Qwen3-4B-Instruct-2507:fastest")
 # Optional fallback if the primary model is unavailable.
-HF_FALLBACK_MODEL = os.environ.get("HF_FALLBACK_MODEL", "")
+HF_FALLBACK_MODEL = os.environ.get("HF_FALLBACK_MODEL", "Qwen/Qwen3-4B-Instruct-2507:fastest")
 HF_MAX_NEW_TOKENS = int(os.environ.get("HF_MAX_NEW_TOKENS", "300"))
 HF_TEMPERATURE = float(os.environ.get("HF_TEMPERATURE", "0.7"))
 HF_TOP_P = float(os.environ.get("HF_TOP_P", "0.95"))
@@ -527,3 +527,6 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 
 # ✅ Admin Security
 ADMIN_URL = os.environ.get('ADMIN_URL', 'admin/')
+
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+TWILIO_WHATSAPP_FROM = os.environ.get("TWILIO_WHATSAPP_FROM", "")

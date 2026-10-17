@@ -9,7 +9,7 @@
         <span class="text-uppercase text-primary fw-semibold small">CONTACT</span>
         <h1 class="fw-bold mt-2 mb-2">Get in touch</h1>
         <p class="text-muted mb-0">
-          For questions, quotes, or bookings - send a message and we’ll reply quickly.
+          Need information or help? Send us your question.
         </p>
       </div>
       <div class="col-lg-4 text-lg-end">
@@ -42,25 +42,18 @@
 
           <div class="text-muted small mb-2">For a faster reply, include:</div>
           <ul class="small text-muted mb-0 ps-3">
-            <li>dates + number of people</li>
-            <li>cities / itinerary</li>
-            <li>budget level (economy / mid-range / premium)</li>
+            <li>the topic of your question</li>
+            <li>the information or help you need</li>
+            <li>how we can contact you</li>
           </ul>
-          {% if country == 'morocco' %}
-          <div class="contact-booking-link">
-            <i class="fa-regular fa-calendar-check mb-3" aria-hidden="true"></i>
-            <h2 class="h5">Ready to choose your dates?</h2>
-            <p class="small">A message is an enquiry, not a reservation. Choose a tour to check my shared guide calendar and request your trip.</p>
-            <a class="btn btn-primary" href="{% url 'reservations' %}">Find a tour <i class="fa-solid fa-arrow-right ms-2" aria-hidden="true"></i></a>
-          </div>
-          {% endif %}
+
         </div>
       </div>
 
       <div class="col-lg-7">
         <div class="contact-form h-100">
           <h2 class="h4 fw-bold mb-1">Send a message</h2>
-          <div class="text-muted mb-4">Share your plan in 2-3 lines - we’ll take it from there.</div>
+          <div class="text-muted mb-4">Tell us what information or assistance you need.</div>
 
           <form method="post" class="contact-form-fields">
             {% csrf_token %}
@@ -85,13 +78,13 @@
 
             <div class="mb-3">
               <label class="form-label" for="contact-subject">Subject</label>
-              <input id="contact-subject" name="subject" class="form-control" value="{{ contact_form.subject.value|default_if_none:'' }}" maxlength="200" placeholder="Quote / Question / Booking">
+              <input id="contact-subject" name="subject" class="form-control" value="{{ contact_form.subject.value|default_if_none:'' }}" maxlength="200" placeholder="Information / Help">
             </div>
 
             <div class="mb-3">
               <label class="form-label" for="contact-message">Message</label>
               <textarea id="contact-message" name="message" class="form-control" rows="6" required
-                        placeholder="{% if country == 'ireland' %}Example: 2 days, Dublin + Cliffs of Moher, 2 people...{% else %}Example: 7 days, Marrakech + Sahara, 2 people, mid-range budget...{% endif %}">{{ contact_form.message.value|default_if_none:'' }}</textarea>
+                        placeholder="How can we help you?">{{ contact_form.message.value|default_if_none:'' }}</textarea>
             </div>
 
             <div class="d-flex flex-wrap gap-2 align-items-center">

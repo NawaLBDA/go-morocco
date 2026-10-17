@@ -110,6 +110,54 @@ class ContactEmailSettings(models.Model):
         return f'{self.country.title()} contact email'
 
 
+class BookingNotificationSettings(models.Model):
+    country = models.CharField(max_length=50, unique=True, default='morocco')
+    email_recipients = models.TextField(blank=True, help_text='One staff email address per line.')
+    whatsapp_recipients = models.TextField(blank=True, help_text='One staff WhatsApp number per line, including country code, e.g. +212600000000.')
+    whatsapp_content_sid = models.CharField(max_length=34, blank=True, help_text='Approved Twilio template Content SID (HX...). See the server setup guide for template variables.')
+
+    class Meta:
+        verbose_name_plural = 'Booking notification settings'
+
+    def __str__(self):
+        return f'{self.country.title()} booking notifications'
+
+    def clean(self):
+        super().clean()
+        import re
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError
+        emails = list(dict.fromkeys(x.strip() for x in self.email_recipients.splitlines() if x.strip()))
+        phones = list(dict.fromkeys(x.strip() for x in self.whatsapp_recipients.splitlines() if x.strip()))
+        for email in emails:
+            try:
+                validate_email(email)
+            except ValidationError:
+                raise ValidationError({'email_recipients': 'Enter one valid email address per line.'})
+        if any(not re.fullmatch(r'\+[1-9]\d{7,14}', phone) for phone in phones):
+            raise ValidationError({'whatsapp_recipients': 'Use international numbers, e.g. +212600000000, one per line.'})
+        if phones and not re.fullmatch(r'HX[0-9a-fA-F]{32}', self.whatsapp_content_sid):
+            raise ValidationError({'whatsapp_content_sid': 'Enter the approved template Content SID (HX followed by 32 hexadecimal characters).'})
+        self.email_recipients = '\n'.join(emails)
+        self.whatsapp_recipients = '\n'.join(phones)
+
+
+class BookingNotification(models.Model):
+    reservation = models.ForeignKey('Reservation', on_delete=models.CASCADE, related_name='notifications')
+    channel = models.CharField(max_length=10, choices=[('email', 'Email'), ('whatsapp', 'WhatsApp')])
+    recipient = models.CharField(max_length=254)
+    status = models.CharField(max_length=12, default='pending', choices=[('pending', 'Pending'), ('sending', 'Sending'), ('sent', 'Accepted by provider'), ('failed', 'Failed')])
+    error = models.CharField(max_length=255, blank=True)
+    provider_reference = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['reservation', 'channel', 'recipient'], name='unique_booking_notification_recipient')]
+
+    def __str__(self):
+        return f'Booking {self.reservation_id} | {self.channel} | {self.status}'
+
+
 class ContactMessage(models.Model):
     country = models.CharField(max_length=50, blank=True, default='')
     name = models.CharField(max_length=150)
