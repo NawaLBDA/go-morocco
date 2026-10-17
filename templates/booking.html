@@ -255,7 +255,7 @@
             <div class="row g-3">
               {% for ea in extra_activities %}
                 <li>
-                  {{ ea.title }} — +{{ ea.price }} $ {% if ea.is_per_night %}/ day{% endif %}
+                  {{ ea.title }} - +{{ ea.price }} $ {% if ea.is_per_night %}/ day{% endif %}
                 </li>
               {% endfor %}
             </div>
@@ -395,7 +395,7 @@
 
       <div class="d-flex justify-content-between">
         <span><i class="fa-regular fa-credit-card me-1"></i> Method</span>
-        <strong class="text-uppercase">{% if reservation.payment_method %}{{ reservation.get_payment_method_display }}{% else %}—{% endif %}</strong>
+        <strong class="text-uppercase">{% if reservation.payment_method %}{{ reservation.get_payment_method_display }}{% else %}-{% endif %}</strong>
       </div>
 
       <div class="d-flex justify-content-between mt-2">
@@ -522,7 +522,7 @@
                   <option value="">Choose a departure</option>
                   {% for departure in tour_departures %}
                     <option value="{{ departure.pk }}" {% if selected_departure.pk == departure.pk %}selected{% endif %} {% if not departure.available %}disabled{% endif %}>
-                      {{ departure.start_date|date:"d M Y" }}{% if departure.end_date != departure.start_date %} – {{ departure.end_date|date:"d M Y" }}{% endif %} · {{ departure.billable_days }} day{{ departure.billable_days|pluralize }}{% if not departure.available %} · Unavailable{% endif %}
+                      {{ departure.start_date|date:"d M Y" }}{% if departure.end_date != departure.start_date %} - {{ departure.end_date|date:"d M Y" }}{% endif %} · {{ departure.billable_days }} day{{ departure.billable_days|pluralize }}{% if not departure.available %} · Unavailable{% endif %}
                     </option>
                   {% endfor %}
                 </select>
@@ -558,7 +558,7 @@
     {% endif %}
     <div class="booking-inline-meta d-flex justify-content-between align-items-center small text-muted mb-3">
       <span><i class="fa-solid fa-calendar-day me-1"></i> Days</span>
-      <strong id="live-days">—</strong>
+      <strong id="live-days">-</strong>
     </div>
 
     <div class="booking-form-group mb-3">
@@ -752,7 +752,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (!startInput.value || !endInput.value){
       totalOutput.textContent = (basePrice * persons).toFixed(2) + " $";
-      if (daysOutput) daysOutput.textContent = "—";
+      if (daysOutput) daysOutput.textContent = "-";
       return;
     }
 
@@ -762,12 +762,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (days < 1){
       totalOutput.textContent = (basePrice * persons).toFixed(2) + " $";
-      if (daysOutput) daysOutput.textContent = "—";
+      if (daysOutput) daysOutput.textContent = "-";
       return;
     }
 
     if (Number.isFinite(MAX_NIGHTS) && days > MAX_NIGHTS){
-      if (daysOutput) daysOutput.textContent = "—";
+      if (daysOutput) daysOutput.textContent = "-";
       showDurationWarning(true);
       totalOutput.textContent = '0 $';
       return;

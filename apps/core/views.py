@@ -196,13 +196,13 @@ def _private_tour_reply(country: str, lang: str) -> str:
     country_label = _country_label(country)
     if lang == 'fr':
         return (
-            f"Oui — on peut organiser des tours privés / sur‑mesure au {country_label}. "
+            f"Oui - on peut organiser des tours privés / sur‑mesure au {country_label}. "
             "On adapte l’itinéraire, le rythme, le chauffeur/guide, et le niveau d’hébergement selon ton style. "
             "Pour te proposer une idée + un prix, dis-moi juste : 1) ville(s) ou circuit souhaité, 2) dates, 3) nombre de personnes, 4) budget (éco / standard / premium). "
             "Tu peux aussi nous écrire via le bouton WhatsApp ou la page Contact." 
         )
     return (
-        f"Yes — we can arrange private / tailor‑made tours in {country_label}. "
+        f"Yes - we can arrange private / tailor‑made tours in {country_label}. "
         "We can adapt the itinerary, pace, driver/guide, and hotel level to your preferences. "
         "To suggest options + a price, tell me: 1) city/route, 2) dates, 3) number of people, 4) budget level (economy / standard / premium). "
         "You can also reach us via the WhatsApp button or the Contact page."
@@ -216,14 +216,14 @@ def _how_it_works_reply(country: str, lang: str) -> str:
             f"Comment ça marche sur le site {country_label} :\n"
             "1) Tu choisis tes dates et ta ville d’arrivée (ex: Marrakech, Casablanca, Rabat).\n"
             "2) On te propose un itinéraire + hébergements + expériences adaptés à ton rythme.\n"
-            "3) Tu profites — avec support et chauffeurs locaux de confiance.\n"
+            "3) Tu profites - avec support et chauffeurs locaux de confiance.\n"
             "Tu as déjà une ville + une période en tête ?"
         )
     return (
         f"How it works on the {country_label} site:\n"
         "1) You choose your dates and arrival city (e.g., Marrakech, Casablanca, Rabat).\n"
         "2) We curate your route, stays, and local experiences to match your pace.\n"
-        "3) You enjoy — with trusted local drivers and end-to-end support.\n"
+        "3) You enjoy - with trusted local drivers and end-to-end support.\n"
         "Do you already have a city and date range in mind?"
     )
 
@@ -257,7 +257,7 @@ def _list_tours_reply(country: str, lang: str, limit: int = 6) -> str:
         if lang == 'fr':
             lines.append(f"- {header} — {t.price_per_night} par {'jour' if t.country == 'morocco' else 'nuit'}.")
         else:
-            lines.append(f"- {header} — {t.price_per_night} per {'day' if t.country == 'morocco' else 'night'}.")
+            lines.append(f"- {header} - {t.price_per_night} per {'day' if t.country == 'morocco' else 'night'}.")
 
     if lang == 'fr':
         lines.append("Dis-moi la ville + tes dates + le nombre de personnes, et je vérifie la disponibilité.")
@@ -820,7 +820,7 @@ def _build_itinerary_days(tour: Tour, selected_extra_ids: list[int] | None = Non
                             card[key] = None if key.endswith('_id') else ''
             actual_date = departure.start_date + timedelta(days=day.day_number - 1)
             days.append({'day_number': day.day_number,
-                         'label': f"{actual_date:%d %b %Y}" + (f" — {day.title}" if day.title else ''),
+                         'label': f"{actual_date:%d %b %Y}" + (f" - {day.title}" if day.title else ''),
                          'cards': cards, 'map_points': []})
         active_numbers = {day['day_number'] for day in days}
         extras = [_serialize_extra_itinerary_option(extra) for extra in tour.extra_activities.filter(is_active=True)
@@ -1078,9 +1078,9 @@ def ai_chat_stream(request):
         if st == 'cancelled' and r:
             tour_title = getattr(getattr(r, 'tour', None), 'title', '') or 'your tour'
             if lang == 'fr':
-                deterministic_text = f"✅ C’est fait — j’ai annulé ta réservation pour “{tour_title}”."
+                deterministic_text = f"✅ C’est fait - j’ai annulé ta réservation pour “{tour_title}”."
             else:
-                deterministic_text = f"✅ Done — I cancelled your reservation for “{tour_title}”."
+                deterministic_text = f"✅ Done - I cancelled your reservation for “{tour_title}”."
         elif st == 'ambiguous':
             if lang == 'fr':
                 deterministic_text = "J’ai trouvé plusieurs réservations actives. Tu veux annuler laquelle (ville ou dates) ?"
@@ -1302,7 +1302,7 @@ def ai_chat_stream(request):
                                 deterministic_text = (
                                     "OK. Paiement par carte ou en espèces ?"
                                     if lang == 'fr' else
-                                    "OK — would you like to pay by card or cash?"
+                                    "OK - would you like to pay by card or cash?"
                                 )
                             else:
                                 _set_pending_booking(request, None)
@@ -1333,11 +1333,11 @@ def ai_chat_stream(request):
                                         pass
 
                                 if lang == 'fr':
-                                    deterministic_text = "✅ Parfait — je pré-remplis la réservation et je l’envoie maintenant (en attente de validation admin)."
+                                    deterministic_text = "✅ Parfait - je pré-remplis la réservation et je l’envoie maintenant (en attente de validation admin)."
                                     if will_replace_existing:
                                         deterministic_text += " (Cela remplace ta réservation précédente.)"
                                 else:
-                                    deterministic_text = "✅ Great — I’m prefilling and submitting your booking request now (pending admin validation)."
+                                    deterministic_text = "✅ Great - I’m prefilling and submitting your booking request now (pending admin validation)."
                                     if will_replace_existing:
                                         deterministic_text += " (This replaces your previous reservation.)"
 
@@ -1490,9 +1490,9 @@ def ai_chat_stream(request):
 
             if not err:
                 if lang == 'fr':
-                    err = "Désolé — le modèle IA a eu un problème. Réessaie dans un instant."
+                    err = "Désolé - le modèle IA a eu un problème. Réessaie dans un instant."
                 else:
-                    err = "Sorry — the AI model had an issue. Please try again in a moment."
+                    err = "Sorry - the AI model had an issue. Please try again in a moment."
 
             err = _redact_secrets(err)
 
@@ -2299,7 +2299,7 @@ def _build_country_catalog_context(country: str, user_message: str) -> str:
         for t in tours:
             dest_name = getattr(t.destination, 'name', '') or ''
             promo = f" (promo -{t.discount_percent}%)" if getattr(t, 'is_promotion', False) and getattr(t, 'discount_percent', 0) else ""
-            line = f"- Tour #{t.id}: {t.title} — {dest_name} — {t.price_per_night} per {'day' if t.country == 'morocco' else 'night'}{promo}."
+            line = f"- Tour #{t.id}: {t.title} - {dest_name} - {t.price_per_night} per {'day' if t.country == 'morocco' else 'night'}{promo}."
             if t.transport:
                 line += f" Transport: {t.transport}."
             if t.hotel:
@@ -3103,7 +3103,7 @@ def ai_chat(request):
             tour_title = getattr(getattr(r, 'tour', None), 'title', '') or 'your tour'
             deterministic_text = (
                 f"✅ C’est fait — j’ai annulé ta réservation pour “{tour_title}”." if lang == 'fr'
-                else f"✅ Done — I cancelled your reservation for “{tour_title}”."
+                else f"✅ Done - I cancelled your reservation for “{tour_title}”."
             )
         elif st == 'ambiguous':
             deterministic_text = (
@@ -3299,7 +3299,7 @@ def ai_chat(request):
                                 )
                                 deterministic_text = (
                                     "OK. Paiement par carte ou en espèces ?" if lang == 'fr'
-                                    else "OK — would you like to pay by card or cash?"
+                                    else "OK - would you like to pay by card or cash?"
                                 )
                             else:
                                 _set_pending_booking(request, None)
@@ -3334,11 +3334,11 @@ def ai_chat(request):
                                         pass
 
                                 if lang == 'fr':
-                                    deterministic_text = "✅ Parfait — je pré-remplis la réservation et je l’envoie maintenant (en attente de validation admin)."
+                                    deterministic_text = "✅ Parfait - je pré-remplis la réservation et je l’envoie maintenant (en attente de validation admin)."
                                     if will_replace_existing:
                                         deterministic_text += " (Cela remplace ta réservation précédente.)"
                                 else:
-                                    deterministic_text = "✅ Great — I’m prefilling and submitting your booking request now (pending admin validation)."
+                                    deterministic_text = "✅ Great - I’m prefilling and submitting your booking request now (pending admin validation)."
                                     if will_replace_existing:
                                         deterministic_text += " (This replaces your previous reservation.)"
 
@@ -3513,7 +3513,7 @@ def generate_fallback_reply(message, country, lang: str | None = None):
         if start_date_req and end_date_req:
             if lang == 'fr':
                 return "Parfait. Je vérifie la disponibilité pour ces dates. Si tu confirmes le nombre de personnes, je peux pré-remplir la réservation."
-            return "Great — I’ll check availability for those dates. If you confirm the number of people, I can prefill the booking."
+            return "Great - I’ll check availability for those dates. If you confirm the number of people, I can prefill the booking."
 
         suggestions = _suggest_available_ranges(country, nights=5, limit=4)
         if lang == 'fr':
@@ -3528,10 +3528,10 @@ def generate_fallback_reply(message, country, lang: str | None = None):
         if suggestions:
             sug_txt = "; ".join([f"{s.strftime('%d %b %Y')} → {e.strftime('%d %b %Y')}" for s, e in suggestions])
             return (
-                "Sure — tell me your exact dates and number of people. "
+                "Sure - tell me your exact dates and number of people. "
                 + ("Published departure dates: " if country == 'morocco' else "Examples of available windows (5 nights): ") + sug_txt + "."
             )
-        return "Sure — tell me your exact dates and number of people and I’ll check availability."
+        return "Sure - tell me your exact dates and number of people and I’ll check availability."
 
     if lang == 'fr':
         return f"Bonjour ! Je suis votre assistant virtuel pour {country_label}. Que souhaitez-vous organiser (destination, dates, budget) ?"
@@ -3797,6 +3797,7 @@ def register(request):
 
                 UserProfile.objects.create(
                     user=user,
+                    is_deaf=request.POST.get('is_deaf') == 'on',
                     phone=request.POST.get('phone'),
                     country=selected_country,
                     postal_code=request.POST.get('postal_code')

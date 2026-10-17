@@ -87,6 +87,12 @@
               <input type="text" name="postal_code" class="form-control" required>
             </div>
 
+            <div class="form-check mb-3">
+              <input type="checkbox" name="is_deaf" id="register-is-deaf" class="form-check-input" {% if request.POST.is_deaf == 'on' %}checked{% endif %} aria-describedby="deaf-help">
+              <label class="form-check-label" for="register-is-deaf">I am Deaf (optional)</label>
+              <div id="deaf-help" class="form-text">Share this with the guide to help prepare communication for your tour.</div>
+            </div>
+
             <!-- PASSWORD -->
             <div class="mb-3">
               <label>Password</label>

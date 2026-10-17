@@ -514,6 +514,15 @@ class TourAdmin(GuideScheduleAdmin):
 @admin.register(Reservation)
 class ReservationAdmin(CountryScopedAdmin):
     country_lookup = 'tour__country'
+    readonly_fields = ('account_deaf_status',)
+
+    @admin.display(description='Deaf (account holder)')
+    def account_deaf_status(self, obj):
+        if not obj or not obj.user_id:
+            return 'Not provided'
+        profile = getattr(obj.user, 'profile', None)
+        return ('Yes' if profile.is_deaf else 'No') if profile else 'Not provided'
+
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         # Keep ModelForm validation and persistence under the same calendar lock.
         # This also gives the Django admin a normal form error on a conflict.
@@ -526,7 +535,7 @@ class ReservationAdmin(CountryScopedAdmin):
         return super().changeform_view(request, object_id, form_url, extra_context)
 
     list_display = (
-        'tour', 'user', 'num_persons',
+        'tour', 'user', 'account_deaf_status', 'num_persons',
         'start_date', 'end_date',
         'full_package', 'include_transport', 'include_hotel',
         'extras_total',

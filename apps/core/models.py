@@ -577,6 +577,7 @@ class CountryContent(models.Model):
 # =========================
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    is_deaf = models.BooleanField(default=False, verbose_name='Deaf', help_text='Voluntarily indicated by the account holder at registration.')
     phone = models.CharField(max_length=20)
     country = models.CharField(max_length=80)
     postal_code = models.CharField(max_length=20)

@@ -481,7 +481,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       return response.ok;
     } catch (error) {
-      addMessage('Sorry — I could not submit the booking right now. Please try again.', 'bot');
+      addMessage('Sorry - I could not submit the booking right now. Please try again.', 'bot');
       return false;
     }
   }
@@ -500,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function () {
           body: JSON.stringify({ message: userText })
         });
         const data = await r.json();
-        const reply = data.reply || data.error || 'Sorry — no reply.';
+        const reply = data.reply || data.error || 'Sorry - no reply.';
         botMsgEl.textContent = reply;
         botMsgEl.removeAttribute('data-streaming');
         saveChatHistory();
@@ -530,7 +530,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // If server returned JSON error, show it.
         let text = '';
         try { text = await response.text(); } catch {}
-        botMsgEl.textContent = text || 'Sorry — the assistant is unavailable right now.';
+        botMsgEl.textContent = text || 'Sorry - the assistant is unavailable right now.';
         botMsgEl.removeAttribute('data-streaming');
         // Try JSON fallback too.
         await fallbackToJson();
@@ -541,7 +541,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!response.body) {
         const ok = await fallbackToJson();
         if (!ok) {
-          botMsgEl.textContent = 'Sorry — streaming is not supported in this browser.';
+          botMsgEl.textContent = 'Sorry - streaming is not supported in this browser.';
           botMsgEl.removeAttribute('data-streaming');
         }
         return;
@@ -608,7 +608,7 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch (e) {
       const ok = await fallbackToJson();
       if (!ok) {
-        botMsgEl.textContent = 'Sorry — the assistant is unavailable right now.';
+        botMsgEl.textContent = 'Sorry - the assistant is unavailable right now.';
         botMsgEl.removeAttribute('data-streaming');
         saveChatHistory();
       }
