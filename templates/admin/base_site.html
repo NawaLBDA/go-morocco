@@ -3,9 +3,4 @@
 {% block title %}{{ title }} | {{ site_title }}{% endblock %}
 {% block branding %}<div id="site-name"><a href="{% url 'admin:index' %}">{{ site_header }}</a></div>{% endblock %}
 {% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/country_admin.css' %}">{% endblock %}
-{% block nav-global %}
-<nav class="admin-country-switch" aria-label="Administration website">
-  <a href="{{ morocco_admin_url }}" {% if admin_country == 'morocco' %}aria-current="page"{% endif %}>Morocco</a>
-  <a href="{{ ireland_admin_url }}" {% if admin_country == 'ireland' %}aria-current="page"{% endif %}>Ireland</a>
-</nav>
-{% endblock %}
+{% block nav-global %}<nav class="admin-country-switch" aria-label="Content management"><a href="{% url 'admin:core_country_changelist' %}">Countries</a><a href="{% url 'admin:core_sitesettings_changelist' %}">Global settings</a><a href="/">View website</a></nav>{% endblock %}

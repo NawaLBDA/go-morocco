@@ -8,13 +8,15 @@ from django.db import close_old_connections
 from django.test import TestCase, TransactionTestCase, override_settings, skipUnlessDBFeature
 from django.urls import reverse
 
-from apps.core.models import ContactMessage, Destination, GuideCalendar, Reservation, Tour, TourExtraActivity, TourDeparture
+from apps.core.models import Country, ContactMessage, Destination, GuideCalendar, Reservation, Tour, TourExtraActivity, TourDeparture
 from apps.core.views import _is_range_available
 from .views import _create_pending_reservation
 
 
 class CalendarFixtures:
     def setUp(self):
+        Country.objects.get_or_create(slug='morocco', defaults={'name': 'Morocco', 'is_active': True})
+        Country.objects.get_or_create(slug='ireland', defaults={'name': 'Ireland'})
         self.day = date.today() + timedelta(days=30)
         self.user = User.objects.create_user('traveler-one', password='test-password')
         self.other = User.objects.create_user('traveler-two', password='test-password')
@@ -179,17 +181,18 @@ class GuideCalendarTests(CalendarFixtures, TestCase):
         self.assertIsNone(reservation)
         self.assertEqual(status, 400)
 
-    def test_search_explains_global_conflict_and_preserves_dates(self):
+    def test_search_keeps_reserved_departures_visible_for_waitlist_review(self):
         response = self.client.get('/morocco/reservations/', {
-            'start_date': self.day.isoformat(), 'end_date': (self.day + timedelta(days=2)).isoformat(),
+            'start_date': self.day.isoformat(), 'end_date': (self.day + timedelta(days=3)).isoformat(),
         })
-        self.assertContains(response, 'start_date=' + self.day.isoformat())
+        self.assertEqual(response.context['search_start_date'], self.day.isoformat())
         self.book()
         response = self.client.get('/morocco/reservations/', {
-            'start_date': self.day.isoformat(), 'end_date': (self.day + timedelta(days=2)).isoformat(),
+            'start_date': self.day.isoformat(), 'end_date': (self.day + timedelta(days=3)).isoformat(),
         })
-        self.assertContains(response, 'changing destination will not free these dates')
-        self.assertEqual(len(response.context['tours']), 0)
+        self.assertContains(response, 'Fully reserved')
+        self.assertContains(response, 'View &amp; join waiting list')
+        self.assertTrue(all(not departure.available for _, departures in response.context['departure_groups'] for departure in departures))
 
     def test_web_and_chat_submission_paths_both_reject_overlap(self):
         self.book()
@@ -229,6 +232,26 @@ class GuideCalendarTests(CalendarFixtures, TestCase):
 
 
 class GuideConcurrencyTests(CalendarFixtures, TransactionTestCase):
+    @skipUnlessDBFeature('has_select_for_update')
+    def test_three_requests_cannot_exceed_two_group_slots(self):
+        Country.objects.filter(slug='morocco').update(max_concurrent_groups=2)
+        TourDeparture.objects.create(tour=self.tour, start_date=self.day,
+            end_date=self.day + timedelta(days=3), is_published=True, max_concurrent_bookings=2)
+        third = User.objects.create_user('third-traveler')
+        barrier = Barrier(3)
+        def submit(user_id):
+            close_old_connections()
+            try:
+                user, tour = User.objects.get(pk=user_id), Tour.objects.get(pk=self.tour.pk)
+                barrier.wait(timeout=10)
+                return self.book(user=user, tour=tour)[3]
+            finally:
+                close_old_connections()
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            results = list(pool.map(submit, [self.user.pk, self.other.pk, third.pk]))
+        self.assertEqual(sorted(results), [200, 200, 409])
+        self.assertEqual(Reservation.objects.count(), 2)
+
     @skipUnlessDBFeature('has_select_for_update')
     def test_simultaneous_requests_only_one_wins_on_empty_calendar(self):
         barrier = Barrier(2)

@@ -78,10 +78,10 @@ class ScheduledDepartureTests(TestCase):
         self.assertEqual(len(itinerary), 4)
         self.assertNotIn(2, [day['day_number'] for day in itinerary])
         self.assertNotIn('Removed museum visit', str(itinerary))
-        reservation, error, _, _ = self.book(persons=5)
+        reservation, error, _, _ = self.book(persons=6)
         self.assertIsNone(error)
         self.assertEqual(reservation.duration_days, 4)
-        self.assertEqual(reservation.total_price, Decimal('1800'))
+        self.assertEqual(reservation.total_price, Decimal('2160'))
         other = Tour.objects.create(title='Marrakech', destination=self.tour.destination, price_per_night=70)
         overlap = TourDeparture.objects.create(tour=other, start_date=self.day + timedelta(days=1),
             end_date=self.day + timedelta(days=1), is_published=True)
@@ -130,16 +130,26 @@ class ScheduledDepartureTests(TestCase):
     def test_page_uses_departures_and_only_the_selected_programme(self):
         path = '/morocco/tour/' + self.tour.slug + '/'
         response = self.client.get(path)
-        self.assertContains(response, 'id="departure-choice"')
-        self.assertContains(response, 'Bank transfer')
+        self.assertNotContains(response, 'id="departure-choice"')
+        self.assertNotContains(response, 'id="booking-form"')
+        self.assertContains(response, 'View dates &amp; availability')
         self.assertNotContains(response, 'https://js.stripe.com/v3/')
         self.assertNotContains(response, 'Unavailable dates across all Morocco tours')
         self.assertNotContains(response, 'Maximum allowed duration')
         self.assertNotContains(response, 'Nights')
         self.assertEqual(response.context['itinerary_days'], [])
         response = self.client.get(path, {'departure_id': self.departure.pk})
+        self.assertContains(response, 'type="hidden" name="departure_id" value="' + str(self.departure.pk) + '"')
+        self.assertContains(response, 'class="fixed-departure')
+        self.assertContains(response, 'Bank transfer')
+        self.assertNotContains(response, 'id="departure-choice"')
         self.assertEqual(len(response.context['itinerary_days']), 5)
         self.assertEqual(response.context['selected_departure'], self.departure)
+
+    def test_invalid_departure_cannot_silently_change_booking_dates(self):
+        path = '/tour/' + self.tour.slug + '/'
+        self.assertEqual(self.client.get(path, {'departure_id': '999999'}).status_code, 404)
+        self.assertEqual(self.client.get(path, {'departure_id': 'invalid'}).status_code, 404)
 
     def test_web_submission_uses_published_departure_and_server_price(self):
         self.client.force_login(self.user)

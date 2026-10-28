@@ -5,12 +5,20 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.test import TestCase, override_settings
 
-from .models import ContactEmailSettings, ContactMessage, Destination, Tour, Reservation, UserProfile
+from .models import Country, ContactEmailSettings, ContactMessage, Destination, Tour, Reservation, UserProfile
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', DEFAULT_FROM_EMAIL='site@example.com')
 class ContactDeliveryTests(TestCase):
+    def test_public_contact_is_email_only(self):
+        for path in ['/', '/contact/']:
+            response = self.client.get(path)
+            self.assertContains(response, 'contact@culturehoptours.com')
+            self.assertNotContains(response, 'WhatsApp')
+            self.assertNotContains(response, 'wa.me')
+
     def setUp(self):
+        Country.objects.filter(slug="ireland").update(is_active=True)
         ContactEmailSettings.objects.create(country='morocco', recipient_email='morocco@example.com')
         ContactEmailSettings.objects.create(country='ireland', recipient_email='ireland@example.com')
         self.payload = {'name': 'Alex', 'email': 'alex@example.com', 'subject': 'Rabat tour', 'message': 'Please send details.'}
@@ -38,15 +46,17 @@ class ContactDeliveryTests(TestCase):
         self.assertEqual(ContactMessage.objects.count(), 0)
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_admin_lists_only_own_country_recipient(self):
+    def test_global_admin_lists_recipients_with_country_filters(self):
         staff = User.objects.create_superuser('staff', 'staff@example.com', 'test-password')
         self.client.force_login(staff)
         response = self.client.get('/admin/core/contactemailsettings/')
         self.assertContains(response, 'morocco@example.com')
-        self.assertNotContains(response, 'ireland@example.com')
+        self.assertContains(response, 'ireland@example.com')
+        filtered = self.client.get('/admin/core/contactemailsettings/', {'country': 'morocco'})
+        self.assertNotContains(filtered, 'ireland@example.com')
         other = ContactEmailSettings.objects.get(country='ireland')
         response = self.client.get(f'/admin/core/contactemailsettings/{other.pk}/change/')
-        self.assertNotContains(response, 'ireland@example.com', status_code=302)
+        self.assertContains(response, 'ireland@example.com')
 
     def test_dashboard_uses_account_details_without_overwriting_other_guest(self):
         staff = User.objects.create_superuser('staff', 'staff@example.com', 'test-password')

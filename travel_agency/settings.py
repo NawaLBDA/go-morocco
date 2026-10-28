@@ -25,10 +25,14 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 # ✅ Dynamic ALLOWED_HOSTS based on environment
 DEFAULT_CUSTOM_DOMAINS = [
+    "culturehoptours.com",
+    "www.culturehoptours.com",
+    "roamandbelong.com",
+    "www.roamandbelong.com",
     "basmamoroccoexperience.com",
     "www.basmamoroccoexperience.com",
 ]
-MOROCCO_SITE_URL = os.environ.get('MOROCCO_SITE_URL', 'https://basmamoroccoexperience.com').rstrip('/')
+MOROCCO_SITE_URL = os.environ.get('MOROCCO_SITE_URL', 'https://www.culturehoptours.com').rstrip('/')
 CUSTOM_DOMAIN = (os.environ.get("CUSTOM_DOMAIN") or "").strip()
 CUSTOM_DOMAINS = [
     item.strip()
@@ -271,6 +275,7 @@ cloudinary.config(
 # ==============================
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
 STRIPE_PUBLIC_KEY = os.environ.get("STRIPE_PUBLIC_KEY")
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
 # ==============================
 # DEFAULTS

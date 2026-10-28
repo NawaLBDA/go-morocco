@@ -1,0 +1,24 @@
+{{ brand }}
+{{ title }}
+Booking reference: #{{ reference }}
+
+{% if audience == 'traveler' %}Hello {{ name }},{% else %}Hello team,{% endif %}
+
+{{ introduction }}
+
+Journey: {{ tour }}
+Destination: {{ country }}
+Dates: {{ start }} – {{ end }}
+Travelers: {{ persons }}
+{% if event == 'paid' %}Payment recorded{% else %}Booking total{% endif %}: {{ amount }}
+Payment method: {{ payment_method }}
+{% if audience == 'staff' %}Traveler: {{ name }}
+Traveler email: {{ email }}{% endif %}
+
+{{ next_step }}
+
+Questions? Reply to this email or contact {{ inbox }}.
+
+Warm regards,
+The {{ brand }} team
+Many cultures. Unforgettable journeys.

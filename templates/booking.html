@@ -2,13 +2,15 @@
 {% load static l10n %}
 
 {% block extra_head %}
-  {% if country != 'morocco' %}
+  <script src="{% static 'js/booking-layout.js' %}?v={{ static_version }}" defer></script>
+  {% if not scheduled_tours %}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litepicker/dist/css/litepicker.css">
   <script src="https://cdn.jsdelivr.net/npm/litepicker/dist/litepicker.js" defer></script>
   {% endif %}
 {% endblock %}
 
 {% block content %}
+{% if tour.deaf_only and tour.explanation_video_url %}<div class="container py-4"><a class="global-button" href="{{ tour.explanation_video_url }}" target="_blank" rel="noopener">Watch the accessible tour introduction ?</a></div>{% endif %}
 {% with c=tour.country|lower %}
 <section class="container my-4 my-lg-5 booking-page-shell" style="{% if c == 'morocco' %}--extras-accent:#2a9d8f;--extras-accent-rgb:42,157,143;{% elif c == 'ireland' %}--extras-accent:#6f42c1;--extras-accent-rgb:111,66,193;{% else %}--extras-accent:var(--primary);--extras-accent-rgb:13,110,253;{% endif %}">
 {% endwith %}
@@ -23,7 +25,7 @@
   <div class="row g-5 booking-layout">
 
     <!-- LEFT CONTENT -->
-    <div class="col-lg-8">
+    <div class="col-lg-8 booking-main-column">
       <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-2 booking-page-title">
         <div class="booking-page-title-copy">
           <h1 class="fw-bold mb-1">{{ tour.title }}</h1>
@@ -34,11 +36,8 @@
         </div>
 
         <div class="d-flex align-items-center gap-2">
-          {% if country == 'morocco' %}
-          <a class="btn btn-primary" href="#tour-booking-card">{% if reservation %}Your reservation{% else %}Choose dates{% endif %} <i class="fa-solid fa-arrow-down ms-1" aria-hidden="true"></i></a>
-          {% endif %}
-          {% if tour.is_promotion and tour.discount_percent > 0 %}
-            <span class="badge text-bg-danger">Promo -{{ tour.discount_percent }}%</span>
+          {% if tour.effective_discount > 0 %}
+            <span class="badge text-bg-danger">Promo -{{ tour.effective_discount }}%</span>
           {% endif %}
           <span class="badge text-bg-dark">{{ brand_name }}</span>
         </div>
@@ -48,9 +47,13 @@
         {% if tour.image %}
           <img src="{{ tour.image.url }}" class="tour-booking-image" alt="{{ tour.title }}" width="1200" height="640" decoding="async" fetchpriority="high">
         {% else %}
-          <img src="{% static 'img/placeholder.jpg' %}" class="tour-booking-image" alt="{{ tour.title }}" width="1200" height="640" decoding="async" fetchpriority="high">
+          <img src="{{ tour.cover_url }}" class="tour-booking-image" alt="{{ tour.title }}" width="1200" height="640" decoding="async" fetchpriority="high">
         {% endif %}
+        <span class="journey-image-badges booking-image-badges"><span class="country-badge">{{ tour.region.name }}</span>{% if deaf_booking_restricted %}{% include 'partials/deaf_badge.html' with compact=True %}{% endif %}</span>
       </div>
+
+      {% include 'partials/departure_status.html' %}
+      {% include 'partials/guiding_team.html' %}
 
       <div class="row g-3 mb-4">
         {% if tour.included %}
@@ -217,7 +220,7 @@
                           {% if ea.image %}
                             <img src="{{ ea.image.url }}" alt="{{ ea.title }}" loading="lazy" decoding="async">
                           {% else %}
-                            <img src="{% static 'img/placeholder.jpg' %}" alt="{{ ea.title }}" loading="lazy" decoding="async">
+                            <img src="{% static 'img/culture-hop-ch.svg' %}" alt="{{ ea.title }}" loading="lazy" decoding="async">
                           {% endif %}
                           {% if ea.map_url %}
                           <span class="activity-guide-overlay">
@@ -235,7 +238,7 @@
                         {% if ea.location_display %}
                           <div class="itinerary-place mb-2">
                             <span class="itinerary-place-thumb">
-                              <img src="{% if ea.image %}{{ ea.image.url }}{% else %}{% static 'img/placeholder.jpg' %}{% endif %}" alt="{{ ea.title }}">
+                              <img src="{% if ea.image %}{{ ea.image.url }}{% else %}{% static 'img/culture-hop-ch.svg' %}{% endif %}" alt="{{ ea.title }}">
                             </span>
                             <span>{{ ea.location_display }}</span>
                           </div>
@@ -266,72 +269,11 @@
 
       </div>
 
-      <div class="booking-section booking-surface card border-0 shadow-sm p-4 mb-4">
-        <div class="booking-section-head mb-3">
-          <span class="booking-section-kicker">Reservation</span>
-          <h4 class="fw-bold mb-0">Your reservation</h4>
-        </div>
-
-        {% if reservation %}
-          <div class="row g-3 reservation-overview-grid">
-            <div class="col-12 col-md-6">
-              <div class="reservation-overview-item">
-              <div class="text-muted small">Dates</div>
-              <div class="fw-semibold">{{ reservation.start_date }} → {{ reservation.end_date }}</div>
-            </div>
-              </div>
-            <div class="col-6 col-md-3">
-              <div class="reservation-overview-item">
-                <div class="text-muted small">Persons</div>
-                <div class="fw-semibold">{{ reservation.num_persons }}</div>
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="reservation-overview-item">
-                <div class="text-muted small">Days</div>
-                <div class="fw-semibold">{{ reservation.duration_days }}</div>
-              </div>
-            </div>
-            <div class="col-12 col-md-6">
-              <div class="reservation-overview-item">
-                <div class="text-muted small">Payment</div>
-              <div class="fw-semibold">{{ reservation.get_payment_method_display }}{% if reservation.payment_status %} • {{ reservation.get_payment_status_display }}{% endif %}</div>
-            </div>
-              </div>
-            <div class="col-12 col-md-6">
-              <div class="reservation-overview-item">
-                <div class="text-muted small">Status</div>
-                <div class="fw-semibold">{{ reservation.get_status_display }}</div>
-              </div>
-            </div>
-            <div class="col-12">
-              <div class="reservation-overview-item is-total">
-                <div class="text-muted small">Total</div>
-                <div class="fw-bold fs-5" style="color:var(--primary);">{{ reservation.total_price }} $</div>
-              </div>
-            </div>
-          </div>
-
-          {% if reservation.admin_note %}
-            <hr class="my-4">
-            <div class="fw-bold mb-2">Note</div>
-            <div class="text-muted">{{ reservation.admin_note|linebreaks }}</div>
-          {% endif %}
-        {% else %}
-          <div class="booking-empty-state">
-            <i class="fa-regular fa-calendar-check"></i>
-            <div>
-              <div class="fw-semibold text-dark mb-1">Your reservation details will appear here</div>
-              <p class="text-muted mb-0">Select your dates and submit your booking to generate your reservation details.</p>
-            </div>
-          </div>
-        {% endif %}
-      </div>
     </div>
 
     <!-- RIGHT BOOKING CARD -->
-    <div class="col-lg-4">
-      <div id="tour-booking-card" class="card p-4 shadow-sm border-0 booking-sidebar booking-surface scroll-target">
+    <div class="col-lg-4 booking-sidebar-column">
+      <div id="tour-booking-card" class="card p-4 shadow-sm border-0 booking-sidebar booking-surface scroll-target" tabindex="0" role="region" aria-label="Booking form">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h4 class="fw-bold mb-0">Booking</h4>
           <span class="badge rounded-pill text-bg-light border">
@@ -342,10 +284,11 @@
 
         
 
-{% if country == 'morocco' %}<p class="text-muted small mb-1">Price per person / per day</p>{% endif %}
-{% if tour.is_promotion and tour.discount_percent > 0 and tour.promo_price %}
+{% if scheduled_tours %}<p class="text-muted small mb-1">Price per person / per day</p>{% endif %}
+{% if selected_departure %}<div class="booking-capacity-pill"><strong>Max {{ selected_departure.max_participants }} travelers</strong><span>per private group · smaller groups welcome</span></div>{% endif %}
+{% if tour.effective_discount > 0 %}
   <div class="mb-3 booking-price-panel">
-    <div class="text-muted small">Promo -{{ tour.discount_percent }}%</div>
+    <div class="text-muted small">Promo -{{ tour.effective_discount }}%</div>
 <div class="d-flex align-items-end gap-2">
   <span class="old-price-big">
     {{ tour.price_per_night }} $
@@ -366,143 +309,17 @@
 {% endif %}
 
 {% if reservation %}
-
-  <div class="mt-3">
-
-    <!-- ✅ DETAILS -->
-    <div class="border rounded p-3 bg-light small mb-3">
-      <div class="d-flex justify-content-between">
-        <span><i class="fa-regular fa-calendar me-1"></i> Dates</span>
-        <strong>{{ reservation.start_date }} → {{ reservation.end_date }}</strong>
-      </div>
-
-      <div class="d-flex justify-content-between mt-2">
-        <span><i class="fa-solid fa-calendar-day me-1"></i> Days</span>
-        <strong>{{ reservation.duration_days }} day{{ reservation.duration_days|pluralize }}</strong>
-      </div>
-
-      <div class="d-flex justify-content-between mt-2">
-        <span><i class="fa-solid fa-users me-1"></i> Persons</span>
-        <strong>{{ reservation.num_persons }}</strong>
-      </div>
-
-      <div class="d-flex justify-content-between mt-2">
-        <span><i class="fa-solid fa-money-bill-wave me-1"></i> Total</span>
-        <strong>{{ reservation.total_price }} $</strong>
-      </div>
-
-      <hr class="my-2">
-
-      <div class="d-flex justify-content-between">
-        <span><i class="fa-regular fa-credit-card me-1"></i> Method</span>
-        <strong class="text-uppercase">{% if reservation.payment_method %}{{ reservation.get_payment_method_display }}{% else %}-{% endif %}</strong>
-      </div>
-
-      <div class="d-flex justify-content-between mt-2">
-        <span><i class="fa-solid fa-circle-info me-1"></i> Payment status</span>
-
-        {% if reservation.payment_status == 'paid' %}
-          <span class="badge bg-success">PAID</span>
-        {% else %}
-          <span class="badge bg-warning text-dark">UNPAID</span>
-        {% endif %}
-      </div>
-    </div>
-
-    <!-- ✅ STATUS -->
-    {% if reservation.status == 'pending' %}
-      <div class="alert alert-warning small">
-        <i class="fa-solid fa-clock me-1"></i>
-        Your booking is under review. Please wait for admin validation.
-      </div>
-
-      <a class="btn btn-outline-success w-100" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
-        <i class="fa-brands fa-whatsapp me-1"></i>
-        Contact {{ brand_name }}
-      </a>
-
-      <button class="btn btn-warning w-100 mt-2" disabled>
-        Pending validation
-      </button>
-
-    {% elif reservation.status == 'booked' %}
-      <div class="alert alert-success small">
-        <i class="fa-solid fa-circle-check me-1"></i>
-        Booking validated ✅
-      </div>
-
-      {% if reservation.payment_status != 'paid' %}
-        <div class="alert alert-info small">
-          <i class="fa-solid fa-triangle-exclamation me-1"></i>
-          You have not paid yet.
-        </div>
-
-        {% if country == 'morocco' %}
-          <p class="alert alert-info small">For bank transfer, contact your guide for bank details after validation.</p>
-        {% elif reservation.payment_method == 'card' %}
-<button type="button"
-        class="btn btn-dark w-100"
-        id="payNowBtn"
-        data-reservation-id="{{ reservation.id }}"
-        data-total="{{ reservation.total_price }}">
-  Pay now
-</button>
-
-        {% endif %}
-      {% endif %}
-
-      <button class="btn btn-success w-100 mt-2" disabled>
-        Booked
-      </button>
-
-      <div class="text-muted small mt-2">
-        To cancel a validated booking, please contact {{ brand_name }}.
-      </div>
-
-    {% elif reservation.status == 'completed' %}
-      <div class="alert alert-secondary small">
-        <i class="fa-solid fa-flag-checkered me-1"></i>
-        Trip completed.
-      </div>
-
-      <a class="btn btn-outline-success w-100" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
-        <i class="fa-brands fa-whatsapp me-1"></i>
-        Contact {{ brand_name }}
-      </a>
-
-      <button class="btn btn-secondary w-100 mt-2" disabled>
-        Completed
-      </button>
-
-
-
-    {% elif reservation.status == 'rejected' %}
-      <div class="alert alert-danger small">
-        <i class="fa-solid fa-xmark me-1"></i>
-        Your booking was rejected. Please choose other dates.
-      </div>
-{% elif reservation.status == 'cancelled' %}
-  <div class="alert alert-secondary small">
-    <i class="fa-solid fa-ban me-1"></i>
-    This reservation was cancelled. You can book again.
-  </div>
-  {% include "partials/booking_form.html" %}
-
-    {% endif %}
-
-  </div>
-
+<p class="small mt-3">You already have a request for this departure.</p><a class="btn btn-primary" href="{% url 'my_reservations' %}">View my reservations</a>
 {% else %}
-
-  <!-- ✅ BOOKING FORM (no reservation yet) -->
-  <form method="post" id="booking-form" action="{% url 'book_tour' tour.id %}" {% if country == 'morocco' %}data-availability-url="{% url 'guide_availability' %}" data-authenticated="{{ user.is_authenticated|yesno:'true,false' }}" data-login-url="{% url 'login' %}"{% endif %}>
-    {% if country == 'morocco' %}
+  {% if not scheduled_tours or selected_departure %}
+  <form method="post" id="booking-form" action="{% url 'book_tour' tour.id %}" {% if scheduled_tours %}data-availability-url="{% url 'guide_availability' %}?country={{ country }}" data-authenticated="{{ user.is_authenticated|yesno:'true,false' }}" data-login-url="{% url 'login' %}"{% endif %}>
+    {% if scheduled_tours %}
       {% include 'partials/morocco_booking_rules.html' %}
-      <p id="guide-availability-status" class="availability-status small" role="status" aria-live="polite">Choose a scheduled departure to check availability.</p>
+      <p id="guide-availability-status" class="availability-status small" role="status" aria-live="polite">Checking availability for your selected dates…</p>
     {% endif %}
     {% csrf_token %}
 
-{% if tour.is_promotion and tour.discount_percent > 0 and tour.promo_price %}
+{% if tour.effective_discount > 0 %}
   <input type="hidden" id="base-price" value="{{ tour.promo_price|unlocalize }}">
 {% else %}
   <input type="hidden" id="base-price" value="{{ tour.price_per_night|unlocalize }}">
@@ -513,20 +330,16 @@
         <span class="booking-form-step">1</span>
         <div>
           <label class="fw-bold mb-1">Dates</label>
-          <div class="booking-form-hint">{% if country == 'morocco' %}Your scheduled departure{% else %}Choose your trip window{% endif %}</div>
+          <div class="booking-form-hint">{% if scheduled_tours %}Your scheduled departure{% else %}Choose your trip window{% endif %}</div>
         </div>
       </div>
 
-      {% if country == 'morocco' %}
-                <select id="departure-choice" name="departure_id" class="form-select mt-3" aria-label="Scheduled dates" style="width:100%;min-width:0" required>
-                  <option value="">Choose a departure</option>
-                  {% for departure in tour_departures %}
-                    <option value="{{ departure.pk }}" {% if selected_departure.pk == departure.pk %}selected{% endif %} {% if not departure.available %}disabled{% endif %}>
-                      {{ departure.start_date|date:"d M Y" }}{% if departure.end_date != departure.start_date %} - {{ departure.end_date|date:"d M Y" }}{% endif %} · {{ departure.billable_days }} day{{ departure.billable_days|pluralize }}{% if not departure.available %} · Unavailable{% endif %}
-                    </option>
-                  {% endfor %}
-                </select>
-        {% if not tour_departures %}<p class="small mt-2 mb-0">No departures published yet. Please contact your guide for upcoming dates.</p>{% endif %}
+      {% if scheduled_tours %}
+        <div class="fixed-departure mt-3" aria-label="Selected departure">
+          <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+          <div><strong>{{ selected_departure.start_date|date:'j M Y' }} – {{ selected_departure.end_date|date:'j M Y' }}</strong><span>{{ selected_departure.duration_days }} day{{ selected_departure.duration_days|pluralize }} · Dates included in this journey</span></div>
+        </div>
+        <input type="hidden" name="departure_id" value="{{ selected_departure.pk }}">
         <input type="hidden" id="booking-tour-id" value="{{ tour.pk }}">
         <input type="hidden" id="booking-days" value="{{ selected_departure.active_days|default:0 }}">
         <input type="hidden" id="start_date" name="start_date" value="{{ selected_departure.start_date|date:'Y-m-d' }}">
@@ -544,7 +357,7 @@
       {% endif %}
     </div>
 
-    {% if country != 'morocco' %}
+    {% if not scheduled_tours %}
     <div id="dateWarning" class="alert alert-warning py-2 px-3 small d-none mt-2">
       <i class="fa-solid fa-triangle-exclamation me-1"></i>
       This date range is already booked. Please select another date.
@@ -569,7 +382,7 @@
           <div class="booking-form-hint">Number of travelers</div>
         </div>
       </div>
-      <input type="number" id="persons" name="persons" value="1" min="1"
+      <input type="number" id="persons" name="persons" value="1" min="1" {% if selected_departure %}max="{{ selected_departure.max_participants }}"{% endif %}
              class="form-control booking-person-input mt-3">
     </div>
 
@@ -578,7 +391,7 @@
     </p>
 
     <div class="alert alert-success small mb-3">
-      <i class="fa-solid fa-gift"></i> 10% discount for 5+ persons
+      <i class="fa-solid fa-gift"></i> 10% discount for groups of more than 5 people
     </div>
 
     <div class="booking-total-bar d-flex justify-content-between fw-bold mb-3">
@@ -603,24 +416,25 @@
       </label>
 
       <label class="payment-option">
-        <input class="form-check-input" type="radio" name="payment_method" value="{% if country == 'morocco' %}transfer{% else %}card{% endif %}" required>
+        <input class="form-check-input" type="radio" name="payment_method" value="{% if scheduled_tours %}transfer{% else %}card{% endif %}" required>
         <span class="payment-option-body">
-          <span class="payment-option-title">{% if country == "morocco" %}<i class="fa-solid fa-building-columns me-2" aria-hidden="true"></i> Bank transfer{% else %}Card payment{% endif %}</span>
-          <span class="payment-option-sub">{% if country == 'morocco' %}Bank details provided after booking validation{% else %}Secure payment via Stripe (after validation){% endif %}</span>
+          <span class="payment-option-title">{% if scheduled_tours %}<i class="fa-solid fa-building-columns me-2" aria-hidden="true"></i> Bank transfer{% else %}Card payment{% endif %}</span>
+          <span class="payment-option-sub">{% if scheduled_tours %}Bank details provided after booking validation{% else %}Secure payment via Stripe (after validation){% endif %}</span>
         </span>
       </label>
     </div>
 
-    <button id="confirmCashBtn" class="btn btn-primary w-100" {% if country == 'morocco' and not selected_departure %}disabled{% endif %}>
-      {% if country == 'morocco' %}Request this tour{% else %}Confirm booking{% endif %}
+    <button id="confirmCashBtn" class="btn btn-primary w-100" {% if scheduled_tours and not selected_departure %}disabled{% endif %}>
+      {% if scheduled_tours %}Request this tour{% else %}Confirm booking{% endif %}
     </button>
 
-    <a class="btn btn-outline-success w-100 mt-2" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
-      <i class="fa-brands fa-whatsapp me-1"></i>
-      Ask {{ brand_name }} on WhatsApp
-    </a>
+    <a class="btn btn-outline-secondary w-100 mt-2" href="mailto:{{ support_email }}"><i class="fa-regular fa-envelope me-1" aria-hidden="true"></i>Email {{ brand_name }}</a>
 
   </form>
+  {% else %}
+  <div class="empty-journeys"><h3>Choose your dated journey</h3><p>Find the departure that suits you, then confirm your group here.</p><a class="btn btn-primary" href="{% url 'reservations' %}?country={{ tour.country }}&amp;q={{ tour.title|urlencode }}">View dates &amp; availability <i class="fa-regular fa-calendar" aria-hidden="true"></i></a></div>
+  {% endif %}
+
 
 {% endif %}
 
@@ -634,7 +448,7 @@
 <!-- ✅ RIGHT SIDEBAR (BOOTSTRAP OFFCANVAS) -->
 
 <!-- ✅ RIGHT SIDEBAR (BOOTSTRAP OFFCANVAS) -->
-{% if country != 'morocco' %}
+{% if not scheduled_tours %}
 <div class="offcanvas offcanvas-end" tabindex="-1" id="cardSidebar">
   <div class="offcanvas-header">
   <h5 class="offcanvas-title fw-bold">
@@ -687,21 +501,21 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body pt-3">
-        <img id="itineraryImageModalPhoto" src="{% static 'img/placeholder.jpg' %}" alt="" class="img-fluid w-100 rounded-4">
+        <img id="itineraryImageModalPhoto" src="{% static 'img/culture-hop-ch.svg' %}" alt="" class="img-fluid w-100 rounded-4">
       </div>
     </div>
   </div>
 </div>
 
-{% if country != 'morocco' %}
-{% if country != 'morocco' %}<script src="https://js.stripe.com/v3/"></script>{% endif %}
+{% if not scheduled_tours %}
+{% if not scheduled_tours %}<script src="https://js.stripe.com/v3/"></script>{% endif %}
 {% elif reservation.status == 'booked' and reservation.payment_method == 'card' and reservation.payment_status != 'paid' %}
-{% if country != 'morocco' %}<script src="https://js.stripe.com/v3/" defer></script>{% endif %}
+{% if not scheduled_tours %}<script src="https://js.stripe.com/v3/" defer></script>{% endif %}
 {% endif %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
-  if (document.body.classList.contains("theme-morocco")) return;
+  if (document.body.dataset.scheduledTours === 'true') return;
   const startInput   = document.getElementById("start_date");
   const endInput     = document.getElementById("end_date");
   const personsInput = document.getElementById("persons");
@@ -788,7 +602,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     let total = (basePrice * days * persons) + extrasTotal;
-    if (persons >= 5) total *= 0.9;
+    if (persons > 5) total *= 0.9;
 
     totalOutput.textContent = total.toFixed(2) + " $";
   }
@@ -799,6 +613,15 @@ document.addEventListener("DOMContentLoaded", function () {
   endInput.addEventListener("change", calculateTotal);
   if (extraEls && extraEls.length) extraEls.forEach((el) => el.addEventListener('change', calculateTotal));
 
+  if (typeof Litepicker === 'undefined') {
+    startInput.type = 'date';
+    endInput.type = 'date';
+    startInput.addEventListener('change', calculateTotal);
+    endInput.addEventListener('change', calculateTotal);
+    personsInput.addEventListener('input', calculateTotal);
+    calculateTotal();
+    return;
+  }
   const picker = new Litepicker({
     element: startInput,
     elementEnd: endInput,
@@ -1387,6 +1210,26 @@ async function openAndInitStripe(){
   .booking-layout .col-lg-4{
     min-width:0;
   }
+  @media (min-width: 992px){
+    .booking-page-shell{max-width:1440px;width:calc(100% - 48px);}
+    .booking-layout{--bs-gutter-x:2rem;}
+    .booking-main-column{width:60%;}
+    .booking-sidebar-column{width:40%;}
+    .booking-sidebar{
+      top:24px;
+      max-height:calc(100dvh - 48px);
+      overflow-y:auto;
+      overflow-x:hidden;
+      overscroll-behavior-y:contain;
+      scrollbar-gutter:stable;
+      scrollbar-width:thin;
+      scrollbar-color:#668c7d #edf1eb;
+    }
+    .booking-sidebar::-webkit-scrollbar{width:8px;}
+    .booking-sidebar::-webkit-scrollbar-thumb{background:#668c7d;border-radius:8px;}
+    .booking-sidebar::-webkit-scrollbar-track{background:#edf1eb;}
+    .booking-sidebar:focus-visible{outline:3px solid #668c7d;outline-offset:4px;}
+  }
   @media (max-width: 991.98px){
     .booking-sidebar{
       position:static;
@@ -1885,7 +1728,7 @@ async function openAndInitStripe(){
     const nextDayButton = document.getElementById('itinerary-next-day');
     const dayPanelsStack = document.getElementById('itinerary-days-stack');
     const extraInputs = Array.from(document.querySelectorAll('.extra-activity-input'));
-    const placeholderImage = "{% static 'img/placeholder.jpg' %}";
+    const placeholderImage = "{% static 'img/culture-hop-ch.svg' %}";
     const imageModalElement = document.getElementById('itineraryImageModal');
     const imageModalLabel = document.getElementById('itineraryImageModalLabel');
     const imageModalLocation = document.getElementById('itineraryImageModalLocation');
@@ -2370,11 +2213,11 @@ async function openAndInitStripe(){
 
     const autobook = params.get('autobook');
 
-    if (!document.body.classList.contains('theme-morocco') && startField && startValue) {
+    if (document.body.dataset.scheduledTours !== 'true' && startField && startValue) {
       startField.value = startValue;
       startField.dispatchEvent(new Event('change', { bubbles: true }));
     }
-    if (!document.body.classList.contains('theme-morocco') && endField && endValue) {
+    if (document.body.dataset.scheduledTours !== 'true' && endField && endValue) {
       endField.value = endValue;
       endField.dispatchEvent(new Event('change', { bubbles: true }));
     }
@@ -2396,7 +2239,7 @@ async function openAndInitStripe(){
 
     // Auto-submit when requested and the form is complete.
     // Note: booking is always pending admin validation.
-    if (!document.body.classList.contains('theme-morocco') && bookingForm && (autobook === '1' || autobook === 'true')) {
+    if (document.body.dataset.scheduledTours !== 'true' && bookingForm && (autobook === '1' || autobook === 'true')) {
       // Wait a tick so Litepicker + pricing handlers settle.
       setTimeout(() => {
         const dateWarning = document.getElementById('dateWarning');
@@ -2418,7 +2261,7 @@ async function openAndInitStripe(){
   });
 </script>
 
-{% if country == 'morocco' %}
+{% if scheduled_tours %}
   {{ disabled_ranges|json_script:"guide-disabled-ranges" }}
   <script src="{% static 'js/morocco-booking.js' %}?v={{ static_version }}" defer></script>
 {% endif %}

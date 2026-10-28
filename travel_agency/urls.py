@@ -4,14 +4,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from apps.core.seo_views import country_sitemap, robots_txt
-from apps.core.admin_site import ireland_admin
-
-for model, model_admin in admin.site._registry.items():
-    if not ireland_admin.is_registered(model):
-        ireland_admin.register(model, model_admin.__class__)
+from django.views.generic import RedirectView
 
 urlpatterns = [
-    path('ireland-admin/', ireland_admin.urls),
+    path('ireland-admin/', RedirectView.as_view(url='/admin/', permanent=False)),
     path('admin/', admin.site.urls),
     path('robots.txt', robots_txt, name='robots_txt'),
     path('sitemap.xml', country_sitemap, name='sitemap'),

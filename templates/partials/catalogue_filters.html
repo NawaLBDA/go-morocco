@@ -1,0 +1,6 @@
+<form method="get" class="collection-navigation my-4" role="search">
+  <div><label for="catalogue-country">Country</label><select id="catalogue-country" name="country" class="form-select"><option value="">All countries</option>{% for destination in countries %}<option value="{{ destination.slug }}" {% if selected_country == destination.slug %}selected{% endif %}>{{ destination.name }}</option>{% endfor %}</select></div>
+  <div><label for="catalogue-year">Travel year</label><select id="catalogue-year" name="year" class="form-select"><option value="">{% if story_catalogue %}All story years / upcoming tours{% else %}All upcoming years{% endif %}</option>{% for year in years %}<option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>{% endfor %}</select></div>
+  <button class="btn btn-primary" type="submit">Explore</button>
+  <details class="collection-search" {% if search_q %}open{% endif %}><summary>Search a city or tour</summary><label class="visually-hidden" for="catalogue-query">City or tour</label><input id="catalogue-query" name="q" value="{{ search_q }}" class="form-control" placeholder="e.g. Rabat"></details>
+</form>

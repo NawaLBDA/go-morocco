@@ -13,6 +13,9 @@ class ResendEmailBackend(BaseEmailBackend):
                     raise RuntimeError('RESEND_API_KEY is not configured')
                 payload = {'from': message.from_email, 'to': message.to,
                            'subject': message.subject, 'text': message.body}
+                for alternative in getattr(message, 'alternatives', []):
+                    if alternative[1] == 'text/html':
+                        payload['html'] = alternative[0]
                 if message.reply_to:
                     payload['reply_to'] = message.reply_to
                 if message.cc:

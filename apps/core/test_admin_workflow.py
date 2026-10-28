@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from .models import Destination, Tour, TourActivity, TourDeparture, Reservation, ContactMessage
+from .models import Country, Destination, Tour, TourActivity, TourDeparture, Reservation, ContactMessage
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -11,6 +11,7 @@ class AdminWorkflowTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_superuser('site-manager', 'manager@example.test', 'test-password')
         self.client.force_login(self.user)
+        Country.objects.filter(slug='ireland').update(is_active=True)
         self.day = date.today() + timedelta(days=60)
         self.rabat = Tour.objects.create(title='Rabat programme', price_per_night=100,
             destination=Destination.objects.create(name='Rabat', country='morocco'))
@@ -28,7 +29,7 @@ class AdminWorkflowTests(TestCase):
 
     def test_published_departure_without_days_form_generates_full_itinerary(self):
         response = self.client.post('/admin/core/tourdeparture/add/', {
-            'tour': self.rabat.pk, 'start_date': self.day.isoformat(), 'end_date': '', 'is_published': 'on', '_save': 'Save'})
+            'tour': self.rabat.pk, 'max_participants': 12, 'start_date': self.day.isoformat(), 'end_date': '', 'is_published': 'on', '_save': 'Save'})
         self.assertEqual(response.status_code, 302)
         departure = TourDeparture.objects.get()
         self.assertEqual(departure.end_date, self.day + timedelta(days=4))
@@ -38,7 +39,7 @@ class AdminWorkflowTests(TestCase):
 
     def test_old_manual_day_payload_no_longer_causes_duplicate_day_server_error(self):
         response = self.client.post('/admin/core/tourdeparture/add/', {
-            'tour': self.rabat.pk, 'start_date': self.day.isoformat(), 'end_date': self.day.isoformat(), 'is_published': 'on',
+            'tour': self.rabat.pk, 'max_participants': 12, 'start_date': self.day.isoformat(), 'end_date': self.day.isoformat(), 'is_published': 'on',
             'program_days-TOTAL_FORMS': 1, 'program_days-INITIAL_FORMS': 0,
             'program_days-MIN_NUM_FORMS': 0, 'program_days-MAX_NUM_FORMS': 1000,
             'program_days-0-day_number': 1, 'program_days-0-is_visible': 'on',
@@ -56,7 +57,7 @@ class AdminWorkflowTests(TestCase):
     def test_shortening_departure_removes_generated_trailing_days_without_error(self):
         departure = TourDeparture.objects.create(tour=self.rabat, start_date=self.day,
             end_date=self.day + timedelta(days=4), is_published=True)
-        data = {'start_date': self.day.isoformat(), 'end_date': self.day.isoformat(), 'is_published': 'on',
+        data = {'max_participants': 12, 'start_date': self.day.isoformat(), 'end_date': self.day.isoformat(), 'is_published': 'on',
             'program_days-TOTAL_FORMS': 5, 'program_days-INITIAL_FORMS': 5,
             'program_days-MIN_NUM_FORMS': 0, 'program_days-MAX_NUM_FORMS': 0, '_continue': 'Save'}
         for index, day in enumerate(departure.program_days.all()):
@@ -93,29 +94,21 @@ class AdminWorkflowTests(TestCase):
         self.assertNotContains(response, 'name="program_days-0-day_number"')
         self.assertFalse(response.context['inline_admin_formsets'][0].has_add_permission)
 
-    def test_country_lists_forms_and_direct_object_urls_are_separate(self):
-        for prefix, included, excluded in [('/admin/', self.rabat, self.dublin), ('/ireland-admin/', self.dublin, self.rabat)]:
-            response = self.client.get(prefix + 'core/tour/')
-            self.assertContains(response, included.title)
-            self.assertNotContains(response, excluded.title)
-            response = self.client.get(prefix + 'core/tourdeparture/add/')
-            field = response.context['adminform'].form.fields['tour']
-            self.assertIn(included, field.queryset)
-            self.assertNotIn(excluded, field.queryset)
-            response = self.client.get(prefix + f'core/tour/{excluded.pk}/change/')
-            self.assertEqual(response.status_code, 302)
-        response = self.client.get('/ireland-admin/')
-        self.assertContains(response, 'href="/admin/"')
-        self.assertContains(response, 'href="/ireland-admin/"')
-
-    def test_cross_site_departure_post_cannot_create_record(self):
-        response = self.client.post('/admin/core/tourdeparture/add/', {
-            'tour': self.dublin.pk, 'start_date': self.day.isoformat(), 'end_date': self.day.isoformat()})
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(TourDeparture.objects.exists())
+    def test_global_admin_lists_and_edits_all_countries_with_explicit_filters(self):
+        response = self.client.get('/admin/core/tour/')
+        self.assertContains(response, self.rabat.title)
+        self.assertContains(response, self.dublin.title)
+        response = self.client.get('/admin/core/tour/', {'country': 'morocco'})
+        self.assertContains(response, self.rabat.title)
+        self.assertNotContains(response, self.dublin.title)
+        response = self.client.get('/admin/core/tourdeparture/add/')
+        field = response.context['adminform'].form.fields['tour']
+        self.assertIn(self.rabat, field.queryset)
+        self.assertIn(self.dublin, field.queryset)
+        self.assertEqual(self.client.get(f'/admin/core/tour/{self.dublin.pk}/change/').status_code, 200)
 
     def test_irish_destination_creation_stays_in_irish_site(self):
-        response = self.client.post('/ireland-admin/core/destination/add/', {
+        response = self.client.post('/admin/core/destination/add/', {'country': 'ireland',
             'name': 'Cork', 'description': '', 'gallery-TOTAL_FORMS': 0, 'gallery-INITIAL_FORMS': 0,
             'gallery-MIN_NUM_FORMS': 0, 'gallery-MAX_NUM_FORMS': 1000, '_save': 'Save'})
         self.assertEqual(response.status_code, 302)

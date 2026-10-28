@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block page %}reservations{% endblock %}
+{% block content %}
+<section class="global-section"><div class="container">
+  <div class="section-heading"><div><div class="eyebrow">FIND YOUR NEXT CHAPTER</div><h1>{% if selected_country_record %}Journeys through {{ selected_country_record.name }}{% else %}Where will you go next?{% endif %}</h1></div><p>Choose a country, then a dated departure. Every private group has its own maximum size.</p></div>
+  {% include 'partials/catalogue_filters.html' %}
+  {% if selected_country_record %}<div class="country-overview"><a href="{% url 'reservations' %}{% if selected_year %}?year={{ selected_year }}{% endif %}">← All countries</a><p>{{ selected_country_record.available_tour_count }} available tour{{ selected_country_record.available_tour_count|pluralize }} · {{ selected_country_record.available_count }} departure{{ selected_country_record.available_count|pluralize }} · {{ selected_country_record.booked_travelers }} travelers reserved{% if selected_year %} · {{ selected_year }}{% endif %}</p><a href="{% url 'blog_list' %}?country={{ selected_country }}">Stories &amp; moments from {{ selected_country_record.name }} ↗</a></div>{% endif %}
+  {% if country_picker %}{% include 'partials/country_packs.html' %}{% else %}{% include 'partials/departure_groups.html' %}{% endif %}
+</div></section>
+{% endblock %}

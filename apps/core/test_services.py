@@ -30,16 +30,16 @@ class ServiceTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             booking = self.book()
             self.assertEqual(len(mail.outbox), 0)
-        self.assertEqual(len(mail.outbox), 2)
-        self.assertEqual({message.to[0] for message in mail.outbox}, {'one@example.com', 'two@example.com'})
+        self.assertEqual(len(mail.outbox), 4)
+        self.assertEqual({message.to[0] for message in mail.outbox}, {'one@example.com', 'two@example.com', 'alex@example.com', 'contact@culturehoptours.com'})
         self.assertIn('Rabat', mail.outbox[0].body)
         with self.captureOnCommitCallbacks(execute=True):
             booking.admin_note = 'Edited'
             booking.save()
-        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(len(mail.outbox), 4)
         for notice in booking.notifications.all():
             deliver_notification(notice.pk)
-        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(len(mail.outbox), 4)
 
     def test_rollback_sends_nothing(self):
         BookingNotificationSettings.objects.create(country='morocco', email_recipients='one@example.com')
@@ -58,7 +58,7 @@ class ServiceTests(TestCase):
         with patch('apps.reservations.notifications.EmailMessage.send', side_effect=OSError('offline')):
             with self.captureOnCommitCallbacks(execute=True):
                 booking = self.book()
-        notice = booking.notifications.get()
+        notice = booking.notifications.get(recipient='one@example.com', audience='staff')
         self.assertEqual(notice.status, 'failed')
         self.assertTrue(Reservation.objects.filter(pk=booking.pk).exists())
         deliver_notification(notice.pk)
@@ -124,7 +124,7 @@ class ServiceTests(TestCase):
         staff = User.objects.create_superuser('staff', 'staff@example.com', 'test-password')
         self.client.force_login(staff)
         self.assertContains(self.client.get('/admin/core/bookingnotification/'), 'private@example.com')
-        self.assertNotContains(self.client.get('/ireland-admin/core/bookingnotification/'), 'private@example.com')
+        self.assertNotContains(self.client.get('/admin/core/bookingnotification/', {'reservation__tour__country': 'ireland'}), 'private@example.com')
 
     @override_settings(HF_API_TOKEN='', OPENAI_API_KEY='')
     def test_chat_endpoints_degrade_to_real_tours_without_provider(self):

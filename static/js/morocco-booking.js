@@ -1,24 +1,5 @@
 /* Scheduled departures: the server validates the programme and locks the guide calendar. */
 document.addEventListener('DOMContentLoaded', () => {
-  const choice = document.getElementById('departure-choice');
-  choice?.addEventListener('change', () => {
-    if (!choice.value) return;
-    const url = new URL(location.href);
-    url.searchParams.set('departure_id', choice.value);
-    const travelers = choice.form.querySelector('[name="persons"]');
-    const payment = choice.form.querySelector('[name="payment_method"]:checked');
-    if (travelers) url.searchParams.set('persons', travelers.value);
-    if (payment) url.searchParams.set('payment_method', payment.value);
-    url.searchParams.delete('autobook');
-    url.searchParams.delete('start_date');
-    url.searchParams.delete('end_date');
-    url.searchParams.delete('extra_activity_ids');
-    document.querySelectorAll('.extra-activity-toggle:checked').forEach(extra => {
-      url.searchParams.append('extra_activity_ids', extra.value);
-    });
-    url.hash = 'booking-form';
-    location.assign(url.href);
-  });
   const form = document.getElementById('booking-form');
   if (!form?.dataset.availabilityUrl) return;
   const departure = form.querySelector('[name="departure_id"]');
@@ -32,15 +13,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const count = Number(document.getElementById('booking-days').value);
   const base = Number(document.getElementById('base-price').value);
   const extras = [...document.querySelectorAll('.extra-activity-toggle')];
-  let timer, revision = 0, submitting = false;
+  let timer, revision = 0, submitting = false, availabilityNotified = false;
   const selection = () => new URLSearchParams(new FormData(form)).toString();
   function message(text, state = '') {
     status.textContent = text;
     status.dataset.state = state;
+    status.hidden = state === 'available';
+    if (state === 'available' && !availabilityNotified) {
+      window.showSiteToast?.(`${document.getElementById('booking-approval-notice')?.textContent || ''} ${text}`, 'info');
+      availabilityNotified = true;
+    }
   }
   function localError() {
     if (!departure.value || !count) return 'Choose a scheduled departure to see your programme and total.';
     if (!Number.isInteger(Number(persons.value)) || Number(persons.value) < 1) return 'Enter at least one traveler.';
+    if (persons.max && Number(persons.value) > Number(persons.max)) return `This departure accommodates up to ${persons.max} travelers.`;
     return '';
   }
   function price() {
@@ -51,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     extras.filter(el => el.checked).forEach(el => {
       amount += Number(el.dataset.price || 0) * travelers * (el.dataset.perNight === '1' ? count : 1);
     });
-    if (travelers >= 5) amount *= .9;
+    if (travelers > 5) amount *= .9;
     total.textContent = `${amount.toFixed(2)} $`;
   }
   async function check() {
@@ -85,6 +72,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   function changed() {
+    if (persons.value && persons.max && Number(persons.value) > Number(persons.max)) {
+      persons.value = persons.max;
+      window.showSiteToast?.(`Maximum ${persons.max} travelers for this departure.`, 'info');
+    }
     revision++;
     clearTimeout(timer);
     button.disabled = true;

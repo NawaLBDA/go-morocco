@@ -1,15 +1,21 @@
 from django.urls import path
-from . import views
+from . import views, global_views, account_views
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
-    path('', views.home, name='home'),
-    path('reservations/', views.reservations, name='reservations'),
+    path('profile/', account_views.profile, name='profile'),
+    path('profile/reservations/', account_views.my_reservations, name='my_reservations'),
+    path('account/password/reset/', account_views.TravelerPasswordResetView.as_view(), name='password_reset'),
+    path('account/password/reset/sent/', auth_views.PasswordResetDoneView.as_view(template_name='account/password_reset_done.html'), name='password_reset_done'),
+    path('account/password/reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(template_name='account/password_reset_confirm.html'), name='password_reset_confirm'),
+    path('account/password/reset/complete/', auth_views.PasswordResetCompleteView.as_view(template_name='account/password_reset_complete.html'), name='password_reset_complete'),
+    path('', global_views.home, name='home'),
+    path('reservations/', global_views.tours, name='reservations'),
     # Legacy numeric URL (backward compatibility)
     path('tour/<int:tour_id>/', views.tour_detail_legacy, name='tour_detail_legacy'),
     path('tour/<slug:tour_slug>/', views.tour_detail, name='tour_detail'),
 
-    path('blog/', views.blog_list, name='blog_list'),
+    path('blog/', global_views.travel_stories, name='blog_list'),
     path('blog/<slug:slug>/', views.blog_detail, name='blog_detail'),
 
     path('about/', views.about, name='about'),

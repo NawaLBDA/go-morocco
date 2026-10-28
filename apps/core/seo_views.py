@@ -7,11 +7,7 @@ from .seo import is_local_preview, morocco_url
 
 
 def country_sitemap(request):
-    """Sitemap that respects the current country (morocco/ireland).
-
-    This works with the Render single-domain setup because the prefix middleware
-    sets the script prefix, so URLs in the sitemap include /morocco/ or /ireland/.
-    """
+    """One sitemap for every active country on the global site."""
 
     country = get_country_from_site(request)
 
@@ -27,7 +23,7 @@ def country_sitemap(request):
 def robots_txt(request):
     country = get_country_from_site(request)
     return render(request, 'robots.txt', {
-        'morocco_robots': country == 'morocco',
-        'local_preview': country == 'morocco' and is_local_preview(request),
+        'morocco_robots': True,
+        'local_preview': is_local_preview(request),
         'sitemap_url': morocco_url('/sitemap.xml'),
     }, content_type='text/plain')

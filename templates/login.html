@@ -57,18 +57,15 @@
 
       <p class="auth-footer mt-3">
         Don’t have an account?
-        <a href="{% url 'register' %}">Create one</a>
+        <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Create one</a>
       </p>
 
       <div class="text-center mt-3 small" style="opacity:.85;">
-        {% if country == 'ireland' %}
-          🇮🇪 Ireland site
-        {% else %}
-          🇲🇦 Morocco site
-        {% endif %}
+        {{ brand_name }} · {{ site_settings.tagline }}
       </div>
 
     </div>
   </div>
 </section>
+<p class="text-center pb-4"><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
 {% endblock %}

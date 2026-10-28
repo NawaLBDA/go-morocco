@@ -7,6 +7,7 @@
 {% endblock %}
 
 {% block content %}
+{% include 'partials/guiding_team.html' %}
 
 <div class="row">
 
@@ -79,7 +80,7 @@
                value="1" min="1" class="form-control mb-3">
 
         <div class="alert alert-success small">
-          🎉 10% discount for 5+ persons
+          🎉 10% discount for groups of more than 5 people
         </div>
 
         <div class="d-flex justify-content-between mb-3">
@@ -141,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     let total = base * nights * parseInt(persons.value || 1);
-    if (persons.value >= 5) total *= 0.9;
+    if (persons.value > 5) total *= 0.9;
 
     livePrice.textContent = total.toFixed(2) + ' $';
   }

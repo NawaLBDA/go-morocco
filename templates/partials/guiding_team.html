@@ -1,0 +1,21 @@
+{% with guides=reservation.guiding_team|default:tour.guiding_team %}
+<section class="guiding-team my-4" aria-labelledby="guiding-team-title">
+  <div class="eyebrow">THE PEOPLE BEHIND YOUR JOURNEY</div>
+  <h2 id="guiding-team-title">Meet your local team</h2>
+  <p class="guiding-team-intro">Local knowledge, personal connections. Your guide or guiding team will be confirmed with your reservation.</p>
+  <div class="guide-grid">
+    {% for guide in guides %}
+    <article class="guide-profile">
+      {% if guide.photo %}
+      <img class="guide-photo" src="{{ guide.photo.url }}" alt="{{ guide.name }}" width="128" height="128" loading="lazy" decoding="async">
+      {% else %}
+      <span class="guide-initial" aria-hidden="true">{{ guide.name|first }}</span>
+      {% endif %}
+      <div class="guide-profile-copy"><h3>{{ guide.name }}</h3><p class="guide-country">{{ guide.country.name }}</p><div class="guide-description">{{ guide.description|linebreaks }}</div></div>
+    </article>
+    {% empty %}
+    <p class="guide-team-pending">Your local guiding team is being arranged. <a href="{% url 'contact' %}?country={{ tour.country }}">Contact us to learn more.</a></p>
+    {% endfor %}
+  </div>
+</section>
+{% endwith %}

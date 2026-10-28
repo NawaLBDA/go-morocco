@@ -87,10 +87,10 @@ class MoroccoSEOTests(TestCase):
         self.assertEqual(head.meta['description'], self.tour.description)
         graph = json.loads(head.schemas[0])['@graph']
         types = {node['@type'] for node in graph}
-        self.assertIn('Person', types)
+        self.assertIn('TravelAgency', types)
         self.assertIn('TouristTrip', types)
         self.assertIn('BreadcrumbList', types)
-        self.assertNotIn('TravelAgency', types)
+        self.assertNotIn('Person', types)
 
     def test_article_schema_uses_real_publication_date(self):
         head = self.get_head('/blog/' + self.post.slug + '/')
@@ -133,18 +133,21 @@ class MoroccoSEOTests(TestCase):
     def test_old_numeric_tour_url_redirects_permanently(self):
         response = self.client.get(f'/morocco/tour/{self.tour.pk}/')
         self.assertEqual(response.status_code, 301)
-        self.assertEqual(response.url, '/morocco/tour/' + self.tour.slug + '/')
+        self.assertEqual(response.url, '/tour/' + self.tour.slug + '/')
 
-    def test_country_host_wins_over_old_session_but_explicit_prefix_wins(self):
-        self.client.get('/ireland/', HTTP_HOST='basmamoroccoexperience.com')
+    def test_global_identity_does_not_change_with_host_or_old_session(self):
+        session = self.client.session
+        session['site_country'] = 'ireland'
+        session.save()
         head = self.get_head('/')
-        self.assertIn('Morocco', head.titles[0])
-        response = self.client.get('/ireland/', HTTP_HOST='basmamoroccoexperience.com')
-        self.assertContains(response, 'theme-ireland')
+        self.assertEqual(head.titles[0], 'Culture Hop Tours')
+        response = self.client.get('/', HTTP_HOST='basmamoroccoexperience.com')
+        self.assertContains(response, 'global-site')
         self.assertNotContains(response, 'morocco-layout.css')
+        self.assertEqual(self.client.get('/ireland/').status_code, 404)
 
-    def test_ireland_sitemap_remains_separate(self):
-        response = self.client.get('/ireland/sitemap.xml')
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '/ireland/tour/' + self.irish_tour.slug + '/')
-        self.assertNotContains(response, self.tour.slug)
+    def test_inactive_country_does_not_create_another_site_or_sitemap(self):
+        self.assertEqual(self.client.get('/ireland/sitemap.xml').status_code, 404)
+        response = self.client.get('/sitemap.xml')
+        self.assertContains(response, self.tour.slug)
+        self.assertNotContains(response, self.irish_tour.slug)

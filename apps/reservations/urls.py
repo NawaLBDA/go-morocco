@@ -1,7 +1,9 @@
 from django.urls import path
-from . import views
+from . import views, waitlist_views
 
 urlpatterns = [
+    path('departure/<int:departure_id>/waitlist/', waitlist_views.join_waitlist, name='join_waitlist'),
+    path('dashboard/waitlist/<int:entry_id>/<str:action>/', waitlist_views.waitlist_decision, name='waitlist_decision'),
     path("api/guide-availability/", views.guide_availability, name="guide_availability"),
     # ✅ create booking (POST)
     path("tour/<int:tour_id>/book/", views.book_tour, name="book_tour"),

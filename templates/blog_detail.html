@@ -3,7 +3,7 @@
 {% block content %}
 
 <section class="container my-5">
-  {% if country == 'morocco' %}
+  {% if scheduled_tours %}
   <nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb small">
       <li class="breadcrumb-item"><a href="{% url 'home' %}">Home</a></li>
@@ -48,6 +48,7 @@
 {% endif %}
 
 
+  {% if post.video_url %}<p><a class="global-button" href="{{ post.video_url }}" target="_blank" rel="noopener">Watch this trip’s story ?</a></p>{% endif %}
   <!-- CONTENU -->
   <div class="blog-content mb-5">
     {{ post.content|linebreaks }}

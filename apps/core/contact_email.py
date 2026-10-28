@@ -9,6 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 def notify_contact(enquiry):
+    from .email_identity import email_identity
+    _, sender, _ = email_identity(enquiry.country)
     """Keep the saved enquiry even if the notification cannot be delivered."""
     recipient = ContactEmailSettings.objects.filter(country=enquiry.country).values_list('recipient_email', flat=True).first()
     if not recipient:
@@ -17,7 +19,7 @@ def notify_contact(enquiry):
         return bool(EmailMessage(
             subject=f'[{enquiry.country.title()}] New contact enquiry #{enquiry.pk}',
             body=f'Name: {enquiry.name}\nEmail: {enquiry.email}\nSubject: {enquiry.subject}\n\n{enquiry.message}',
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=sender,
             to=[recipient],
             reply_to=[enquiry.email],
         ).send(fail_silently=False))

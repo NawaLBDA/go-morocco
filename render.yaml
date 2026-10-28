@@ -3,8 +3,12 @@ services:
     name: go-morocco
     env: python
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: python manage.py migrate --noinput && python manage.py seed_core_data && gunicorn travel_agency.wsgi:application
+    startCommand: python manage.py migrate --noinput && python manage.py seed_core_data && python manage.py seed_global_site && gunicorn travel_agency.wsgi:application
     envVars:
+      - key: MOROCCO_SITE_URL
+        value: https://www.culturehoptours.com
+      - key: CUSTOM_DOMAINS
+        value: culturehoptours.com,www.culturehoptours.com
       - key: ENVIRONMENT
         value: production
       - key: DEBUG

@@ -1,0 +1,21 @@
+{% if selected_departure %}
+<section class="departure-status card p-4 mb-4" id="departure-status" aria-labelledby="departure-status-title">
+  <div class="eyebrow">YOUR DATED DEPARTURE</div>
+  <h2 id="departure-status-title" class="h4">{{ selected_departure.start_date|date:'j M Y' }} – {{ selected_departure.end_date|date:'j M Y' }}</h2>
+  <p><strong>Up to {{ selected_departure.max_participants }} travelers per private group.</strong> You can book for fewer people.</p>
+  <p>{{ selected_departure.booked_travelers|default:0 }} travelers · {{ selected_departure.booked_groups|default:0 }} group{{ selected_departure.booked_groups|pluralize }} already booked or awaiting confirmation.</p>
+  {% if reservation %}<a href="{% url 'my_reservations' %}">View your requests in My reservations</a>
+  {% elif selected_departure.is_past %}<p class="mb-0">This departure has ended. <a href="{% url 'reservations' %}?country={{ tour.country }}">Explore upcoming journeys.</a></p>
+  {% elif selected_departure.available %}<p class="text-success mb-0">Available to request. Choose your group size in the booking form.</p>
+  {% elif waitlist_entry %}<p class="mb-0">Your waiting-list request: <strong>{{ waitlist_entry.get_status_display }}</strong>. Our team will respond by email.</p>
+  {% else %}
+  <h3 class="h5">Join the waiting list</h3><p>This departure is fully reserved. Our team can review another group if guiding capacity becomes available and will email you its decision.</p>
+  {% if user.is_authenticated %}<form method="post" action="{% url 'join_waitlist' selected_departure.pk %}" class="waitlist-form">{% csrf_token %}
+    <label class="form-label" for="waitlist-persons">Travelers in your group (maximum {{ selected_departure.max_participants }})</label><input class="form-control mb-3" type="number" name="persons" id="waitlist-persons" min="1" max="{{ selected_departure.max_participants }}" value="1" required>
+    <label class="form-label" for="waitlist-email">Email for our response</label><input class="form-control mb-3" type="email" name="email" id="waitlist-email" value="{{ user.email }}" required maxlength="254">
+    <label class="form-label" for="waitlist-message">Tell us about your group (optional)</label><textarea class="form-control mb-3" name="message" id="waitlist-message" rows="3" maxlength="3000"></textarea>
+    <button class="btn btn-primary" type="submit">Join waiting list</button><p class="small mt-2 mb-0">Joining the waiting list does not reserve a place.</p>
+  </form>{% else %}<a class="btn btn-primary" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in to join the waiting list</a>{% endif %}
+  {% endif %}
+</section>
+{% endif %}

@@ -42,8 +42,9 @@
       </div>
       {% endif %}
 
-      <form method="post" novalidate>
+      <form method="post">
         {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
 
         <div class="row">
           <!-- LEFT COLUMN -->
@@ -64,7 +65,8 @@
             <!-- EMAIL -->
             <div class="mb-3">
               <label>Email</label>
-              <input type="email" name="email" class="form-control" required>
+              {{ form.email|add_class:"form-control" }}
+              {% for error in form.email.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
             </div>
 
             <!-- FULL NAME -->
@@ -85,11 +87,7 @@
             <!-- COUNTRY -->
             <div class="mb-3">
               <label>Country</label>
-              <select name="country" class="form-control" required>
-                <option value="">Select country</option>
-                <option value="morocco" {% if country == 'morocco' %}selected{% endif %}>🇲🇦 Morocco</option>
-                <option value="ireland" {% if country == 'ireland' %}selected{% endif %}>🇮🇪 Ireland</option>
-              </select>
+              <input name="country" class="form-control" value="{{ request.POST.country|default:'' }}" maxlength="80" autocomplete="country-name" placeholder="Your country of residence" required>
             </div>
 
             <!-- POSTAL CODE -->

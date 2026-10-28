@@ -14,10 +14,7 @@
       </div>
       <div class="col-lg-4 text-lg-end">
         <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-          <a class="btn btn-primary" href="{{ whatsapp_link }}" target="_blank" rel="noopener">
-            <i class="fa-brands fa-whatsapp me-1"></i>
-            WhatsApp
-          </a>
+
           <a class="btn btn-outline-secondary" href="mailto:{{ support_email }}">
             <i class="fa-solid fa-envelope me-1"></i>
             Email
@@ -36,8 +33,8 @@
 
           <div class="d-flex align-items-center gap-2 mb-3">
             <i class="fa-solid fa-location-dot text-danger"></i>
-            <span class="fw-semibold">{% if country == 'ireland' %}Ireland{% else %}Morocco{% endif %}</span>
-            <span class="text-muted small">{% if country == 'ireland' %}(local driver tours){% else %}(local operations){% endif %}</span>
+            <span class="fw-semibold">International journeys</span>
+            <span class="text-muted small">(starting in Morocco)</span>
           </div>
 
           <div class="text-muted small mb-2">For a faster reply, include:</div>
@@ -56,6 +53,7 @@
           <div class="text-muted mb-4">Tell us what information or assistance you need.</div>
 
           <form method="post" class="contact-form-fields">
+            <div class="mb-3"><label for="contact-destination_country" class="form-label">Destination</label><select id="contact-destination_country" name="destination_country" class="form-select"><option value="">General enquiry</option>{% for destination in countries %}<option value="{{ destination.slug }}" {% if contact_form.destination_country.value == destination.slug %}selected{% endif %}>{{ destination.name }}</option>{% endfor %}</select></div>
             {% csrf_token %}
             {% if contact_form.errors %}
             <div class="alert alert-danger" role="alert">

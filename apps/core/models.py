@@ -2,14 +2,112 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils.text import slugify
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
+from .countries import validate_country, uses_scheduled_departures
 
 from cloudinary.models import CloudinaryField
+
+class Country(models.Model):
+    slug = models.SlugField(max_length=50, unique=True)
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=False, help_text='Only active countries are offered to travelers.')
+    uses_scheduled_departures = models.BooleanField(default=True, help_text='Published departures, daily pricing and a private-group guide calendar. Disable for legacy flexible nightly tours.')
+    image = models.ImageField(upload_to='img/countries/', blank=True)
+    introduction = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=0)
+    max_concurrent_groups = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)],
+        help_text='Maximum private groups guided at the same time across this country. Keep 1 for a small team.')
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name_plural = 'Countries'
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        super().clean()
+        if self.pk and self.max_concurrent_groups:
+            from django.utils import timezone
+            from apps.reservations.availability import active_reservations, peak_groups
+            rows = list(active_reservations(self.slug).filter(end_date__gte=timezone.localdate()).values('start_date', 'end_date'))
+            if rows and peak_groups(rows, min(r['start_date'] for r in rows), max(r['end_date'] for r in rows)) > self.max_concurrent_groups:
+                raise ValidationError({'max_concurrent_groups': 'Existing groups exceed this limit. Reassign or cancel the affected bookings before lowering it.'})
+
+
+class CountryLinkedModel(models.Model):
+    # Retain the original slug API for integrations; region provides referential integrity.
+    region = models.ForeignKey(Country, to_field='slug', on_delete=models.PROTECT,
+        related_name='%(class)s_records', editable=False, null=True, blank=True)
+
+    class Meta:
+        abstract = True
+        constraints = [models.CheckConstraint(
+            condition=(models.Q(region__isnull=False, country=models.F('region')) |
+                       models.Q(region__isnull=True, country='')),
+            name='%(app_label)s_%(class)s_country_link')]
+
+    def clean(self):
+        super().clean()
+        validate_country(self.country)
+        self.region_id = self.country or None
+
+    def save(self, *args, **kwargs):
+        self.region_id = self.country or None
+        if kwargs.get('update_fields') and 'country' in kwargs['update_fields']:
+            kwargs['update_fields'] = set(kwargs['update_fields']) | {'region'}
+        return super().save(*args, **kwargs)
+
+
+class SiteSettings(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    brand_name = models.CharField(max_length=100, default='Culture Hop Tours')
+    tagline = models.CharField(max_length=180, default='Many cultures. Unforgettable journeys.')
+    regions_text = models.CharField(max_length=200, default='Africa • Caribbean • Middle East • Ireland', help_text='Brand horizons, not a list of currently bookable destinations.')
+    hero_title = models.CharField(max_length=180, default='Many cultures. Unforgettable journeys.')
+    hero_subtitle = models.TextField(default='Different countries, cultures, people and experiences, brought together in journeys that stay with you. Our story begins in Morocco.')
+    hero_image = models.ImageField(upload_to='img/site/', blank=True)
+    support_email = models.EmailField(default='contact@culturehoptours.com', help_text='Public contact address. The mailbox must be created with your email provider to receive mail.')
+    sender_email = models.EmailField(blank=True, help_text='Future professional sender address. Verify it with your email provider before using it. Empty: use server DEFAULT_FROM_EMAIL.')
+    whatsapp_number = models.CharField(max_length=25, blank=True, default='')
+    christmas_theme = models.BooleanField(default=True, help_text='Show festive styling while a Christmas promotion is active.')
+    assistant_enabled = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name_plural = 'Global website settings'
+
+    def __str__(self):
+        return 'Global website settings'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        return super().save(*args, **kwargs)
+
 
 # =========================
 # Destination
 # =========================
-class Destination(models.Model):
+class Guide(models.Model):
+    country = models.ForeignKey(Country, to_field='slug', on_delete=models.PROTECT, related_name='guides')
+    name = models.CharField(max_length=120)
+    photo = models.ImageField(upload_to='img/guides/', blank=True)
+    description = models.TextField()
+    is_active = models.BooleanField(default=True, help_text='Only active guides are shown to travelers.')
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'name', 'pk']
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        super().clean()
+        if self.pk and self.country_id and (self.tours.exclude(country=self.country_id).exists() or self.assigned_bookings.exclude(tour__country=self.country_id).exists()):
+            raise ValidationError({'country': 'Remove this guide from tours in the previous country before changing their country.'})
+
+
+class Destination(CountryLinkedModel):
     country = models.CharField(max_length=50, default='morocco')
     name = models.CharField(max_length=150)
     image = models.ImageField(upload_to='img/destinations/', blank=True, null=True)
@@ -34,7 +132,7 @@ class DestinationImage(models.Model):
 # =========================
 # Sections (Pages content)
 # =========================
-class Section(models.Model):
+class Section(CountryLinkedModel):
     title = models.CharField(max_length=120)
     slug = models.SlugField(max_length=120, unique=True)
     content = models.TextField(blank=True)
@@ -51,10 +149,11 @@ class Section(models.Model):
 # =========================
 # Blog
 # =========================
-class BlogPost(models.Model):
+class BlogPost(CountryLinkedModel):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
     content = models.TextField()
+    video_url = models.URLField(blank=True, help_text='Optional short trip video; hosted externally.')
     image = CloudinaryField('image', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -98,7 +197,31 @@ class BlogComment(models.Model):
 # =========================
 # Contact
 # =========================
-class ContactEmailSettings(models.Model):
+class HomeHero(models.Model):
+    settings = models.ForeignKey(SiteSettings, on_delete=models.CASCADE, related_name='heroes', default=1)
+    country = models.ForeignKey(Country, on_delete=models.SET_NULL, null=True, blank=True)
+    title = models.CharField(max_length=180)
+    subtitle = models.TextField(blank=True)
+    caption = models.CharField(max_length=180, blank=True)
+    image = models.ImageField(upload_to='img/heroes/', blank=True)
+    starter_image = models.CharField(max_length=40, blank=True, choices=[('morocco', 'Morocco dunes'), ('nigeria', 'Nigeria landscape illustration')])
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'pk']
+        verbose_name_plural = 'Homepage hero slides'
+
+    @property
+    def image_url(self):
+        from django.templatetags.static import static
+        return self.image.url if self.image else static('img/nigeria-hero.webp' if self.starter_image == 'nigeria' else 'img/global-hero.webp')
+
+    def __str__(self):
+        return self.title
+
+
+class ContactEmailSettings(CountryLinkedModel):
     country = models.CharField(max_length=50, unique=True, default='morocco')
     recipient_email = models.EmailField(help_text='Contact form notifications are sent to this address. Outgoing email must also be configured on the server.')
 
@@ -110,7 +233,7 @@ class ContactEmailSettings(models.Model):
         return f'{self.country.title()} contact email'
 
 
-class BookingNotificationSettings(models.Model):
+class BookingNotificationSettings(CountryLinkedModel):
     country = models.CharField(max_length=50, unique=True, default='morocco')
     email_recipients = models.TextField(blank=True, help_text='One staff email address per line.')
     whatsapp_recipients = models.TextField(blank=True, help_text='One staff WhatsApp number per line, including country code, e.g. +212600000000.')
@@ -146,19 +269,22 @@ class BookingNotification(models.Model):
     reservation = models.ForeignKey('Reservation', on_delete=models.CASCADE, related_name='notifications')
     channel = models.CharField(max_length=10, choices=[('email', 'Email'), ('whatsapp', 'WhatsApp')])
     recipient = models.CharField(max_length=254)
+    event = models.CharField(max_length=20, default='requested', choices=[('requested', 'Request received'), ('approved', 'Booking approved'), ('paid', 'Payment received')])
+    audience = models.CharField(max_length=12, default='staff', choices=[('staff', 'Team'), ('traveler', 'Traveler')])
+    context = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=12, default='pending', choices=[('pending', 'Pending'), ('sending', 'Sending'), ('sent', 'Accepted by provider'), ('failed', 'Failed')])
     error = models.CharField(max_length=255, blank=True)
     provider_reference = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['reservation', 'channel', 'recipient'], name='unique_booking_notification_recipient')]
+        constraints = [models.UniqueConstraint(fields=['reservation', 'channel', 'recipient', 'event', 'audience'], name='unique_booking_event_recipient')]
 
     def __str__(self):
         return f'Booking {self.reservation_id} | {self.channel} | {self.status}'
 
 
-class ContactMessage(models.Model):
+class ContactMessage(CountryLinkedModel):
     country = models.CharField(max_length=50, blank=True, default='')
     name = models.CharField(max_length=150)
     email = models.EmailField()
@@ -173,12 +299,20 @@ class ContactMessage(models.Model):
 # =========================
 # Promotion
 # =========================
-class Promotion(models.Model):
+class Promotion(CountryLinkedModel):
     country = models.CharField(max_length=50, default='morocco')
     name = models.CharField(max_length=120)
-    percent = models.PositiveIntegerField(default=0)
+    percent = models.PositiveIntegerField(default=0, validators=[MaxValueValidator(100)])
+    starts_on = models.DateField(blank=True, null=True)
+    ends_on = models.DateField(blank=True, null=True)
+    christmas = models.BooleanField(default=False)
     active = models.BooleanField(default=False)
     apply_to_all = models.BooleanField(default=False)
+
+    def clean(self):
+        super().clean()
+        if self.starts_on and self.ends_on and self.ends_on < self.starts_on:
+            raise ValidationError({'ends_on': 'The promotion must end on or after its start date.'})
 
     def __str__(self):
         return f"{self.name} ({self.percent}%)"
@@ -190,7 +324,9 @@ class Promotion(models.Model):
 from django.db import models
 from cloudinary.models import CloudinaryField
 
-class Tour(models.Model):
+class Tour(CountryLinkedModel):
+    guides = models.ManyToManyField(Guide, blank=True, related_name='tours',
+        help_text='Choose one or more guides from this country. Leave empty to show the active country team.')
     destination = models.ForeignKey(Destination, on_delete=models.CASCADE, related_name='tours')
     title = models.CharField(max_length=200)
 
@@ -231,13 +367,35 @@ class Tour(models.Model):
     not_included = models.TextField(blank=True, help_text="What is NOT included (one item per line).")
 
     is_promotion = models.BooleanField(default=False)
-    discount_percent = models.IntegerField(default=0)
+    discount_percent = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
+    deaf_only = models.BooleanField(default=False, verbose_name='Designed for deaf travelers', help_text='Display the deaf-traveler badge. Everyone can book, regardless of their registered deaf status.')
+    explanation_video_url = models.URLField(blank=True, help_text="Accessible explanatory video for this tour.")
 
     country = models.CharField(max_length=50, default='morocco')
 
+    @property
+    def cover_url(self):
+        if self.image:
+            return self.image.url
+        from django.templatetags.static import static
+        images = {'demo-marrakech-atlas': 'morocco-marrakech-starter.webp', 'demo-sahara-stars': 'global-hero.webp',
+                  'demo-chefchaouen': 'hero3.jpeg'}
+        return static('img/' + images.get(self.slug, 'hero4.jpeg'))
+
+    @property
+    def guiding_team(self):
+        assigned = self.guides.all()
+        if assigned.exists():
+            return assigned.filter(is_active=True, country_id=self.country).select_related('country')
+        return Guide.objects.filter(country_id=self.country, is_active=True).select_related('country')
+
     def clean(self):
         super().clean()
-        if self.pk and self.max_days and self.country == 'morocco':
+        if self.pk and self.guides.exclude(country_id=self.country).exists():
+            raise ValidationError({'country': 'Remove the guides from the previous country before changing this tour country.'})
+        if self.destination_id and self.destination.country != self.country:
+            raise ValidationError({'destination': 'The destination must belong to the tour country.'})
+        if self.pk and self.max_days and uses_scheduled_departures(self.country):
             if any(departure.duration_days > self.max_days for departure in self.departures.filter(is_published=True)):
                 raise ValidationError({'max_days': 'An existing published departure exceeds this limit. Update or unpublish it first.'})
 
@@ -257,10 +415,20 @@ class Tour(models.Model):
 
 
 class TourDeparture(models.Model):
+    deaf_only = models.BooleanField(default=False, verbose_name='Designed for deaf travelers',
+        help_text='Display the deaf-traveler badge for these dates. Everyone can book; this does not restrict access.')
+
+    @property
+    def requires_deaf(self):
+        return self.deaf_only or self.tour.deaf_only
+
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='departures')
     start_date = models.DateField()
     end_date = models.DateField(help_text="For a one-day tour, use the same start and end date.")
     is_published = models.BooleanField(default=False)
+    max_participants = models.PositiveIntegerField(default=12, validators=[MinValueValidator(1)])
+    max_concurrent_bookings = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)],
+        help_text='Maximum independent groups on this departure. Also limited by the country team capacity. Each group has its own maximum participants.')
 
     class Meta:
         ordering = ['start_date', 'end_date', 'pk']
@@ -299,6 +467,11 @@ class TourDeparture(models.Model):
         if self.duration_days > self.tour.max_days:
             raise ValidationError({'end_date': f'This tour allows {self.tour.max_days} days. Increase Maximum days in the tour settings first.'})
         if self.pk:
+            active = self.reservations.filter(status__in=['pending', 'booked'])
+            if self.max_concurrent_bookings and active.count() > self.max_concurrent_bookings:
+                raise ValidationError({'max_concurrent_bookings': 'This departure already has more reserved groups than this limit.'})
+            if self.max_participants and active.filter(num_persons__gt=self.max_participants).exists():
+                raise ValidationError({'max_participants': 'An existing group exceeds this maximum. Review its booking before lowering it.'})
             if self.reservations.filter(status__in=['pending', 'booked']).exclude(
                 start_date=self.start_date, end_date=self.end_date, tour_id=self.tour_id).exists():
                 raise ValidationError('This departure has reservations. Create a new departure instead of changing its dates or tour.')
@@ -482,7 +655,7 @@ class TourExtraActivity(models.Model):
         return f"https://www.google.com/maps/search/?api=1&query={query.replace(' ', '+')}"
 
 
-class Information(models.Model):
+class Information(CountryLinkedModel):
     title = models.CharField(max_length=255)
     content = models.TextField(blank=True)
     file = models.FileField(upload_to='information_files/', blank=True, null=True)
@@ -514,12 +687,14 @@ class ChatMessage(models.Model):
 # =========================
 # Reservation (BOOKING)
 # =========================
-class GuideCalendar(models.Model):
+class GuideCalendar(CountryLinkedModel):
     """Lock row for the independent guide's shared booking calendar."""
     country = models.CharField(max_length=50, unique=True)
 
 
 class Reservation(models.Model):
+    assigned_guides = models.ManyToManyField(Guide, blank=True, related_name='assigned_bookings',
+        help_text='Optional confirmed guides for this private group. Guides cannot overlap another active booking.')
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('booked', 'Booked'),
@@ -591,15 +766,21 @@ class Reservation(models.Model):
         super().clean()
         from apps.reservations.availability import validate_reservation
         validate_reservation(self)
+        if self.departure_id and self.num_persons > self.departure.max_participants:
+            raise ValidationError({'num_persons': 'The group exceeds this departure capacity.'})
 
     def save(self, *args, **kwargs):
-        if self.tour_id and self.tour.country == 'morocco':
+        if self.tour_id and uses_scheduled_departures(self.tour.country):
             from apps.reservations.availability import lock_guide_calendar, validate_reservation
-            with lock_guide_calendar():
+            with lock_guide_calendar(self.tour.country):
                 validate_reservation(self)
                 return super().save(*args, **kwargs)
         return super().save(*args, **kwargs)
 
+
+    @property
+    def guiding_team(self):
+        return self.assigned_guides.filter(is_active=True, country_id=self.tour.country).select_related('country')
 
     @property
     def nights(self):
@@ -608,10 +789,34 @@ class Reservation(models.Model):
     @property
     def duration_days(self):
         return self.booked_days if self.booked_days is not None else (self.nights + 1 if self.priced_per_day else self.nights)
+
+
+class WaitlistEntry(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='waitlist_entries')
+    departure = models.ForeignKey(TourDeparture, on_delete=models.PROTECT, related_name='waitlist_entries')
+    num_persons = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    email = models.EmailField(help_text='Address for the decision, provided by the traveler.')
+    message = models.TextField(blank=True)
+    status = models.CharField(max_length=12, default='waiting', choices=[
+        ('waiting', 'Waiting for review'), ('accepted', 'Accepted'), ('rejected', 'Declined')])
+    reservation = models.OneToOneField(Reservation, on_delete=models.PROTECT, null=True, blank=True, related_name='waitlist_entry')
+    decision_note = models.TextField(blank=True)
+    decided_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='waitlist_decisions')
+    decided_at = models.DateTimeField(null=True, blank=True)
+    email_sent_at = models.DateTimeField(null=True, blank=True)
+    email_error = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'pk']
+        constraints = [models.UniqueConstraint(fields=['user', 'departure'], name='unique_user_departure_waitlist')]
+
+    def __str__(self):
+        return f'{self.user} | {self.departure} | {self.get_status_display()}'
 # =========================
 # Country Content
 # =========================
-class CountryContent(models.Model):
+class CountryContent(CountryLinkedModel):
     country = models.CharField(max_length=50, unique=True)
     hero_title = models.CharField(max_length=200, default="Discover Morocco")
     hero_subtitle = models.TextField(blank=True)
