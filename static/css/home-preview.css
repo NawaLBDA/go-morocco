@@ -1,4 +1,13 @@
 /* Home-only typography preview for client review. 1pt = 4/3 CSS px. */
+.global-site[data-page="home"] .nav-account > a { font-size: 17px; line-height: 1.5; }
+.global-site[data-page="home"] .nav-account .global-button { padding: 13px 20px; }
+.global-site[data-page="home"] .global-footer h3 { font-size: 20px; }
+.global-site[data-page="home"] .global-footer p,
+.global-site[data-page="home"] .global-footer a:not(.global-brand),
+.global-site[data-page="home"] .footer-bottom { font-size: calc(16px + 1pt); line-height: 1.7; }
+.global-site[data-page="home"] .global-footer a { overflow-wrap: anywhere; }
+.global-site[data-page="home"] .empty-journeys p { font-size: calc(17px + 1pt); line-height: 1.7; }
+.global-site[data-page="home"] .empty-journeys h3 { font-size: 28px; line-height: 1.35; }
 .global-site[data-page="home"] .collection-search summary { font-size: calc(.9rem + 1pt); line-height: 1.65; }
 .global-site[data-page="home"] .filter-summary { font-size: calc(15px + 1pt); line-height: 1.65; flex-wrap: wrap; }
 .global-site[data-page="home"] .country-pack-body > p { font-size: calc(16px + 1pt); line-height: 1.7; }
