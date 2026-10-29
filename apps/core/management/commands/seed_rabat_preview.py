@@ -57,7 +57,7 @@ class Command(BaseCommand):
                     if not day.activities.exists():
                         day.activities.add(*tour.activity_cards.filter(day_number=day.day_number))
         BlogPost.objects.get_or_create(slug='rabat-between-river-and-ocean', defaults={
-            'country': 'morocco', 'title': 'Rabat, between river and ocean', 'image': tour.image,
+            'country': 'morocco', 'title': 'Rabat, between river and ocean', 'image': tour.image, 'story_kind': 'inspiration',
             'content': 'Rabat rewards a slower look. Its monumental landmarks, medina and riverfront offer different ways to discover Morocco’s capital.\n\nStart with the setting around Hassan Tower and the Mohammed V Mausoleum. Make time for the lanes of the Kasbah of the Oudaia and a pause near the Atlantic. Chellah adds another perspective on the city’s layered heritage.\n\nThis sample editorial accompanies our illustrative three-day Rabat itinerary. It is inspiration for planning, rather than a report of a completed group journey. Dates, access, transport and visits should be confirmed with our team.'})
         self.stdout.write(self.style.SUCCESS('Rabat example ready. Sample dates, coordinates and connections are editable in Django admin.'))
         for departure in departures:

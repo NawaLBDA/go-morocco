@@ -218,5 +218,6 @@ class CapacityWaitlistTests(TestCase):
         response = self.client.get('/blog/', {'country': 'japan'})
         self.assertContains(response, 'Kyoto moments')
         self.assertNotContains(response, 'Atlas moments')
-        self.assertContains(response, 'country-moments')
+        self.assertContains(response, 'Journeys we remember.')
+        self.assertNotContains(response, 'country-tours')
         self.assertEqual(self.client.get('/reservations/', {'year': 'bad'}).status_code, 404)

@@ -36,7 +36,7 @@ def metadata(request, *, tour=None, post=None):
     titles = {
         'home': BRAND,
         'reservations': f'Find Your Next Journey | {BRAND}',
-        'blog_list': f'Travel Stories & Experiences | {BRAND}',
+        'blog_list': f'Travel Stories & Memories | {BRAND}',
         'contact': f'Plan Your Next Journey | {BRAND}',
         'about': f'Our Approach to Travel | {BRAND}',
         'login': f'Sign In | {BRAND}',
@@ -69,11 +69,11 @@ def metadata(request, *, tour=None, post=None):
     elif post is not None:
         title = f'{post.title} | {BRAND}'
         description = plain_excerpt(post.content)
-        if post.image:
-            image = request.build_absolute_uri(post.image.url)
+        if post.image or post.starter_image:
+            image = request.build_absolute_uri(post.cover_url)
         image_alt = post.title
         og_type = 'article'
-        demo = (post.slug or '').startswith('demo-')
+        demo = post.is_demo or (post.slug or '').startswith('demo-')
 
     filtered = page in {'home', 'reservations'} and any(
         request.GET.get(key) for key in ('q', 'date', 'start_date', 'end_date', 'country', 'month', 'year')
@@ -101,7 +101,7 @@ def metadata(request, *, tour=None, post=None):
                       'datePublished': post.created_at.isoformat(),
                       'mainEntityOfPage': {'@id': canonical + '#webpage'}, 'image': [image]})
     if tour is not None or post is not None:
-        section, path = ('Tours', '/reservations/') if tour is not None else ('Our Experiences', '/blog/')
+        section, path = ('Tours', '/reservations/') if tour is not None else ('Travel Stories', '/blog/')
         graph.append({'@type': 'BreadcrumbList', 'itemListElement': [
             {'@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': root},
             {'@type': 'ListItem', 'position': 2, 'name': section, 'item': morocco_url(path)},

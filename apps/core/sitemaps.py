@@ -65,7 +65,7 @@ class BlogSitemap(CountrySitemap):
         self.country = country
 
     def items(self):
-        posts = BlogPost.objects.filter(region__is_active=True)
+        posts = BlogPost.objects.filter(region__is_active=True, is_demo=False)
         if self.country == 'morocco':
             posts = posts.exclude(slug__startswith='demo-')
         return posts.order_by("-created_at")

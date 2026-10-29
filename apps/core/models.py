@@ -156,11 +156,28 @@ class BlogPost(CountryLinkedModel):
     video_url = models.URLField(blank=True, help_text='Optional short trip video; hosted externally.')
     image = CloudinaryField('image', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    story_kind = models.CharField(max_length=20, default='memory', choices=[('memory', 'Travel memory'), ('inspiration', 'Planning inspiration')])
+    trip_date = models.DateField(blank=True, null=True, help_text='Date of the past trip represented by this memory.')
+    city = models.CharField(max_length=100, blank=True)
+    is_demo = models.BooleanField(default=False, help_text='Show a visible demo label for fictional stories and generated images. Uncheck only after replacing them with real content.')
+    starter_image = models.CharField(max_length=20, blank=True, choices=[('rabat', 'Demo Rabat group'), ('marrakech', 'Demo Marrakech craft visit'), ('lagos', 'Demo Lagos art visit')], help_text='Initial demo cover; an uploaded image takes priority.')
 
     country = models.CharField(max_length=50, default='morocco')
 
     def __str__(self):
         return self.title
+
+    @property
+    def cover_url(self):
+        if self.image:
+            return self.image.url
+        from django.templatetags.static import static
+        return static(f'img/demo-memory-{self.starter_image}.webp') if self.starter_image in {'rabat', 'marrakech', 'lagos'} else static('img/culture-hop-ch.svg')
+
+    @property
+    def memory_date(self):
+        from django.utils import timezone
+        return self.trip_date or (timezone.localtime(self.created_at).date() if self.created_at else None)
 
 
 

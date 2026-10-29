@@ -7,26 +7,27 @@
   <nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb small">
       <li class="breadcrumb-item"><a href="{% url 'home' %}">Home</a></li>
-      <li class="breadcrumb-item"><a href="{% url 'blog_list' %}">Our Experiences</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'blog_list' %}">Travel stories &amp; memories</a></li>
       <li class="breadcrumb-item active" aria-current="page">{{ post.title }}</li>
     </ol>
   </nav>
   {% endif %}
 
   <h1 class="fw-bold mb-2">{{ post.title }}</h1>
-  <p class="text-muted mb-4">{{ post.created_at|date:'d M Y' }}</p>
-{% if post.image or post.gallery.all %}
+  <p class="text-muted mb-4">{{ post.region.name }}{% if post.city %} / {{ post.city }}{% endif %} · {{ post.memory_date|date:'j M Y' }}</p>
+{% if post.is_demo %}<aside class="memory-demo-disclosure" role="note"><strong>Demo memory</strong><p>This fictional story and its AI-generated images are examples for previewing the journal. They do not document an actual Culture Hop Tours trip, guide or customer.</p></aside>{% elif post.story_kind == 'inspiration' %}<p class="memory-demo-disclosure">Travel inspiration · A planning article rather than a memory of a completed group trip.</p>{% endif %}
+{% if post.image or post.starter_image or post.gallery.all %}
 <div class="blog-gallery-wrapper mb-4">
 
-  <button type="button" class="gallery-nav left" onclick="scrollGallery(-1)" aria-label="Scroll gallery left">‹</button>
+  {% if post.gallery.all %}<button type="button" class="gallery-nav left" onclick="scrollGallery(-1)" aria-label="Scroll gallery left">‹</button>{% endif %}
 
   <div class="blog-gallery-grid" id="galleryGrid">
 
     {# FIRST IMAGE = BlogPost.image #}
-    {% if post.image %}
-      <img src="{{ post.image.url }}"
+    {% if post.image or post.starter_image %}
+      <img src="{{ post.cover_url }}"
            class="gallery-image"
-          alt="{{ post.title }}"
+          alt="{% if post.is_demo %}AI-generated demo illustration: {% endif %}{{ post.title }}"
           loading="lazy" decoding="async"
            onclick="openImageModal(this)">
     {% endif %}
@@ -42,13 +43,14 @@
 
   </div>
 
-  <button type="button" class="gallery-nav right" onclick="scrollGallery(1)" aria-label="Scroll gallery right">›</button>
+  {% if post.gallery.all %}<button type="button" class="gallery-nav right" onclick="scrollGallery(1)" aria-label="Scroll gallery right">›</button>{% endif %}
 
 </div>
 {% endif %}
 
 
   {% if post.video_url %}<p><a class="global-button" href="{{ post.video_url }}" target="_blank" rel="noopener">Watch this trip’s story ?</a></p>{% endif %}
+{% if post.is_demo %}<p class="memory-demo-note">All people and scenes shown in the demo image are fictional.</p>{% endif %}
   <!-- CONTENU -->
   <div class="blog-content mb-5">
     {{ post.content|linebreaks }}

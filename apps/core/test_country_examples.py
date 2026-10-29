@@ -76,7 +76,7 @@ class CountryExampleTests(TestCase):
         self.assertGreater(sample.departures.order_by('start_date').first().start_date,reservation.end_date)
 
     def test_render_migration_uses_historical_models_and_creates_complete_programmes(self):
-        registry=MigrationExecutor(connection).loader.project_state([('core','0050_render_country_examples')]).apps
+        registry=MigrationExecutor(connection).loader.project_state([('core','0052_separate_travel_memories')]).apps
         module=import_module('apps.core.migrations.0050_render_country_examples')
         with patch.dict('os.environ',{'RENDER':'true'}):
             module.populate_requested_render_catalogue(registry,SimpleNamespace(connection=connection))

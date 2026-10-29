@@ -594,7 +594,9 @@ class BlogImageInline(admin.TabularInline):
 
 @admin.register(BlogPost)
 class BlogPostAdmin(CountryScopedAdmin):
-    list_display = ('title', 'created_at')
+    list_display = ('title', 'city', 'story_kind', 'trip_date', 'is_demo')
+    list_filter = ('story_kind', 'is_demo', 'country')
+    fields = ('country', 'title', 'slug', 'story_kind', 'city', 'trip_date', 'is_demo', 'content', 'image', 'starter_image', 'video_url')
     prepopulated_fields = {'slug': ('title',)}
     inlines = [BlogImageInline]
 

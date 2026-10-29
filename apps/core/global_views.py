@@ -107,10 +107,7 @@ def catalogue_data(request, *, stories=False):
 
 def home(request):
     data = catalogue_data(request)
-    stories = BlogPost.objects.filter(region__is_active=True)
-    if data['selected_country']:
-        stories = stories.filter(country=data['selected_country'])
-    return render(request, 'home.html', {**data, 'home_catalogue': True, 'stories': stories.order_by('-created_at')[:3]})
+    return render(request, 'home.html', {**data, 'home_catalogue': True})
 
 
 def tours(request):
@@ -118,13 +115,38 @@ def tours(request):
 
 
 def travel_stories(request):
-    data = catalogue_data(request, stories=True)
-    posts = BlogPost.objects.filter(region__is_active=True).select_related('region')
-    if data['selected_country']:
-        posts = posts.filter(country=data['selected_country'])
-    if data['selected_year']:
-        posts = posts.filter(created_at__year=data['selected_year'])
-    if data['search_q']:
-        posts = posts.filter(Q(title__icontains=data['search_q']) | Q(content__icontains=data['search_q']))
-    moments = BlogImage.objects.filter(post__in=posts).select_related('post').order_by('-post__created_at', 'pk')[:18]
-    return render(request, 'blog_list.html', {**data, 'story_catalogue': True, 'posts': posts.order_by('-created_at'), 'moments': moments})
+    countries = list(Country.objects.filter(is_active=True))
+    selected = request.GET.get('country') or getattr(request, 'site_country', '')
+    selected_record = next((country for country in countries if country.slug == selected), None)
+    if selected and not selected_record:
+        raise Http404('This country collection is not available.')
+    posts = BlogPost.objects.filter(region__is_active=True, story_kind='memory').select_related('region')
+    years = {timezone.localdate().year}
+    for trip_date, created_at in posts.values_list('trip_date', 'created_at'):
+        years.add(trip_date.year if trip_date else timezone.localtime(created_at).year)
+    raw_year = request.GET.get('year', '')
+    try:
+        year = int(raw_year) if raw_year else None
+        if year is not None and not 1900 <= year <= 9999:
+            raise ValueError
+    except ValueError:
+        raise Http404('Choose a valid memory year.')
+    if year:
+        posts = posts.filter(Q(trip_date__year=year) | Q(trip_date__isnull=True, created_at__year=year))
+        years.add(year)
+    query = request.GET.get('q', '').strip()[:200]
+    if query:
+        posts = posts.filter(Q(title__icontains=query) | Q(content__icontains=query) | Q(city__icontains=query))
+    counts = dict(posts.values('country').annotate(total=Count('pk')).values_list('country', 'total'))
+    for country in countries:
+        country.story_count = counts.get(country.slug, 0)
+    if selected:
+        posts = posts.filter(country=selected)
+    posts = sorted(posts, key=lambda post: (post.memory_date, post.pk), reverse=True)
+    moments = [{'post': post, 'url': post.cover_url, 'caption': post.city or post.region.name}
+               for post in posts if post.image or post.starter_image][:12]
+    for image in BlogImage.objects.filter(post__in=posts).select_related('post').order_by('-post__created_at', 'pk')[:12]:
+        moments.append({'post': image.post, 'url': image.image.url, 'caption': image.post.title})
+    return render(request, 'blog_list.html', {'countries': countries, 'selected_country': selected,
+        'selected_country_record': selected_record, 'selected_year': year, 'years': sorted(years, reverse=True),
+        'search_q': query, 'posts': posts, 'moments': moments[:18], 'story_catalogue': True})

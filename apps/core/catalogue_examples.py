@@ -98,6 +98,9 @@ def seed_examples(registry, alias='default', *, activate_countries=False, today=
         ('nigeria', 'starter-nigeria-city-connections', 'Nigeria: art, city life and shared discoveries',
          'Our Nigeria collection begins with Lagos and Abuja: starting points for exploring art, craft, green spaces and the connections that give travel meaning.\n\nThis is starter editorial content, not a report of a completed group journey. Visits and access remain subject to confirmation. Deaf-labelled departures welcome everyone; sign-language and communication support must be discussed with the team.'),
     ]:
-        Blog.objects.using(alias).get_or_create(slug=slug, defaults={
-            'country': country, 'region_id': country, 'title': title, 'content': content})
+        defaults = {'country': country, 'region_id': country, 'title': title, 'content': content}
+        # Migration 0050 also uses this helper with the older historical BlogPost schema.
+        if any(field.name == 'story_kind' for field in Blog._meta.fields):
+            defaults['story_kind'] = 'inspiration'
+        Blog.objects.using(alias).get_or_create(slug=slug, defaults=defaults)
     return {'tours_created': created_tours, 'departures_created': created_departures}
