@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load static l10n %}
 
+{% block page %}booking{% endblock %}
 {% block extra_head %}
   <script src="{% static 'js/booking-layout.js' %}?v={{ static_version }}" defer></script>
   {% if not scheduled_tours %}
@@ -308,7 +309,9 @@
   </p>
 {% endif %}
 
-{% if reservation %}
+{% if deaf_booking_ineligible %}
+<div class="alert alert-info" role="status"><strong>Deaf travelers only</strong><p class="mb-0 mt-2">This tour is reserved for travelers who indicated they are deaf when creating their account. Your account is not eligible for this departure.</p></div>
+{% elif reservation %}
 <p class="small mt-3">You already have a request for this departure.</p><a class="btn btn-primary" href="{% url 'my_reservations' %}">View my reservations</a>
 {% else %}
   {% if not scheduled_tours or selected_departure %}

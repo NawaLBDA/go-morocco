@@ -195,12 +195,12 @@ class CapacityWaitlistTests(TestCase):
         with self.assertRaises(ValidationError), transaction.atomic():
             guide.assigned_bookings.add(first, second)
 
-    def test_deaf_labeled_packages_can_be_waitlisted_by_any_account(self):
+    def test_deaf_packages_reject_non_deaf_waitlist(self):
         self.book()
         self.tour.deaf_only = True
         self.tour.save()
         self.assertEqual(self.queue().status_code, 302)
-        self.assertTrue(WaitlistEntry.objects.exists())
+        self.assertFalse(WaitlistEntry.objects.exists())
 
     def test_country_first_catalogue_story_packs_and_year_navigation(self):
         japan = Country.objects.create(slug='japan', name='Japan', is_active=True)

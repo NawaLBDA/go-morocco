@@ -32,14 +32,14 @@ class CountryExampleTests(TestCase):
         response=self.client.get('/reservations/',{'country':'nigeria'})
         self.assertContains(response,'Lagos: art, city life')
         self.assertContains(response,'Abuja: crafts')
-        self.assertContains(response,'Everyone welcome',count=4)  # accessible name + visible text on two badges
+        self.assertContains(response,'Deaf travelers only',count=2)  # accessible name + visible text on two badges
         self.assertNotContains(response,'Tangier: sea views')
         self.assertContains(response,'nigeria-hero.webp')
         user=User.objects.create_user('hearing-traveler',email='test@example.com')
         self.client.force_login(user)
         departure=TourDeparture.objects.filter(tour__country='nigeria',deaf_only=True).first()
         response=self.client.get(f'/tour/{departure.tour.slug}/',{'departure_id':departure.pk})
-        self.assertContains(response,'id="booking-form"')
+        self.assertNotContains(response,'id="booking-form"')
 
     def test_repeated_seed_preserves_staff_edits_and_does_not_recreate_deleted_dates(self):
         seed_examples(apps,activate_countries=True)

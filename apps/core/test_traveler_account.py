@@ -28,34 +28,34 @@ class TravelerAccountTests(TestCase):
         return _create_pending_reservation(user=user, tour=self.tour, start_date=dep.start_date, end_date=dep.end_date,
             departure_id=dep.pk, persons=2, payment_method='cash', full_package=False, include_transport=False, include_hotel=False, extra_activity_ids=[])
 
-    def test_deaf_labeled_departure_accepts_a_non_deaf_account(self):
-        self.assertEqual(self.book(self.other)[3], 200)
+    def test_deaf_departure_rejects_non_deaf_and_accepts_deaf_account(self):
+        self.assertEqual(self.book(self.other)[3], 403)
+        self.assertEqual(self.book(self.deaf)[3], 200)
         self.assertEqual(self.book(self.deaf, self.public)[3], 200)
         response=self.client.get('/', {'country':'morocco'})
-        self.assertContains(response, 'For deaf travelers · Everyone welcome', count=1)
+        self.assertContains(response, 'Deaf travelers only', count=1)
         self.assertContains(response, 'deaf-travelers.svg')
 
-    def test_public_and_non_deaf_visitors_see_the_normal_booking_form(self):
+    def test_public_can_view_but_non_deaf_accounts_cannot_request(self):
         url=f'/tour/{self.tour.slug}/?departure_id={self.restricted.pk}'
         self.assertContains(self.client.get(url),'id="booking-form"')
         self.client.force_login(self.other)
         response=self.client.get(url)
-        self.assertContains(response,'id="booking-form"')
-        self.assertNotContains(response,'Your account is not eligible')
+        self.assertNotContains(response,'id="booking-form"')
+        self.assertContains(response,'Your account is not eligible')
         response=self.client.post(f'/tour/{self.tour.pk}/book/', {'departure_id':self.restricted.pk,
             'start_date':self.restricted.start_date,'end_date':self.restricted.end_date,'persons':1,'payment_method':'cash'})
-        self.assertRedirects(response,'/profile/reservations/')
-        self.assertEqual(Reservation.objects.get().user,self.other)
+        self.assertFalse(Reservation.objects.exists())
 
-    def test_tour_label_also_accepts_everyone_and_keeps_waitlist_open(self):
+    def test_tour_flag_also_restricts_booking_and_waitlist(self):
         self.tour.deaf_only=True
         self.tour.save()
-        self.assertEqual(self.book(self.other,self.public)[3],200)
+        self.assertEqual(self.book(self.other,self.public)[3],403)
         self.assertEqual(self.book(self.deaf)[3],200)
         self.client.force_login(self.other)
         self.assertEqual(self.client.post(f'/departure/{self.restricted.pk}/waitlist/', {'persons':1,'email':'other@example.com'}).status_code,302)
         from .models import WaitlistEntry
-        self.assertTrue(WaitlistEntry.objects.filter(user=self.other).exists())
+        self.assertFalse(WaitlistEntry.objects.filter(user=self.other).exists())
 
     def test_profile_and_reservations_are_private_read_only_and_user_scoped(self):
         self.assertEqual(self.client.get('/profile/').status_code,302)

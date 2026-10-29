@@ -1,0 +1,42 @@
+/* Comfortable reading sizes across the public website. */
+.global-site { font-size: 18px; line-height: 1.65; }
+.global-site .nav-link, .global-site .btn, .global-site .form-control,
+.global-site .form-select { font-size: 1.0625rem; }
+.global-site .form-control, .global-site .form-select { min-height: 48px; }
+.global-site .section-heading h2 { font-size: clamp(2.125rem, 3.5vw, 3.125rem); line-height: 1.25; }
+.global-site .section-heading h1 { font-size: clamp(2.25rem, 4vw, 3.5rem); line-height: 1.25; }
+.global-site .section-heading > p, .global-site .departure-availability,
+.global-site .departure-bookings, .global-site .collection-summary { font-size: 1rem; line-height: 1.65; }
+.global-site .country-overview, .global-site .country-overview p,
+.global-site .country-pack-counts, .global-site .country-pack-body > p { font-size: 1rem; line-height: 1.65; }
+.global-site .journey-bottom { gap: 12px; flex-wrap: wrap; }
+.global-site .departure-group-size strong { font-size: 1.375rem; letter-spacing: normal; }
+.global-site .journey-body h4, .global-site .journey-body h3,
+.global-site .memory-copy h3 { font-size: 1.75rem; line-height: 1.35; }
+.global-site .journey-body > p, .global-site .memory-copy > p:not(.eyebrow),
+.global-site .journey-meta, .global-site .journey-dates { font-size: 1rem; line-height: 1.65; }
+.global-site .journey-bottom strong { font-size: 2.125rem; letter-spacing: -.03em; }
+.global-site .journey-bottom small, .global-site .journey-bottom del,
+.global-site .month-heading > span, .global-site .filter-summary { font-size: .9375rem; }
+.global-site .country-badge, .global-site .sale-badge,
+.global-site .journey-image-badges .deaf-travel-badge,
+.global-site .deaf-travel-badge { font-size: 1rem; line-height: 1.4; padding: 8px 12px; font-weight: 700; }
+.global-site .journey-image-badges { right: 15px; gap: 8px; }
+.global-site .journey-image-badges .deaf-travel-badge img { width: 24px; height: 24px; }
+.global-site .journey-card .journey-image-badges img { transform: none; }
+.global-site .collection-navigation label, .global-site .memory-filters label,
+.global-site .eyebrow { font-size: .9375rem; }
+.global-site .global-footer a, .global-site .global-footer p,
+.global-site .memory-countries a, .global-site .site-toast { font-size: 1rem; }
+.global-site[data-page="booking"] .small,
+.global-site[data-page="booking"] .booking-form-hint,
+.global-site[data-page="booking"] .payment-option-sub,
+.global-site[data-page="booking"] .fixed-departure span { font-size: 1rem; line-height: 1.6; }
+.global-site[data-page="booking"] .booking-price-panel { font-size: 2.5rem !important; }
+.global-site[data-page="booking"] .new-price-big { font-size: 2.5rem; }
+.global-site[data-page="booking"] .booking-form-heading,
+.global-site[data-page="booking"] .payment-option-title { font-size: 1.125rem; }
+@media (max-width: 600px) {
+  .global-site .journey-body { padding: 22px; }
+  .global-site .journey-body h4, .global-site .journey-body h3 { font-size: 1.625rem; }
+}

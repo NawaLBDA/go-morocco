@@ -386,7 +386,7 @@ class Tour(CountryLinkedModel):
 
     is_promotion = models.BooleanField(default=False)
     discount_percent = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
-    deaf_only = models.BooleanField(default=False, verbose_name='Designed for deaf travelers', help_text='Display the deaf-traveler badge. Everyone can book, regardless of their registered deaf status.')
+    deaf_only = models.BooleanField(default=False, verbose_name='Deaf travelers only', help_text='Only accounts registered as deaf can book this tour.')
     explanation_video_url = models.URLField(blank=True, help_text="Accessible explanatory video for this tour.")
 
     country = models.CharField(max_length=50, default='morocco')
@@ -435,8 +435,8 @@ class Tour(CountryLinkedModel):
 
 
 class TourDeparture(models.Model):
-    deaf_only = models.BooleanField(default=False, verbose_name='Designed for deaf travelers',
-        help_text='Display the deaf-traveler badge for these dates. Everyone can book; this does not restrict access.')
+    deaf_only = models.BooleanField(default=False, verbose_name='Deaf travelers only',
+        help_text='Only accounts registered as deaf can book these dates.')
 
     @property
     def requires_deaf(self):

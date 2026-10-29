@@ -18,7 +18,7 @@ class RabatPreviewTests(TestCase):
         call_command('seed_deaf_departure_preview', stdout=StringIO())
         self.assertEqual(tour.departures.count(), 3)
         response = self.client.get('/', {'country': 'morocco'})
-        self.assertContains(response, 'For deaf travelers · Everyone welcome', count=1)
+        self.assertContains(response, 'Deaf travelers only', count=1)
         self.assertContains(response, 'class="journey-grid dated-grid"', count=1)
 
     def test_seed_is_repeatable_preserves_edits_and_provides_map_points(self):

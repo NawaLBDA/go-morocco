@@ -20,6 +20,10 @@ def join_waitlist(request, departure_id):
     departure = get_object_or_404(TourDeparture.objects.select_related('tour', 'tour__region'),
         pk=departure_id, tour__in=visible_tours(request.user), is_published=True, start_date__gte=timezone.localdate())
     target = reverse('tour_detail', args=[departure.tour.slug]) + f'?departure_id={departure.pk}#departure-status'
+    from .eligibility import can_book_departure, DEAF_ONLY_MESSAGE
+    if not can_book_departure(request.user, departure.tour, departure):
+        messages.error(request, DEAF_ONLY_MESSAGE)
+        return redirect(target)
     try:
         persons = int(request.POST.get('persons', '1'))
         email = request.POST.get('email', request.user.email).strip()

@@ -77,7 +77,7 @@ class GlobalSiteTests(TestCase):
         self.tour.save()
         self.assertNotContains(self.client.get('/'), 'Atlas journey')
         self.assertEqual(self.client.get('/tour/' + self.tour.slug + '/').status_code, 200)
-        self.assertContains(self.client.get('/', {'country': 'morocco'}), 'For deaf travelers · Everyone welcome')
+        self.assertContains(self.client.get('/', {'country': 'morocco'}), 'Deaf travelers only')
         UserProfile.objects.create(user=self.user, is_deaf=True, phone='123', country='France', postal_code='123')
         self.client.force_login(self.user)
         self.assertEqual(self.client.get('/tour/' + self.tour.slug + '/').status_code, 200)

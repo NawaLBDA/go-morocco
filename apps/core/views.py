@@ -2830,6 +2830,7 @@ def tour_detail(request, tour_slug: str):
     return render(request, "booking.html", {
         **scheduled,
         "deaf_booking_restricted": deaf_booking_restricted,
+        "deaf_booking_ineligible": deaf_booking_restricted and request.user.is_authenticated and not UserProfile.objects.filter(user=request.user, is_deaf=True).exists(),
         "tour": tour,
         "reservation": reservation,
         "disabled_ranges": disabled_ranges,

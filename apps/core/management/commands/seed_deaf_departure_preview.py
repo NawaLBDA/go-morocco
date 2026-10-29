@@ -24,5 +24,5 @@ class Command(BaseCommand):
             departure, _ = TourDeparture.objects.get_or_create(tour=tour, start_date=start,
                 end_date=start+timedelta(days=duration-1), defaults={'deaf_only': True, 'is_published': True,
                     'max_participants': 8, 'max_concurrent_bookings': 1})
-        self.stdout.write(self.style.SUCCESS(f'Rabat example: {departure.start_date} to {departure.end_date}. Badge only; everyone welcome. Dates and arrangements are examples for staff to review.'))
+        self.stdout.write(self.style.SUCCESS(f'Rabat example: {departure.start_date} to {departure.end_date}. Reserved for travelers registered as deaf. Dates and arrangements are examples for staff to review.'))
         self.stdout.write(f'/tour/{tour.slug}/?departure_id={departure.pk}')

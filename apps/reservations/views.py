@@ -133,6 +133,9 @@ def _create_pending_reservation_checked(
     if uses_scheduled_departures(tour.country):
         from .departures import resolve_departure
         departure = resolve_departure(tour, start_date, end_date, departure_id)
+    from .eligibility import can_book_departure, DEAF_ONLY_MESSAGE
+    if not can_book_departure(user, tour, departure):
+        return None, DEAF_ONLY_MESSAGE, None, 403
     nights = (end_date - start_date).days
     if nights < 0 or (nights == 0 and not uses_scheduled_departures(tour.country)):
         return None, "Invalid date range.", None, 400
