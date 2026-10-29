@@ -397,6 +397,8 @@ class Tour(CountryLinkedModel):
         if self.image:
             return self.image.url
         from django.templatetags.static import static
+        if self.country == 'ireland':
+            return static('img/ireland-howth-starter.webp')
         if self.country == 'nigeria':
             return static('img/nigeria-hero.webp')
         images = {'demo-marrakech-atlas': 'morocco-marrakech-starter.webp', 'demo-sahara-stars': 'global-hero.webp',
