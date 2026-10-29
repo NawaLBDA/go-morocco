@@ -1,4 +1,7 @@
 /* Home-only typography preview for client review. 1pt = 4/3 CSS px. */
+.global-site[data-page="home"] .collection-search summary { font-size: calc(.9rem + 1pt); line-height: 1.65; }
+.global-site[data-page="home"] .filter-summary { font-size: calc(15px + 1pt); line-height: 1.65; flex-wrap: wrap; }
+.global-site[data-page="home"] .country-pack-body > p { font-size: calc(16px + 1pt); line-height: 1.7; }
 .global-site[data-page="home"] { font-size: 17px; }
 .global-site[data-page="home"] .journey-body h3,
 .global-site[data-page="home"] .journey-body h4 { font-size: 28px; line-height: 1.35; }
@@ -14,7 +17,7 @@
 .global-site[data-page="home"] .approach-feature h3 { font-size: 22px; }
 .global-site[data-page="home"] .approach-copy p,
 .global-site[data-page="home"] .journey-invitation p,
-.global-site[data-page="home"] .country-collection-banner p { font-size: 17px; line-height: 1.7; }
+.global-site[data-page="home"] .country-collection-banner p { font-size: calc(17px + 1pt); line-height: 1.7; }
 .global-site[data-page="home"] .global-brand .culture-hop-wordmark {
   text-transform: none; letter-spacing: -.02em; font-size: 24px; gap: 8px;
 }
