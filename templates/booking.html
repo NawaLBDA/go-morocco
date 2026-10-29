@@ -428,7 +428,7 @@
       {% if scheduled_tours %}Request this tour{% else %}Confirm booking{% endif %}
     </button>
 
-    <a class="btn btn-outline-secondary w-100 mt-2" href="mailto:{{ support_email }}"><i class="fa-regular fa-envelope me-1" aria-hidden="true"></i>Email {{ brand_name }}</a>
+    <a class="btn btn-outline-secondary w-100 mt-2" href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to={{ support_email|urlencode }}" target="_blank" rel="noopener noreferrer"><i class="fa-regular fa-envelope me-1" aria-hidden="true"></i>Email {{ brand_name }}</a>
 
   </form>
   {% else %}
