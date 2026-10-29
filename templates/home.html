@@ -1,6 +1,6 @@
 ﻿{% extends 'base.html' %}{% load static %}
 {% block page %}home{% endblock %}
-{% block extra_head %}<link rel="preload" as="image" href="{% static 'img/roam-belong-banner.webp' %}" fetchpriority="high">{% endblock %}
+{% block extra_head %}<link rel="preload" as="image" href="{% static 'img/roam-belong-banner.webp' %}" fetchpriority="high"><link rel="stylesheet" href="{% static 'css/home-preview.css' %}?v=1">{% endblock %}
 {% block content %}
 <section class="home-title-bar" aria-labelledby="home-title"><div class="container"><h1 id="home-title">{{ site_settings.hero_title }}</h1></div></section>
 <section id="journeys" class="global-section journeys-section"><div class="container"><div class="section-heading"><div><div class="eyebrow">GOOD THINGS ARE ON THE CALENDAR</div><h2>Find your next <span class="destination-heading-accent">destination.</span></h2></div><p>Choose a country, then your dated journey.<br>One card. One departure. Your next adventure.</p></div>{% if selected_country or selected_month or search_q %}<div class="filter-summary">Showing your selected journeys <a href="{% url 'home' %}#journeys">Clear filters ×</a></div>{% endif %}

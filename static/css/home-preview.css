@@ -1,0 +1,32 @@
+/* Home-only typography preview for client review. 1pt = 4/3 CSS px. */
+.global-site[data-page="home"] { font-size: 17px; }
+.global-site[data-page="home"] .journey-body h3,
+.global-site[data-page="home"] .journey-body h4 { font-size: 28px; line-height: 1.35; }
+.global-site[data-page="home"] .journey-body .journey-description,
+.global-site[data-page="home"] .journey-body .journey-dates { font-size: calc(16px + 1pt); line-height: 1.65; }
+.global-site[data-page="home"] .section-heading h2 { font-size: clamp(30px, 3.2vw, 42px); }
+.global-site[data-page="home"] .journey-bottom strong { font-size: 30px; }
+.global-site[data-page="home"] .departure-group-size strong { font-size: 20px; }
+.global-site[data-page="home"] .journey-image-badges .country-badge,
+.global-site[data-page="home"] .journey-image-badges .deaf-travel-badge { font-size: 15px; padding: 7px 10px; }
+.global-site[data-page="home"] .approach-copy h2,
+.global-site[data-page="home"] .journey-invitation h2 { font-size: clamp(30px, 3.4vw, 46px); line-height: 1.3; }
+.global-site[data-page="home"] .approach-feature h3 { font-size: 22px; }
+.global-site[data-page="home"] .approach-copy p,
+.global-site[data-page="home"] .journey-invitation p,
+.global-site[data-page="home"] .country-collection-banner p { font-size: 17px; line-height: 1.7; }
+.global-site[data-page="home"] .global-brand .culture-hop-wordmark {
+  text-transform: none; letter-spacing: -.02em; font-size: 24px; gap: 8px;
+}
+.global-site[data-page="home"] .global-brand .culture-hop-wordmark > img {
+  width: 38px; height: 38px; overflow: visible;
+}
+.global-site[data-page="home"] .global-brand small {
+  font-size: 14px; line-height: 1.5; letter-spacing: 0; padding-left: 46px;
+  text-transform: none; white-space: normal;
+}
+@media(max-width:600px) {
+  .global-site[data-page="home"] .global-brand .culture-hop-wordmark { font-size: 22px; }
+  .global-site[data-page="home"] .global-brand small { font-size: 13px; padding-left: 0; max-width: 270px; }
+  .global-site[data-page="home"] .journey-body h3 { font-size: 28px; }
+}

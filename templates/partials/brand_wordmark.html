@@ -1,1 +1,1 @@
-{% load static %}<span class="culture-hop-wordmark"><img src="{% static 'img/culture-hop-ch.svg' %}" alt="" width="30" height="30">{{ brand_name }}</span>
+{% load static %}<span class="culture-hop-wordmark"><img src="{% if request.resolver_match.url_name == 'home' %}{% static 'img/culture-hop-ch-padded.svg' %}{% else %}{% static 'img/culture-hop-ch.svg' %}{% endif %}" alt="" width="30" height="30">{% if request.resolver_match.url_name == 'home' %}CultureHop.Tours{% else %}{{ brand_name }}{% endif %}</span>
