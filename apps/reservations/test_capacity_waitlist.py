@@ -158,7 +158,7 @@ class CapacityWaitlistTests(TestCase):
         self.book()
         self.queue()
         entry = WaitlistEntry.objects.get()
-        with patch('apps.reservations.waitlist.send_mail', side_effect=OSError('offline')):
+        with patch('apps.reservations.waitlist.EmailMessage.send', side_effect=OSError('offline')):
             with self.captureOnCommitCallbacks(execute=True):
                 decide_waitlist(entry.pk, accept=False, staff=self.staff, note='The other group is confirmed. Please consider another date.')
         entry.refresh_from_db()

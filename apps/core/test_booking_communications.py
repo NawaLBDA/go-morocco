@@ -16,19 +16,20 @@ class BookingCommunicationTests(TestCase):
         self.user = User.objects.create_user('traveler-mail', email='traveler@example.com', first_name='Alex')
         self.tour = Tour.objects.create(title='Rabat journey', destination=Destination.objects.create(name='Rabat'), price_per_night=100)
         ContactEmailSettings.objects.create(country='morocco', recipient_email='contact@example.com')
+        SiteSettings.objects.update_or_create(pk=1, defaults={'booking_email':'bookings@example.com'})
 
     def book(self):
         start = timezone.localdate()+timedelta(days=90)
         return Reservation.objects.create(user=self.user, tour=self.tour, start_date=start, end_date=start+timedelta(days=2), total_price=300, payment_method='transfer')
 
-    def test_three_events_notify_customer_and_contact_inbox_once_with_html(self):
+    def test_three_events_notify_customer_and_booking_inbox_once_with_html(self):
         with self.captureOnCommitCallbacks(execute=True):
             booking = self.book()
         self.assertEqual(len(mail.outbox), 2)
-        self.assertEqual({m.to[0] for m in mail.outbox}, {'traveler@example.com', 'contact@example.com'})
+        self.assertEqual({m.to[0] for m in mail.outbox}, {'traveler@example.com', 'bookings@example.com'})
         customer = next(m for m in mail.outbox if m.to == ['traveler@example.com'])
         self.assertIn('pending approval', customer.body)
-        self.assertEqual(customer.reply_to, ['contact@example.com'])
+        self.assertEqual(customer.reply_to, ['bookings@example.com'])
         self.assertEqual(customer.alternatives[0][1], 'text/html')
         self.assertIn('Rabat journey', customer.alternatives[0][0])
         with self.captureOnCommitCallbacks(execute=True):

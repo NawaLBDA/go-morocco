@@ -2,7 +2,7 @@
 import logging
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage
 from django.db import transaction
 from django.utils import timezone
 from apps.core.models import WaitlistEntry, SiteSettings
@@ -16,7 +16,7 @@ def send_decision_email(entry_id):
     if entry.status == 'waiting' or entry.email_sent_at:
         return
     from apps.core.email_identity import email_identity
-    brand, sender, _ = email_identity(entry.departure.tour.country)
+    brand, sender, inbox = email_identity(entry.departure.tour.country, purpose='booking')
     dates = f'{entry.departure.start_date:%d %b %Y} – {entry.departure.end_date:%d %b %Y}'
     decision = 'accepted' if entry.status == 'accepted' else 'declined'
     body = f'Your waiting-list request for {entry.departure.tour.title} ({dates}), {entry.num_persons} traveler(s), has been {decision}.\n\n'
@@ -29,8 +29,9 @@ def send_decision_email(entry_id):
         if settings.EMAIL_BACKEND in ('django.core.mail.backends.console.EmailBackend',
                 'django.core.mail.backends.dummy.EmailBackend', 'django.core.mail.backends.filebased.EmailBackend'):
             raise RuntimeError('Configure a real outgoing email provider.')
-        sent = send_mail(f'{brand} | Waiting-list request {decision}', body,
-            sender, [entry.email], fail_silently=False)
+        sent = EmailMessage(f'{brand} | Waiting-list request {decision}', body,
+            sender, [entry.email], bcc=[inbox] if entry.email.casefold() != inbox.casefold() else [],
+            reply_to=[inbox]).send(fail_silently=False)
         if not sent:
             raise RuntimeError('Email provider did not accept the message.')
         WaitlistEntry.objects.filter(pk=entry.pk).update(email_sent_at=timezone.now(), email_error='')

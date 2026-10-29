@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def queue_booking_notifications(booking, event='requested'):
-    brand, sender, inbox = email_identity(booking.tour.country)
+    brand, sender, inbox = email_identity(booking.tour.country, purpose='booking')
     context = {'brand': brand, 'name': booking.user.get_full_name() or booking.user.username,
         'reference': str(booking.pk), 'tour': booking.tour.title,
         'country': booking.tour.region.name, 'start': booking.start_date.strftime('%d %b %Y'),
@@ -54,7 +54,7 @@ def deliver_notification(pk):
         if notice.channel == 'email':
             if settings.EMAIL_BACKEND in ['django.core.mail.backends.console.EmailBackend', 'django.core.mail.backends.dummy.EmailBackend', 'django.core.mail.backends.filebased.EmailBackend']:
                 raise RuntimeError('Email delivery disabled. Configure EMAIL_BACKEND and a verified sender.')
-            brand, sender, inbox = email_identity(booking.tour.country)
+            brand, sender, inbox = email_identity(booking.tour.country, purpose='booking')
             context = notice.context or {'brand': brand, 'name': name, 'reference': str(booking.pk),
                 'tour': booking.tour.title, 'start': str(booking.start_date), 'end': str(booking.end_date),
                 'persons': booking.num_persons, 'amount': f'{booking.total_price} USD',
@@ -64,6 +64,9 @@ def deliver_notification(pk):
                 'requested': ('Booking request received', 'Thank you for choosing us. We have received your booking request and our team is reviewing it.', 'Your booking is pending approval. We will email you as soon as our team confirms it. Please wait for approval before arranging payment.'),
                 'approved': ('Your journey is confirmed', 'Our team has approved your booking. We look forward to welcoming you on your journey.', 'If your balance is unpaid, please contact our team to arrange your selected payment method. Approval does not mean payment has been received.'),
                 'paid': ('Payment received', 'Thank you. Our team has recorded your booking payment as received.', 'Keep this confirmation with your travel details. Contact us if you have any questions about your journey.'),
+                'rejected': ('Booking request declined', 'Our team has reviewed your request and is unable to confirm this booking.', 'Reply to this email if you would like to discuss another departure. This notice does not confirm or reverse a payment.'),
+                'cancelled': ('Booking cancelled', 'Your booking has been marked as cancelled by our team.', 'Contact us with any questions about the cancellation or any payment arrangements. This notice does not itself confirm a refund.'),
+                'completed': ('Journey completed', 'Your journey has been marked as completed. Thank you for traveling with us.', 'We hope to welcome you on another journey. Reply to this email if you need any help with this booking.'),
             }[notice.event]
             if notice.audience == 'staff':
                 introduction = f'Booking #{booking.pk}: {title.lower()}. Review the reservation in your administration dashboard.'

@@ -13,7 +13,7 @@ class ContactDeliveryTests(TestCase):
     def test_public_contact_is_email_only(self):
         for path in ['/', '/contact/']:
             response = self.client.get(path)
-            self.assertContains(response, 'contact@culturehoptours.com')
+            self.assertContains(response, 'info@culturehoptours.com')
             self.assertNotContains(response, 'WhatsApp')
             self.assertNotContains(response, 'wa.me')
 

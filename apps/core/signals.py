@@ -17,6 +17,8 @@ def booking_created(sender, instance, created, raw=False, **kwargs):
         queue_booking_notifications(instance, event='approved')
     if instance.payment_status == 'paid' and (created or previous.get('payment_status') != 'paid') and (fields is None or 'payment_status' in fields):
         queue_booking_notifications(instance, event='paid')
+    if not created and instance.status in {'rejected', 'cancelled', 'completed'} and previous.get('status') != instance.status and (fields is None or 'status' in fields):
+        queue_booking_notifications(instance, event=instance.status)
 
 
 @receiver(pre_save, sender=Reservation)

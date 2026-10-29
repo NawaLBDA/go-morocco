@@ -31,7 +31,7 @@ class ServiceTests(TestCase):
             booking = self.book()
             self.assertEqual(len(mail.outbox), 0)
         self.assertEqual(len(mail.outbox), 4)
-        self.assertEqual({message.to[0] for message in mail.outbox}, {'one@example.com', 'two@example.com', 'alex@example.com', 'contact@culturehoptours.com'})
+        self.assertEqual({message.to[0] for message in mail.outbox}, {'one@example.com', 'two@example.com', 'alex@example.com', 'omasampson@culturehoptours.com'})
         self.assertIn('Rabat', mail.outbox[0].body)
         with self.captureOnCommitCallbacks(execute=True):
             booking.admin_note = 'Edited'
