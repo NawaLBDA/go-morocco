@@ -7,7 +7,7 @@ from apps.core.seo_views import country_sitemap, robots_txt
 from django.views.generic import RedirectView
 
 urlpatterns = [
-    path('favicon.ico', RedirectView.as_view(url='/static/img/culture-hop-ch-favicon.png', permanent=False), name='favicon'),
+    path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico?v=3', permanent=False), name='favicon'),
     path('ireland-admin/', RedirectView.as_view(url='/admin/', permanent=False)),
     path('admin/', admin.site.urls),
     path('robots.txt', robots_txt, name='robots_txt'),

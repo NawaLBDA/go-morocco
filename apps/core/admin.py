@@ -713,8 +713,8 @@ class GuideAdmin(admin.ModelAdmin):
 @admin.register(Country)
 class CountryAdmin(admin.ModelAdmin):
     inlines = (CountryGuideInline,)
-    list_display = ('name', 'slug', 'is_active', 'max_concurrent_groups', 'order')
-    list_editable = ('is_active', 'order')
+    list_display = ('name', 'slug', 'is_active', 'coming_soon', 'max_concurrent_groups', 'order')
+    list_editable = ('is_active', 'coming_soon', 'order')
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ('name',)
     def get_readonly_fields(self, request, obj=None):

@@ -11,6 +11,7 @@ class Country(models.Model):
     slug = models.SlugField(max_length=50, unique=True)
     name = models.CharField(max_length=100)
     is_active = models.BooleanField(default=False, help_text='Only active countries are offered to travelers.')
+    coming_soon = models.BooleanField(default=False, help_text='Announcement only: hide tour prices and disable new bookings until ready.')
     uses_scheduled_departures = models.BooleanField(default=True, help_text='Published departures, daily pricing and a private-group guide calendar. Disable for legacy flexible nightly tours.')
     image = models.ImageField(upload_to='img/countries/', blank=True)
     introduction = models.TextField(blank=True)

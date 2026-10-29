@@ -120,7 +120,7 @@ def travel_stories(request):
     selected_record = next((country for country in countries if country.slug == selected), None)
     if selected and not selected_record:
         raise Http404('This country collection is not available.')
-    posts = BlogPost.objects.filter(region__is_active=True, story_kind='memory').select_related('region')
+    posts = BlogPost.objects.filter(region__is_active=True, region__coming_soon=False, story_kind='memory').select_related('region')
     years = {timezone.localdate().year}
     for trip_date, created_at in posts.values_list('trip_date', 'created_at'):
         years.add(trip_date.year if trip_date else timezone.localtime(created_at).year)

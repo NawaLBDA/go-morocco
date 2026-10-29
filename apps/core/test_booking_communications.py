@@ -98,14 +98,14 @@ class BookingCommunicationTests(TestCase):
         from io import StringIO
         call_command('seed_home_heroes', stdout=StringIO())
         self.assertEqual(HomeHero.objects.count(), 2)
-        self.assertFalse(Country.objects.get(slug='nigeria').is_active)
+        self.assertTrue(Country.objects.get(slug='nigeria').coming_soon)
         response = self.client.get('/')
         self.assertNotContains(response, 'hero-carousel')
         self.assertContains(response, 'home-title-bar')
         self.assertNotContains(response, 'data-hero-pause')
         self.assertNotContains(response, 'data-hero-next')
-        self.assertNotContains(response, 'nigeria-hero.webp')
-        self.assertNotContains(response, '?country=nigeria#journeys')
+        self.assertContains(response, 'nigeria-hero.webp')
+        self.assertContains(response, '?country=nigeria#journeys')
         hero = HomeHero.objects.get(starter_image='nigeria')
         hero.title = 'Team edited headline'
         hero.save()

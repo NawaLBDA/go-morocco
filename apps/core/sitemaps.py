@@ -48,7 +48,7 @@ class TourSitemap(CountrySitemap):
         self.country = country
 
     def items(self):
-        tours = Tour.objects.filter(region__is_active=True, deaf_only=False).exclude(slug__isnull=True).exclude(slug='')
+        tours = Tour.objects.filter(region__is_active=True, region__coming_soon=False, deaf_only=False).exclude(slug__isnull=True).exclude(slug='')
         if self.country == 'morocco':
             tours = tours.exclude(slug__startswith='demo-')
         return tours.order_by("id")

@@ -18,7 +18,7 @@ from .sitemaps import BlogSitemap
 class MemoryJournalTests(TestCase):
     def setUp(self):
         Country.objects.get_or_create(slug='nigeria',defaults={'name':'Nigeria','is_active':True})
-        Country.objects.filter(slug='nigeria').update(is_active=True)
+        Country.objects.filter(slug='nigeria').update(is_active=True, coming_soon=False)
 
     def test_journal_has_no_booking_catalogue_or_planning_articles(self):
         memory=BlogPost.objects.create(title='A genuine old memory',slug='real-memory',country='morocco',content='A shared moment.',trip_date=date(2024,6,3))

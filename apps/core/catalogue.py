@@ -5,7 +5,7 @@ from .models import Promotion, Tour
 
 
 def visible_tours(user):
-    return Tour.objects.filter(region__is_active=True)
+    return Tour.objects.filter(region__is_active=True, region__coming_soon=False)
 
 
 def active_promotions(country=None):

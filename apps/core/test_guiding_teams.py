@@ -74,6 +74,6 @@ class GuidingTeamTests(TestCase):
         response = self.client.get('/')
         self.assertContains(response, 'Culture Hop Tours')
         self.assertContains(response, 'Many cultures. Unforgettable journeys.')
-        self.assertContains(response, 'Africa • Caribbean • Middle East • Ireland')
+        self.assertContains(response, 'Nigeria • Morocco • Ireland • Jamaica')
         self.assertNotContains(response, '> Basma<')
         self.assertEqual(SiteSettings.objects.get(pk=1).brand_name, 'Culture Hop Tours')

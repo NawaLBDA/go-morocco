@@ -1,3 +1,4 @@
-{% if departure_groups %}
+{% if selected_country_record.coming_soon %}<div class="empty-journeys"><h3>{{ selected_country_record.name }} is in the works.</h3><p>We are preparing this destination. Dates, itineraries and prices will be announced when ready.</p><a href="{% url 'contact' %}" class="btn btn-primary">Keep me informed</a></div>{% else %}{% if departure_groups %}
 <div class="journey-grid dated-grid">{% for month, departures in departure_groups %}{% for departure in departures %}{% include 'partials/departure_card.html' %}{% endfor %}{% endfor %}</div>
 {% else %}<div class="empty-journeys"><h3>New journeys are taking shape.</h3><p>No published departures match these filters. Choose another year or contact us to plan your trip.</p><a href="{% url 'contact' %}" class="btn btn-primary">Talk to our team</a></div>{% endif %}
+{% endif %}

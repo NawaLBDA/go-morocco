@@ -16,6 +16,9 @@ from .models import Country, Destination, Tour, TourDeparture, TourActivity, Res
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class CountryExampleTests(TestCase):
+    def setUp(self):
+        Country.objects.filter(slug="nigeria").update(coming_soon=False)
+
     def test_requested_catalogue_contains_two_countries_five_trips_and_open_deaf_departures(self):
         result=seed_examples(apps, activate_countries=True)
         self.assertEqual(result, {'tours_created':5,'departures_created':10})

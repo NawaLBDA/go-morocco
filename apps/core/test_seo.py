@@ -48,6 +48,8 @@ class HeadParser(HTMLParser):
 class MoroccoSEOTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        from .models import Country
+        Country.objects.filter(slug="ireland").update(is_active=False)
         destination = Destination.objects.create(name='Rabat')
         cls.tour = Tour.objects.create(title='Rabat discovery', destination=destination,
             price_per_night=100, description='A private tour of Rabat with your local guide.')
