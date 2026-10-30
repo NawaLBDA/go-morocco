@@ -64,3 +64,5 @@
   .global-site .global-nav .global-brand { margin: 0; }
   .global-site .global-nav .culturehop-logo { width: min(300px, calc(100vw - 100px)); }
 }
+
+.global-site .country-pack-image > .country-coming-soon-badge { background: #f8d66d; color: #382c0b; font-weight: 700; }
