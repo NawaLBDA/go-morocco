@@ -1,4 +1,6 @@
 /* Shared identity and footer on every public page. */
+.global-site .journey-card .journey-bottom { flex-direction: column; align-items: flex-start; gap: 12px; }
+.global-site .journey-card .departure-group-size { display: flex; align-items: center; gap: 8px; text-align: left; padding: 0; font-size: 15px; line-height: 1.5; color: #526963; }
 .global-site[data-page="blog"] .memory-intro .text-link { font-size: 20px; line-height: 1.6; }
 .global-site[data-page="blog"] .moments-grid a > span { font-size: 18px; line-height: 1.6; padding: 16px 18px; }
 .global-site .country-coming-soon { font-size: calc(17px + 1pt); line-height: 1.6; color: #204f46; font-weight: 700; }

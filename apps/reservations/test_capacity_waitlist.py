@@ -60,7 +60,7 @@ class CapacityWaitlistTests(TestCase):
         self.assertEqual((stats['booked_groups'], stats['booked_travelers']), (2, 5))
         response = self.client.get('/reservations/', {'country': 'morocco'})
         self.assertContains(response, '5 travelers reserved')
-        self.assertContains(response, 'Max 7')
+        self.assertContains(response, '1&ndash;7 travelers per group')
         self.assertNotContains(response, self.users[0].email)
 
     def test_country_team_limit_still_applies_when_departure_allows_more(self):

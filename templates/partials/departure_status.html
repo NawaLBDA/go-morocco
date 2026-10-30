@@ -1,7 +1,6 @@
 {% if selected_departure %}
 <section class="departure-status card p-4 mb-4" id="departure-status" aria-labelledby="departure-status-title">
-  <div class="eyebrow">YOUR DATED DEPARTURE</div>
-  <h2 id="departure-status-title" class="h4">{{ selected_departure.start_date|date:'j M Y' }} – {{ selected_departure.end_date|date:'j M Y' }}</h2>
+  <h2 id="departure-status-title" class="h4">Departure availability</h2>
   <p><strong>Up to {{ selected_departure.max_participants }} travelers per private group.</strong> You can book for fewer people.</p>
   <p>{{ selected_departure.booked_travelers|default:0 }} travelers · {{ selected_departure.booked_groups|default:0 }} group{{ selected_departure.booked_groups|pluralize }} already booked or awaiting confirmation.</p>
   {% if reservation %}<a href="{% url 'my_reservations' %}">View your requests in My reservations</a>

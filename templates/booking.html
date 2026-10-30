@@ -53,7 +53,7 @@
         <span class="journey-image-badges booking-image-badges"><span class="country-badge">{{ tour.region.name }}</span>{% if deaf_booking_restricted %}{% include 'partials/deaf_badge.html' with compact=True %}{% endif %}</span>
       </div>
 
-      {% include 'partials/departure_status.html' %}
+      {% if not selected_departure.available or reservation or waitlist_entry %}{% include 'partials/departure_status.html' %}{% endif %}
       {% include 'partials/guiding_team.html' %}
 
       <div class="row g-3 mb-4">
@@ -328,26 +328,15 @@
   <input type="hidden" id="base-price" value="{{ tour.display_price|unlocalize }}">
 {% endif %}
 
-    <div class="booking-form-group mb-3">
-      <div class="booking-form-heading">
-        <span class="booking-form-step">1</span>
-        <div>
-          <label class="fw-bold mb-1">Dates</label>
-          <div class="booking-form-hint">{% if scheduled_tours %}Your scheduled departure{% else %}Choose your trip window{% endif %}</div>
-        </div>
-      </div>
-
-      {% if scheduled_tours %}
-        <div class="fixed-departure mt-3" aria-label="Selected departure">
-          <i class="fa-regular fa-calendar" aria-hidden="true"></i>
-          <div><strong>{{ selected_departure.start_date|date:'j M Y' }} – {{ selected_departure.end_date|date:'j M Y' }}</strong><span>{{ selected_departure.duration_days }} day{{ selected_departure.duration_days|pluralize }} · Dates included in this journey</span></div>
-        </div>
+    {% if scheduled_tours %}
         <input type="hidden" name="departure_id" value="{{ selected_departure.pk }}">
         <input type="hidden" id="booking-tour-id" value="{{ tour.pk }}">
         <input type="hidden" id="booking-days" value="{% if tour.package_price %}{{ selected_departure.duration_days|default:0 }}{% else %}{{ selected_departure.active_days|default:0 }}{% endif %}">
         <input type="hidden" id="start_date" name="start_date" value="{{ selected_departure.start_date|date:'Y-m-d' }}">
         <input type="hidden" id="end_date" name="end_date" value="{{ selected_departure.end_date|date:'Y-m-d' }}">
-      {% else %}
+    {% else %}
+    <div class="booking-form-group mb-3">
+      <div class="booking-form-heading"><span class="booking-form-step">1</span><div><label class="fw-bold mb-1">Dates</label><div class="booking-form-hint">Choose your trip window</div></div></div>
       <div class="booking-input-grid mt-3">
         <input type="text" id="start_date" name="start_date"
                class="form-control booking-date"
@@ -357,8 +346,8 @@
                class="form-control booking-date"
                placeholder="End date" aria-label="End date" autocomplete="off" required>
       </div>
-      {% endif %}
     </div>
+    {% endif %}
 
     {% if not scheduled_tours %}
     <div id="dateWarning" class="alert alert-warning py-2 px-3 small d-none mt-2">
@@ -372,14 +361,16 @@
     </div>
 
     {% endif %}
+{% if scheduled_tours %}<span id="live-days" hidden></span>{% else %}
     <div class="booking-inline-meta d-flex justify-content-between align-items-center small text-muted mb-3">
       <span><i class="fa-solid fa-calendar-day me-1"></i> Days</span>
       <strong id="live-days">-</strong>
     </div>
 
+{% endif %}
     <div class="booking-form-group mb-3">
       <div class="booking-form-heading">
-        <span class="booking-form-step">2</span>
+        <span class="booking-form-step">{% if scheduled_tours %}1{% else %}2{% endif %}</span>
         <div>
           <label class="fw-bold mb-1">Persons</label>
           <div class="booking-form-hint">Number of travelers</div>
@@ -405,7 +396,7 @@
     </div>
 
     <div class="booking-form-heading mb-2">
-      <span class="booking-form-step">3</span>
+      <span class="booking-form-step">{% if scheduled_tours %}2{% else %}3{% endif %}</span>
       <div>
         <label class="fw-bold mb-1">Payment method</label>
         <div class="booking-form-hint">Choose how you want to pay</div>
