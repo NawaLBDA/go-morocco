@@ -52,12 +52,15 @@ def _recalculate_total_for_reservation(
     include_hotel: bool,
     selected_extra_activities: list,
     charge_days: int | None = None,
+    package_priced: bool | None = None,
+    base_price_override: Decimal | None = None,
 ) -> tuple[Decimal, Decimal, Decimal, Decimal, Decimal]:
     nights = charge_days if charge_days is not None else max(0, (end_date - start_date).days)
     persons = max(1, int(persons or 1))
 
     from apps.core.catalogue import tour_rate
-    base_price = tour_rate(tour)
+    package_priced = tour.package_price is not None if package_priced is None else package_priced
+    base_price = Decimal(base_price_override) if base_price_override is not None else tour_rate(tour)
 
     if full_package:
         include_transport = True
@@ -80,10 +83,10 @@ def _recalculate_total_for_reservation(
         extras_total += line
 
     extras_total = extras_total.quantize(Decimal('0.01'))
-    nightly_total = (base_price + transport_add + hotel_add) * Decimal(nights) * Decimal(persons)
+    nightly_total = (base_price * (1 if package_priced else Decimal(nights)) + (transport_add + hotel_add) * Decimal(nights)) * Decimal(persons)
     total = (nightly_total + extras_total).quantize(Decimal('0.01'))
 
-    if persons > 5:
+    if persons > 5 and not package_priced:
         total = (total * Decimal('0.90')).quantize(Decimal('0.01'))
 
     return total, base_price, transport_add, hotel_add, extras_total
@@ -193,7 +196,7 @@ def _create_pending_reservation_checked(
         include_transport=include_transport,
         include_hotel=include_hotel,
         selected_extra_activities=selected_extras_payload,
-        charge_days=departure.active_days if departure else None,
+        charge_days=(departure.duration_days if tour.package_price is not None else departure.active_days) if departure else None,
     )
 
     with transaction.atomic():
@@ -210,8 +213,9 @@ def _create_pending_reservation_checked(
             user=user,
             tour=tour,
             departure=departure,
+            package_priced=tour.package_price is not None,
             priced_per_day=bool(departure),
-            booked_days=departure.active_days if departure else None,
+            booked_days=(departure.duration_days if tour.package_price is not None else departure.active_days) if departure else None,
             start_date=start_date,
             end_date=end_date,
             num_persons=persons,
@@ -763,6 +767,8 @@ def admin_update_reservation(request, id):
         include_hotel=include_hotel,
         selected_extra_activities=r.selected_extra_activities,
         charge_days=r.booked_days if r.priced_per_day else None,
+        package_priced=r.package_priced,
+        base_price_override=r.base_price_per_night or r.tour.price_per_night,
     )
 
     r.start_date = start_date
@@ -940,7 +946,7 @@ def guide_availability(request):
                 departure = resolve_departure(
                     get_object_or_404(visible_tours(request.user), pk=request.GET.get('tour_id'), country=country),
                     start, end, request.GET['departure_id'])
-                payload['days'] = departure.active_days
+                payload['days'] = departure.duration_days if departure.tour.package_price is not None else departure.active_days
             except (ValidationError, ValueError) as exc:
                 return JsonResponse({'error': str(exc.messages[0]) if isinstance(exc, ValidationError) else 'Invalid departure.'}, status=400)
         from .availability import has_conflict, departure_capacity

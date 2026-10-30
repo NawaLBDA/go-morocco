@@ -20,7 +20,7 @@ class ContactInquiryForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         from .models import Country
         self.fields['destination_country'].choices = [('', 'General enquiry')] + list(
-            Country.objects.filter(is_active=True).values_list('slug', 'name'))
+            Country.objects.filter(is_active=True, is_visible=True).values_list('slug', 'name'))
 
     class Meta:
         model = ContactMessage

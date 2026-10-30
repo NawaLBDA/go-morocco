@@ -285,14 +285,14 @@
 
         
 
-{% if scheduled_tours %}<p class="text-muted small mb-1">Price per person / per day</p>{% endif %}
+{% if scheduled_tours %}<p class="text-muted small mb-1">{% if tour.package_price %}Price per person / complete {{ tour.package_days }}-day journey{% else %}Price per person / per day{% endif %}</p>{% endif %}
 {% if selected_departure %}<div class="booking-capacity-pill"><strong>Max {{ selected_departure.max_participants }} travelers</strong><span>per private group · smaller groups welcome</span></div>{% endif %}
 {% if tour.effective_discount > 0 %}
   <div class="mb-3 booking-price-panel">
     <div class="text-muted small">Promo -{{ tour.effective_discount }}%</div>
 <div class="d-flex align-items-end gap-2">
   <span class="old-price-big">
-    {{ tour.price_per_night }} $
+    {{ tour.display_price }} $
   </span>
 
   <span class="new-price-big">
@@ -305,7 +305,7 @@
   </div>
 {% else %}
   <p class="fs-3 fw-bold text-primary mb-1 booking-price-panel">
-    {{ tour.price_per_night }} $
+    {{ tour.display_price }} $
   </p>
 {% endif %}
 
@@ -315,7 +315,7 @@
 <p class="small mt-3">You already have a request for this departure.</p><a class="btn btn-primary" href="{% url 'my_reservations' %}">View my reservations</a>
 {% else %}
   {% if not scheduled_tours or selected_departure %}
-  <form method="post" id="booking-form" action="{% url 'book_tour' tour.id %}" {% if scheduled_tours %}data-availability-url="{% url 'guide_availability' %}?country={{ country }}" data-authenticated="{{ user.is_authenticated|yesno:'true,false' }}" data-login-url="{% url 'login' %}"{% endif %}>
+  <form method="post" id="booking-form" data-package-priced="{{ tour.package_price|yesno:'true,false' }}" action="{% url 'book_tour' tour.id %}" {% if scheduled_tours %}data-availability-url="{% url 'guide_availability' %}?country={{ country }}" data-authenticated="{{ user.is_authenticated|yesno:'true,false' }}" data-login-url="{% url 'login' %}"{% endif %}>
     {% if scheduled_tours %}
       {% include 'partials/morocco_booking_rules.html' %}
       <p id="guide-availability-status" class="availability-status small" role="status" aria-live="polite">Checking availability for your selected dates…</p>
@@ -325,7 +325,7 @@
 {% if tour.effective_discount > 0 %}
   <input type="hidden" id="base-price" value="{{ tour.promo_price|unlocalize }}">
 {% else %}
-  <input type="hidden" id="base-price" value="{{ tour.price_per_night|unlocalize }}">
+  <input type="hidden" id="base-price" value="{{ tour.display_price|unlocalize }}">
 {% endif %}
 
     <div class="booking-form-group mb-3">
@@ -344,7 +344,7 @@
         </div>
         <input type="hidden" name="departure_id" value="{{ selected_departure.pk }}">
         <input type="hidden" id="booking-tour-id" value="{{ tour.pk }}">
-        <input type="hidden" id="booking-days" value="{{ selected_departure.active_days|default:0 }}">
+        <input type="hidden" id="booking-days" value="{% if tour.package_price %}{{ selected_departure.duration_days|default:0 }}{% else %}{{ selected_departure.active_days|default:0 }}{% endif %}">
         <input type="hidden" id="start_date" name="start_date" value="{{ selected_departure.start_date|date:'Y-m-d' }}">
         <input type="hidden" id="end_date" name="end_date" value="{{ selected_departure.end_date|date:'Y-m-d' }}">
       {% else %}
@@ -393,9 +393,11 @@
       🛈 Booking will be confirmed after admin validation.
     </p>
 
+{% if not tour.package_price %}
     <div class="alert alert-success small mb-3">
       <i class="fa-solid fa-gift"></i> 10% discount for groups of more than 5 people
     </div>
+{% endif %}
 
     <div class="booking-total-bar d-flex justify-content-between fw-bold mb-3">
       <span>Total</span>
@@ -2266,6 +2268,6 @@ async function openAndInitStripe(){
 
 {% if scheduled_tours %}
   {{ disabled_ranges|json_script:"guide-disabled-ranges" }}
-  <script src="{% static 'js/morocco-booking.js' %}?v={{ static_version }}" defer></script>
+  <script src="{% static 'js/morocco-booking.js' %}?v={{ static_version }}-package-1" defer></script>
 {% endif %}
 {% endblock %}

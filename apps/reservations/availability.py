@@ -88,6 +88,8 @@ def departure_capacity(departure, *, rows=None, country_limit=None, exclude_id=N
 
 
 def validate_reservation(reservation):
+    if not reservation.pk and reservation.num_persons > 20:
+        raise ValidationError("Groups are limited to 20 travelers.")
     if reservation.departure_id and not 1 <= reservation.num_persons <= reservation.departure.max_participants:
         raise ValidationError('Choose a group size between 1 and the departure maximum.')
     if not reservation.tour_id or not uses_scheduled_departures(reservation.tour.country):

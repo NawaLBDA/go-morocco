@@ -11,6 +11,7 @@ class Country(models.Model):
     slug = models.SlugField(max_length=50, unique=True)
     name = models.CharField(max_length=100)
     is_active = models.BooleanField(default=False, help_text='Only active countries are offered to travelers.')
+    is_visible = models.BooleanField(default=True, db_default=True, verbose_name='Show this country', help_text='Hide this country and its public tours and stories without deleting data. Independent of the coming-soon announcement.')
     coming_soon = models.BooleanField(default=False, help_text='Announcement only: hide tour prices and disable new bookings until ready.')
     uses_scheduled_departures = models.BooleanField(default=True, help_text='Published departures, daily pricing and a private-group guide calendar. Disable for legacy flexible nightly tours.')
     image = models.ImageField(upload_to='img/countries/', blank=True)
@@ -359,8 +360,11 @@ class Tour(CountryLinkedModel):
 
     image = CloudinaryField('image', blank=True, null=True)
 
+    package_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(4000)], help_text='USD per person for the complete 14-day journey. Minimum $4,000. Empty only for legacy daily-priced tours.')
+    package_days = models.PositiveIntegerField(default=14, db_default=14, validators=[MinValueValidator(14), MaxValueValidator(14)])
     price_per_night = models.DecimalField(max_digits=8, decimal_places=2)
-    max_days = models.PositiveIntegerField(default=5, validators=[MinValueValidator(1)],
+    max_days = models.PositiveIntegerField(default=14, validators=[MinValueValidator(1)],
         help_text="Morocco: maximum days per departure, including arrival and departure days. Increase this before adding longer departures.")
     description = models.TextField(blank=True)
 
@@ -391,6 +395,10 @@ class Tour(CountryLinkedModel):
     explanation_video_url = models.URLField(blank=True, help_text="Accessible explanatory video for this tour.")
 
     country = models.CharField(max_length=50, default='morocco')
+
+    @property
+    def display_price(self):
+        return self.package_price if self.package_price is not None else self.price_per_night
 
     @property
     def cover_url(self):
@@ -449,7 +457,7 @@ class TourDeparture(models.Model):
     start_date = models.DateField()
     end_date = models.DateField(help_text="For a one-day tour, use the same start and end date.")
     is_published = models.BooleanField(default=False)
-    max_participants = models.PositiveIntegerField(default=12, validators=[MinValueValidator(1)])
+    max_participants = models.PositiveIntegerField(default=20, validators=[MinValueValidator(1), MaxValueValidator(20)])
     max_concurrent_bookings = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)],
         help_text='Maximum independent groups on this departure. Also limited by the country team capacity. Each group has its own maximum participants.')
 
@@ -487,6 +495,8 @@ class TourDeparture(models.Model):
             return
         if self.end_date < self.start_date:
             raise ValidationError({'end_date': 'End date cannot be before start date.'})
+        if self.tour.package_price is not None and self.duration_days != self.tour.package_days and not (self.pk and self.reservations.exists()):
+            raise ValidationError({'end_date': 'Package departures must last exactly 14 days, including arrival and departure.'})
         if self.duration_days > self.tour.max_days:
             raise ValidationError({'end_date': f'This tour allows {self.tour.max_days} days. Increase Maximum days in the tour settings first.'})
         if self.pk:
@@ -741,6 +751,7 @@ class Reservation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reservations')
     tour = models.ForeignKey(Tour, on_delete=models.CASCADE, related_name='reservations')
     departure = models.ForeignKey(TourDeparture, on_delete=models.PROTECT, null=True, blank=True, related_name='reservations')
+    package_priced = models.BooleanField(default=False, db_default=False, editable=False)
     priced_per_day = models.BooleanField(default=False, editable=False)
     booked_days = models.PositiveIntegerField(null=True, blank=True, editable=False)
 

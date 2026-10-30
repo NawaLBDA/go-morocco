@@ -485,6 +485,8 @@ class TourTeamAdminForm(forms.ModelForm):
 
     def clean(self):
         data = super().clean()
+        if not self.instance.pk and data.get('package_price') is None:
+            self.add_error('package_price', 'Enter the complete 14-day package price (minimum $4,000 per person).')
         guides = data.get('guides')
         country = data.get('country') or self.instance.country
         if guides is not None and guides.exclude(country_id=country).exists():
@@ -494,13 +496,20 @@ class TourTeamAdminForm(forms.ModelForm):
 
 @admin.register(Tour)
 class TourAdmin(GuideScheduleAdmin):
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        initial.update(package_price=4100 if initial.get('country', 'morocco') == 'morocco' else 4000,
+            package_days=14, max_days=14, price_per_night=0)
+        return initial
+
     form = TourTeamAdminForm
-    list_display = ('title', 'destination', 'price_per_night', 'is_promotion', 'discount_percent')
+    list_display = ('title', 'destination', 'package_price', 'price_per_night', 'is_promotion', 'discount_percent')
     list_filter = (('destination', admin.RelatedOnlyFieldListFilter), 'is_promotion')
     search_fields = ('title', 'description', 'activities', 'included', 'not_included')
     inlines = [TourActivityInline, TourItineraryLegInline, TourExtraActivityInline, TourDepartureInline]
     fieldsets = (
-        ('Tour essentials', {'fields': ('country', 'title', 'destination', 'image', 'description', 'price_per_night', 'max_days', 'deaf_only', 'explanation_video_url')}),
+        ('Tour essentials', {'fields': ('country', 'title', 'destination', 'image', 'description', 'package_price', 'package_days', 'max_days', 'deaf_only', 'explanation_video_url')}),
+        ('Legacy daily pricing', {'fields': ('price_per_night',), 'classes': ('collapse',), 'description': 'Used only when the complete package price is empty.'}),
         ('Guiding team', {'fields': ('guides',), 'description': 'Choose one or more guides, or leave empty to show the active team for this country.'}),
         ('What is included', {'fields': ('included', 'not_included', 'activities'), 'classes': ('collapse',)}),
         ('Promotion and address', {'fields': ('is_promotion', 'discount_percent', 'slug'), 'classes': ('collapse',)}),
@@ -713,8 +722,8 @@ class GuideAdmin(admin.ModelAdmin):
 @admin.register(Country)
 class CountryAdmin(admin.ModelAdmin):
     inlines = (CountryGuideInline,)
-    list_display = ('name', 'slug', 'is_active', 'coming_soon', 'max_concurrent_groups', 'order')
-    list_editable = ('is_active', 'coming_soon', 'order')
+    list_display = ('name', 'slug', 'is_active', 'is_visible', 'coming_soon', 'max_concurrent_groups', 'order')
+    list_editable = ('is_active', 'is_visible', 'coming_soon', 'order')
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ('name',)
     def get_readonly_fields(self, request, obj=None):

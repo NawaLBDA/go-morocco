@@ -12,7 +12,7 @@ from apps.reservations.availability import departure_capacity
 
 def catalogue_data(request, *, stories=False):
     selected = request.GET.get('country') or getattr(request, 'site_country', '')
-    countries = list(Country.objects.filter(is_active=True))
+    countries = list(Country.objects.filter(is_active=True, is_visible=True))
     selected_record = next((c for c in countries if c.slug == selected), None)
     if selected and not selected_record:
         raise Http404('This destination is not currently available.')
@@ -25,7 +25,7 @@ def catalogue_data(request, *, stories=False):
         billable_count=Count('program_days', filter=Q(program_days__is_visible=True), distinct=True))
     years = set(all_departures.values_list('start_date__year', flat=True))
     if stories:
-        years.update(timezone.localtime(value).year for value in BlogPost.objects.filter(region__is_active=True).values_list('created_at', flat=True) if value is not None)
+        years.update(timezone.localtime(value).year for value in BlogPost.objects.filter(region__is_active=True, region__is_visible=True).values_list('created_at', flat=True) if value is not None)
     years.add(timezone.localdate().year)
     year_raw = request.GET.get('year', '')
     try:
@@ -63,7 +63,7 @@ def catalogue_data(request, *, stories=False):
         seasonal[promotion.country] = max(seasonal.get(promotion.country, 0), promotion.percent)
     story_counts = {}
     if stories:
-        story_query = BlogPost.objects.filter(region__is_active=True)
+        story_query = BlogPost.objects.filter(region__is_active=True, region__is_visible=True)
         if year:
             story_query = story_query.filter(created_at__year=year)
         story_counts = dict(story_query.values('country').annotate(total=Count('pk')).values_list('country', 'total'))
@@ -74,6 +74,8 @@ def catalogue_data(request, *, stories=False):
         country.story_count = story_counts.get(country.slug, 0)
     departures = []
     for departure in all_departures.order_by('start_date', 'pk'):
+        if departure.tour.package_price is not None and departure.duration_days != departure.tour.package_days:
+            continue
         if not departure.billable_count or departure.duration_days > departure.tour.max_days:
             continue
         country = country_map[departure.tour.country]
@@ -115,12 +117,12 @@ def tours(request):
 
 
 def travel_stories(request):
-    countries = list(Country.objects.filter(is_active=True))
+    countries = list(Country.objects.filter(is_active=True, is_visible=True))
     selected = request.GET.get('country') or getattr(request, 'site_country', '')
     selected_record = next((country for country in countries if country.slug == selected), None)
     if selected and not selected_record:
         raise Http404('This country collection is not available.')
-    posts = BlogPost.objects.filter(region__is_active=True, region__coming_soon=False, story_kind='memory').select_related('region')
+    posts = BlogPost.objects.filter(region__is_active=True, region__is_visible=True, region__coming_soon=False, story_kind='memory').select_related('region')
     years = {timezone.localdate().year}
     for trip_date, created_at in posts.values_list('trip_date', 'created_at'):
         years.add(trip_date.year if trip_date else timezone.localtime(created_at).year)

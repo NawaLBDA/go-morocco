@@ -12,7 +12,7 @@ from .availability import has_conflict, departure_capacity
 def available_departure_ranges(*, anchor=None, limit=4, country='morocco'):
     """Chat suggestions must use published departures, never invented windows."""
     anchor = anchor or date.today()
-    departures = list(TourDeparture.objects.filter(tour__country=country,
+    departures = list(TourDeparture.objects.filter(tour__country=country, tour__region__is_visible=True, tour__region__coming_soon=False,
         is_published=True, start_date__gte=date.today()).select_related('tour'))
     departures.sort(key=lambda departure: (abs((departure.start_date - anchor).days), departure.start_date))
     ranges = []
@@ -36,6 +36,8 @@ def resolve_departure(tour, start, end, departure_id=None):
     departure = departures.filter(start_date=start, end_date=end).first()
     if not departure or departure.start_date < date.today():
         raise ValidationError('Choose one of the published departures for this tour.')
+    if tour.package_price is not None and departure.duration_days != tour.package_days:
+        raise ValidationError('Choose a published 14-day package departure.')
     if departure.duration_days > tour.max_days or not departure.active_days:
         raise ValidationError('This departure is not currently available. Please choose another departure.')
     return departure
@@ -56,7 +58,7 @@ def departure_context(request, tour, reservation=None):
         count = sum(day.is_visible for day in departure.program_days.all())
         if not count or departure.duration_days > tour.max_days:
             continue
-        departure.billable_days = count
+        departure.billable_days = departure.duration_days if tour.package_price is not None else count
         capacity = departure_capacity(departure)
         departure.is_past = departure.start_date < date.today()
         departure.available = capacity['available'] and not departure.is_past

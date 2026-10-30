@@ -48,7 +48,7 @@ class TourSitemap(CountrySitemap):
         self.country = country
 
     def items(self):
-        tours = Tour.objects.filter(region__is_active=True, region__coming_soon=False, deaf_only=False).exclude(slug__isnull=True).exclude(slug='')
+        tours = Tour.objects.filter(region__is_active=True, region__is_visible=True, region__coming_soon=False, deaf_only=False).exclude(slug__isnull=True).exclude(slug='')
         if self.country == 'morocco':
             tours = tours.exclude(slug__startswith='demo-')
         return tours.order_by("id")
@@ -65,7 +65,7 @@ class BlogSitemap(CountrySitemap):
         self.country = country
 
     def items(self):
-        posts = BlogPost.objects.filter(region__is_active=True, is_demo=False)
+        posts = BlogPost.objects.filter(region__is_active=True, region__is_visible=True, is_demo=False)
         if self.country == 'morocco':
             posts = posts.exclude(slug__startswith='demo-')
         return posts.order_by("-created_at")

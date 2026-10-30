@@ -19,7 +19,7 @@ class CountryPrefixMiddleware:
         first = path.strip('/').split('/')[0]
         if first not in {'admin', 'static', 'media', 'ireland-admin'}:
             try:
-                if Country.objects.filter(slug=first, is_active=True).exists():
+                if Country.objects.filter(slug=first, is_active=True, is_visible=True).exists():
                     request.site_country = first
                     request.path_info = path[len(first) + 1:] or '/'
             except (OperationalError, ProgrammingError):

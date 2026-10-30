@@ -5,12 +5,12 @@ from .models import Country, SiteSettings, Section, Tour, BlogPost, Reservation
 def get_country_from_site(request):
     """Country is content context, never a hostname or a user's nationality."""
     explicit = getattr(request, 'site_country', None) or request.GET.get('country')
-    if explicit and Country.objects.filter(slug=explicit, is_active=True).exists():
+    if explicit and Country.objects.filter(slug=explicit, is_active=True, is_visible=True).exists():
         return explicit
     match = getattr(request, 'resolver_match', None)
     if match:
         args = match.kwargs
-        qs = Tour.objects.filter(region__is_active=True)
+        qs = Tour.objects.filter(region__is_active=True, region__is_visible=True)
         tour = None
         if args.get('tour_slug'):
             tour = qs.filter(slug=args['tour_slug']).first()
@@ -19,7 +19,7 @@ def get_country_from_site(request):
         if tour:
             return tour.country
         if args.get('slug') and match.url_name == 'blog_detail':
-            post = BlogPost.objects.filter(slug=args['slug'], region__is_active=True).first()
+            post = BlogPost.objects.filter(slug=args['slug'], region__is_active=True, region__is_visible=True).first()
             if post:
                 return post.country
         reservation_id = args.get('reservation_id') or args.get('id')
@@ -37,10 +37,11 @@ def sections_processor(request):
     promotion = active_promotions().filter(apply_to_all=True).order_by('-percent').first()
     return {
         'site_settings': site, 'brand_name': site.brand_name,
+        'footer_destinations': ' \u2022 '.join(Country.objects.filter(is_active=True, is_visible=True).values_list('name', flat=True)),
         'footer_brand_name': site.brand_name, 'about_brand_name': site.brand_name,
         'support_email': site.support_email,
         'country': country,
-        'countries': Country.objects.filter(is_active=True),
+        'countries': Country.objects.filter(is_active=True, is_visible=True),
         'sections': Section.objects.filter(country=country, show_in_nav=True).order_by('order'),
         'active_promotion': promotion, 'has_promotion': bool(promotion),
         'festive_theme': site.christmas_theme and active_promotions().filter(christmas=True).exists(),

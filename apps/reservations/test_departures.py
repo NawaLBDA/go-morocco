@@ -40,8 +40,8 @@ class ScheduledDepartureTests(TestCase):
         self.assertEqual(reservation.payment_method, 'transfer')
         self.assertEqual(reservation.payment_status, 'unpaid')
 
-    def test_default_five_days_and_configurable_nineteen(self):
-        self.assertEqual(self.tour.max_days, 5)
+    def test_default_fourteen_days_and_legacy_configurable_nineteen(self):
+        self.assertEqual(self.tour.max_days, 14)
         self.departure.full_clean()
         longer = TourDeparture(tour=self.tour, start_date=self.day, end_date=self.day + timedelta(days=18))
         with self.assertRaises(ValidationError):

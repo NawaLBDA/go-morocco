@@ -130,7 +130,7 @@ def _list_cities_reply(country: str, lang: str, limit: int = 12) -> str:
     country_label = _country_label(country)
     try:
         names = list(
-            Tour.objects.filter(country=country, deaf_only=False, region__is_active=True)
+            Tour.objects.filter(country=country, deaf_only=False, region__is_active=True, region__is_visible=True)
             .select_related('destination')
             .order_by('destination__name')
             .values_list('destination__name', flat=True)
@@ -235,7 +235,7 @@ def _list_tours_reply(country: str, lang: str, limit: int = 6) -> str:
     country_label = _country_label(country)
     try:
         tours = list(
-            Tour.objects.filter(country=country, deaf_only=False, region__is_active=True)
+            Tour.objects.filter(country=country, deaf_only=False, region__is_active=True, region__is_visible=True)
             .select_related('destination')
             .order_by('id')[: max(1, int(limit))]
         )
@@ -1437,7 +1437,7 @@ def ai_chat_stream(request):
 def _normalize_country(country: str) -> str:
     country = (country or '').strip().lower()
     from .models import Country
-    return country if Country.objects.filter(slug=country, is_active=True).exists() else 'morocco'
+    return country if Country.objects.filter(slug=country, is_active=True, is_visible=True).exists() else 'morocco'
 
 
 def _country_label(country: str) -> str:
@@ -2175,7 +2175,7 @@ def _build_country_catalog_context(country: str, user_message: str) -> str:
 
     try:
         tours_qs = (
-            Tour.objects.filter(country=country, deaf_only=False, region__is_active=True)
+            Tour.objects.filter(country=country, deaf_only=False, region__is_active=True, region__is_visible=True)
             .select_related('destination')
             .order_by('id')
         )
@@ -2256,7 +2256,7 @@ def _build_country_catalog_context(country: str, user_message: str) -> str:
 def _pick_tour_for_booking(country: str, destination_hint: str | None = None):
     country = _normalize_country(country)
     try:
-        qs = Tour.objects.filter(country=country, deaf_only=False, region__is_active=True)
+        qs = Tour.objects.filter(country=country, deaf_only=False, region__is_active=True, region__is_visible=True)
         if destination_hint:
             tour = qs.filter(
                 Q(destination__name__icontains=destination_hint) |
@@ -2298,7 +2298,7 @@ def _tours_for_hint(country: str, hint: str):
         return []
     try:
         return list(
-            Tour.objects.filter(country=country, deaf_only=False, region__is_active=True)
+            Tour.objects.filter(country=country, deaf_only=False, region__is_active=True, region__is_visible=True)
             .select_related('destination')
             .filter(Q(destination__name__icontains=hint) | Q(title__icontains=hint))
             .order_by('id')
@@ -2316,7 +2316,7 @@ def _select_tour_for_booking(country: str, message: str, destination_hint: str |
     explicit_id = _extract_explicit_tour_id(message)
     if explicit_id:
         try:
-            t = Tour.objects.filter(country=country, deaf_only=False, region__is_active=True).select_related('destination').filter(id=explicit_id).first()
+            t = Tour.objects.filter(country=country, deaf_only=False, region__is_active=True, region__is_visible=True).select_related('destination').filter(id=explicit_id).first()
         except (OperationalError, ProgrammingError):
             t = None
         if not t:
@@ -2398,7 +2398,7 @@ def _find_relevant_tours(country: str, destination_hint: str | None, limit: int 
         return []
     try:
         qs = (
-            Tour.objects.filter(country=country, deaf_only=False, region__is_active=True)
+            Tour.objects.filter(country=country, deaf_only=False, region__is_active=True, region__is_visible=True)
             .select_related('destination')
             .filter(
                 Q(destination__name__icontains=hint) |
@@ -2441,7 +2441,7 @@ def _resolve_destination_hint(country: str, message: str, parsed_hint: str | Non
                 return dest.name
 
             # Fallback: a tour title might match even if destination table isn't perfect.
-            has_tour = Tour.objects.filter(country=country, deaf_only=False, region__is_active=True).filter(
+            has_tour = Tour.objects.filter(country=country, deaf_only=False, region__is_active=True, region__is_visible=True).filter(
                 Q(destination__name__icontains=msg) | Q(title__icontains=msg)
             ).exists()
             return msg if has_tour else None
@@ -2634,7 +2634,7 @@ def home(request):
 
     country = get_country_from_site(request)
     try:
-        tours = Tour.objects.filter(country=country, deaf_only=False, region__is_active=True).select_related('destination').prefetch_related('activity_cards')
+        tours = Tour.objects.filter(country=country, deaf_only=False, region__is_active=True, region__is_visible=True).select_related('destination').prefetch_related('activity_cards')
     except (OperationalError, ProgrammingError):
         tours = Tour.objects.none()
 
@@ -3519,7 +3519,7 @@ def twiml_call_complete(request, reservation_id):
 
 def blog_list(request):
     country = get_country_from_site(request)
-    posts = BlogPost.objects.filter(region__is_active=True).order_by('-created_at')
+    posts = BlogPost.objects.filter(region__is_active=True, region__is_visible=True).order_by('-created_at')
     if request.GET.get('country'):
         posts = posts.filter(country=country)
     return render(request, 'blog_list.html', {'posts': posts})
@@ -3527,7 +3527,7 @@ def blog_list(request):
 
 def blog_detail(request, slug):
     country = get_country_from_site(request)
-    post = get_object_or_404(BlogPost, slug=slug, country=country, region__is_active=True)
+    post = get_object_or_404(BlogPost, slug=slug, country=country, region__is_active=True, region__is_visible=True)
     comments = post.comments.all()
 
     if request.method == 'POST' and request.user.is_authenticated:

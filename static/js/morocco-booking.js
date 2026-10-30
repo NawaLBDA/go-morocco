@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const total = document.getElementById('live-price');
   const days = document.getElementById('live-days');
   const count = Number(document.getElementById('booking-days').value);
+  const packagePriced = form.dataset.packagePriced === 'true';
   const base = Number(document.getElementById('base-price').value);
   const extras = [...document.querySelectorAll('.extra-activity-toggle')];
   let timer, revision = 0, submitting = false, availabilityNotified = false;
@@ -34,11 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const travelers = Number(persons.value);
     days.textContent = count ? `${count} ${count === 1 ? 'day' : 'days'}` : '?';
     if (localError()) { total.textContent = '?'; return; }
-    let amount = base * count * travelers;
+    let amount = base * (packagePriced ? 1 : count) * travelers;
     extras.filter(el => el.checked).forEach(el => {
       amount += Number(el.dataset.price || 0) * travelers * (el.dataset.perNight === '1' ? count : 1);
     });
-    if (travelers > 5) amount *= .9;
+    if (travelers > 5 && !packagePriced) amount *= .9;
     total.textContent = `${amount.toFixed(2)} $`;
   }
   async function check() {

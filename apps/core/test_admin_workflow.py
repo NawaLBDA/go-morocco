@@ -32,8 +32,8 @@ class AdminWorkflowTests(TestCase):
             'tour': self.rabat.pk, 'max_participants': 12, 'start_date': self.day.isoformat(), 'end_date': '', 'is_published': 'on', '_save': 'Save'})
         self.assertEqual(response.status_code, 302)
         departure = TourDeparture.objects.get()
-        self.assertEqual(departure.end_date, self.day + timedelta(days=4))
-        self.assertEqual(departure.program_days.count(), 5)
+        self.assertEqual(departure.end_date, self.day + timedelta(days=13))
+        self.assertEqual(departure.program_days.count(), 14)
         self.assertEqual(list(departure.program_days.get(day_number=1).activities.all()), [self.first])
         self.assertEqual(list(departure.program_days.get(day_number=2).activities.all()), [self.second])
 
@@ -56,7 +56,7 @@ class AdminWorkflowTests(TestCase):
 
     def test_shortening_departure_removes_generated_trailing_days_without_error(self):
         departure = TourDeparture.objects.create(tour=self.rabat, start_date=self.day,
-            end_date=self.day + timedelta(days=4), is_published=True)
+            end_date=self.day + timedelta(days=13), is_published=True)
         data = {'max_participants': 12, 'start_date': self.day.isoformat(), 'end_date': self.day.isoformat(), 'is_published': 'on',
             'program_days-TOTAL_FORMS': 5, 'program_days-INITIAL_FORMS': 5,
             'program_days-MIN_NUM_FORMS': 0, 'program_days-MAX_NUM_FORMS': 0, '_continue': 'Save'}
