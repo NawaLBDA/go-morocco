@@ -366,8 +366,9 @@ class Tour(CountryLinkedModel):
         verbose_name='Minimum travelers per group', help_text='Minimum group size for this package. The total is the price per person multiplied by the number of travelers.')
     max_travelers = models.PositiveIntegerField(default=20, db_default=20, validators=[MinValueValidator(1)],
         verbose_name='Maximum travelers per group', help_text='Maximum for this package. An individual departure may have a lower capacity.')
-    deposit_enabled = models.BooleanField(default=False, db_default=False, help_text='Require a deposit before approval for new bookings that meet the traveler threshold. Existing bookings are unchanged.')
+    deposit_enabled = models.BooleanField(default=False, db_default=False, help_text='Optional deposit before approval, only when this package minimum is greater than 1. Minimum 1 always disables the deposit. Existing bookings are unchanged.')
     deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, default=500, db_default=500, validators=[MinValueValidator(1)])
+    # Retained for compatibility with existing deployments; the rule now uses group_minimum.
     deposit_min_travelers = models.PositiveIntegerField(default=2, db_default=2, validators=[MinValueValidator(1)], help_text='Apply the deposit starting at this number of travelers; independent of the minimum group size.')
     deposit_per_person = models.BooleanField(default=False, db_default=False, help_text='Multiply the deposit by the number of travelers. Otherwise it is one deposit for the reservation.')
     package_days = models.PositiveIntegerField(default=14, db_default=14, validators=[MinValueValidator(14), MaxValueValidator(14)])

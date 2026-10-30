@@ -508,8 +508,8 @@ class TourAdmin(GuideScheduleAdmin):
     search_fields = ('title', 'description', 'activities', 'included', 'not_included')
     inlines = [TourActivityInline, TourItineraryLegInline, TourExtraActivityInline, TourDepartureInline]
     fieldsets = (
-        ('Tour essentials', {'fields': ('country', 'title', 'destination', 'image', 'description', 'package_price', 'package_days', 'min_travelers', 'max_travelers', 'max_days', 'deaf_only', 'explanation_video_url')}),
-        ('Deposit before approval', {'fields': ('deposit_enabled', 'deposit_amount', 'deposit_min_travelers', 'deposit_per_person'), 'classes': ('collapse',)}),
+        ('Tour essentials', {'fields': ('country', 'title', 'destination', 'image', 'description', 'package_price', 'package_days', 'max_days', 'deaf_only', 'explanation_video_url')}),
+        ('Group size and deposit', {'fields': (('min_travelers', 'deposit_enabled'), 'max_travelers', 'deposit_amount', 'deposit_per_person'), 'description': 'Minimum 1: no deposit. Above 1: tick Deposit enabled to require the configured amount before approval.'}),
         ('Legacy daily pricing', {'fields': ('price_per_night',), 'classes': ('collapse',), 'description': 'Used only when the complete package price is empty.'}),
         ('Guiding team', {'fields': ('guides',), 'description': 'Choose one or more guides, or leave empty to show the active team for this country.'}),
         ('What is included', {'fields': ('included', 'not_included', 'activities'), 'classes': ('collapse',)}),

@@ -2,12 +2,12 @@
 
 Les packs acceptent par défaut 1 à 20 voyageurs. Le minimum et le maximum restent modifiables dans Django → Tours.
 
-La fonction d'acompte est préparée mais **désactivée par défaut**. La règle d'application et le montant restent à confirmer. Aucun caractère non remboursable n'est ajouté et aucun débit automatique n'est effectué.
+La fonction d'acompte est **désactivée par défaut**. Le minimum du pack commande son application : minimum 1, aucun acompte ; minimum supérieur à 1, l'admin peut l'activer ou le désactiver. Aucun caractère non remboursable n'est ajouté et aucun débit automatique n'est effectué.
 
-Dans Tours → Deposit before approval :
+Dans Tours → Group size and deposit :
 
-- Deposit enabled : activer la règle pour les nouvelles demandes uniquement.
-- Deposit min travelers : nombre de voyageurs à partir duquel elle s'applique.
+- Minimum travelers per group et Deposit enabled sont côte à côte : la case active la règle pour les nouvelles demandes uniquement si le minimum est supérieur à 1.
+- Maximum travelers per group reste configurable indépendamment.
 - Deposit amount : montant de l'acompte.
 - Deposit per person : cocher uniquement si le montant s'applique à chaque personne ; sinon il concerne toute la réservation.
 

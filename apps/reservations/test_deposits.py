@@ -15,7 +15,7 @@ class DepositWorkflowTests(TestCase):
     def setUp(self):
         self.traveler = User.objects.create_user('deposit-traveler', email='traveler@example.com')
         self.staff = User.objects.create_user('deposit-manager', is_staff=True, email='manager@example.com')
-        self.tour = Tour.objects.create(title='Rabat deposit example', package_price=4000, price_per_night=0,
+        self.tour = Tour.objects.create(title='Rabat deposit example', package_price=4000, price_per_night=0, min_travelers=2,
             destination=Destination.objects.create(name='Rabat'), deposit_enabled=True)
         start = timezone.localdate() + timedelta(days=100)
         self.departure = TourDeparture.objects.create(tour=self.tour, start_date=start,
@@ -31,6 +31,8 @@ class DepositWorkflowTests(TestCase):
         return booking
 
     def test_one_person_is_allowed_without_group_deposit(self):
+        self.tour.min_travelers = 1
+        self.tour.save()
         booking = self.book(1)
         self.assertEqual(self.tour.min_travelers, 1)
         self.assertEqual(booking.total_price, Decimal('4000'))
@@ -42,6 +44,23 @@ class DepositWorkflowTests(TestCase):
         self.tour.deposit_enabled = False
         self.tour.save()
         self.assertFalse(self.book(5).deposit_pending)
+
+    def test_minimum_one_disables_deposit_even_for_a_larger_group(self):
+        self.tour.min_travelers = 1
+        self.tour.save()
+        booking = self.book(5)
+        self.assertEqual(booking.total_price, Decimal('20000'))
+        self.assertFalse(booking.deposit_pending)
+        response = self.client.get(f'/tour/{self.tour.slug}/', {'departure_id': self.departure.pk})
+        self.assertNotContains(response, 'booking-deposit-notice')
+
+    def test_amount_and_activation_are_configurable_with_the_pack_minimum(self):
+        self.tour.min_travelers = 5
+        self.tour.deposit_amount = 875
+        self.tour.save()
+        booking = self.book(5)
+        self.assertEqual(booking.deposit_required_amount, Decimal('875'))
+        self.assertTrue(booking.deposit_pending)
 
     def test_deposit_is_part_of_total_and_snapshot_survives_tour_edits(self):
         booking = self.book(5)

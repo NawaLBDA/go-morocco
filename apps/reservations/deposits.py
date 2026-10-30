@@ -7,7 +7,7 @@ from .availability import lock_guide_calendar
 
 
 def deposit_terms(tour, persons, total):
-    if not tour.deposit_enabled or persons < tour.deposit_min_travelers:
+    if not tour.deposit_enabled or tour.group_minimum <= 1:
         return {'deposit_status': 'not_required', 'deposit_required_amount': Decimal('0.00')}
     amount = (Decimal(str(tour.deposit_amount)) * (persons if tour.deposit_per_person else 1)).quantize(Decimal('0.01'))
     if amount <= 0 or amount > total:
