@@ -10,7 +10,7 @@
 .account-menu summary { display: flex; align-items: center; gap: 9px; padding: 12px 0; font-size: 18px; font-weight: 600; cursor: pointer; white-space: nowrap; list-style: none; color: #183d47; }
 .account-menu summary::-webkit-details-marker { display: none; }
 .account-menu summary::marker { content: ''; }
-.account-chevron { font-size: 20px; }
+.account-username { display: block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-menu-panel { position: absolute; z-index: 1100; top: calc(100% + 8px); right: 0; width: 250px; padding: 10px; margin: 0; list-style: none; border: 1px solid #d9e2da; border-radius: 12px; background: #fffefb; box-shadow: 0 14px 35px #17303926; }
 .global-site .account-menu-panel a { display: block; padding: 10px 12px; font-size: 18px; line-height: 1.5; color: #183d47; border-radius: 6px; text-decoration: none; }
 .account-menu-panel a:hover, .account-menu-panel a:focus-visible { background: #eaf1eb; outline-offset: 2px; }
