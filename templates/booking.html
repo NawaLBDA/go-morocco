@@ -283,7 +283,7 @@
           </span>
         </div>
 
-        
+
 
 {% if scheduled_tours %}<p class="text-muted small mb-1">{% if tour.package_price %}Price per person / complete {{ tour.package_days }}-day journey{% else %}Price per person / per day{% endif %}</p>{% endif %}
 {% if selected_departure %}<div class="booking-capacity-pill"><strong>{{ selected_departure.group_minimum }}&ndash;{{ selected_departure.group_maximum }} travelers</strong><span>per private group &middot; price per person</span></div>{% endif %}
@@ -336,7 +336,7 @@
         <input type="hidden" id="end_date" name="end_date" value="{{ selected_departure.end_date|date:'Y-m-d' }}">
     {% else %}
     <div class="booking-form-group mb-3">
-      <div class="booking-form-heading"><span class="booking-form-step">1</span><div><label class="fw-bold mb-1">Dates</label><div class="booking-form-hint">Choose your trip window</div></div></div>
+      <div class="booking-form-heading"><div><label class="fw-bold mb-1">Dates</label><div class="booking-form-hint">Choose your trip window</div></div></div>
       <div class="booking-input-grid mt-3">
         <input type="text" id="start_date" name="start_date"
                class="form-control booking-date"
@@ -368,16 +368,10 @@
     </div>
 
 {% endif %}
-    <div class="booking-form-group mb-3">
-      <div class="booking-form-heading">
-        <span class="booking-form-step">{% if scheduled_tours %}1{% else %}2{% endif %}</span>
-        <div>
-          <label class="fw-bold mb-1">Persons</label>
-          <div class="booking-form-hint">Number of travelers</div>
-        </div>
-      </div>
+    <div class="booking-form-group booking-traveler-row mb-3">
       <input type="number" id="persons" name="persons" value="{{ tour.group_minimum }}" min="{{ tour.group_minimum }}" {% if selected_departure %}max="{{ selected_departure.group_maximum }}"{% endif %}
-             class="form-control booking-person-input mt-3">
+             class="form-control booking-person-input">
+      <label for="persons" class="booking-traveler-label">Number of Travelers</label>
     </div>
 
     <p class="text-muted small mt-2 booking-form-note">
@@ -396,7 +390,7 @@
     </div>
 
     <div class="booking-form-heading mb-2">
-      <span class="booking-form-step">{% if scheduled_tours %}2{% else %}3{% endif %}</span>
+
       <div>
         <label class="fw-bold mb-1">Payment method</label>
         <div class="booking-form-hint">Choose how you want to pay</div>

@@ -1,4 +1,16 @@
 /* Shared identity and footer on every public page. */
+.global-site .booking-sidebar .booking-traveler-row { display: flex; align-items: center; gap: 16px; }
+.global-site .booking-sidebar .booking-person-input { flex: 0 0 90px; width: 90px; margin: 0; }
+.global-site .booking-sidebar .booking-traveler-label { flex: 1; text-align: right; font-size: calc(18px + 1pt); font-weight: 700; line-height: 1.4; }
+.global-site .booking-sidebar .small,
+.global-site .booking-sidebar .booking-form-hint,
+.global-site .booking-sidebar .payment-option-sub,
+.global-site .booking-sidebar .booking-capacity-pill span { font-size: calc(16px + 1pt); line-height: 1.6; }
+.global-site .booking-sidebar .booking-form-heading,
+.global-site .booking-sidebar .payment-option-title,
+.global-site .booking-sidebar .booking-total-bar { font-size: calc(18px + 1pt); }
+.global-site .booking-sidebar .form-control,
+.global-site .booking-sidebar .btn { font-size: calc(17px + 1pt); }
 .global-site .journey-card .journey-bottom { flex-direction: column; align-items: flex-start; gap: 12px; }
 .global-site .journey-card .departure-group-size { display: flex; align-items: center; gap: 8px; text-align: left; padding: 0; font-size: 15px; line-height: 1.5; color: #526963; }
 .global-site[data-page="blog"] .memory-intro .text-link { font-size: 20px; line-height: 1.6; }
