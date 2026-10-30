@@ -27,18 +27,6 @@
 .global-site[data-page="home"] .approach-copy p,
 .global-site[data-page="home"] .journey-invitation p,
 .global-site[data-page="home"] .country-collection-banner p { font-size: calc(17px + 1pt); line-height: 1.7; }
-.global-site[data-page="home"] .global-brand .culture-hop-wordmark {
-  text-transform: none; letter-spacing: -.02em; font-size: 24px; gap: 8px;
-}
-.global-site[data-page="home"] .global-brand .culture-hop-wordmark > img {
-  width: 38px; height: 38px; overflow: visible;
-}
-.global-site[data-page="home"] .global-brand small {
-  font-size: 14px; line-height: 1.5; letter-spacing: 0; padding-left: 46px;
-  text-transform: none; white-space: normal;
-}
 @media(max-width:600px) {
-  .global-site[data-page="home"] .global-brand .culture-hop-wordmark { font-size: 22px; }
-  .global-site[data-page="home"] .global-brand small { font-size: 13px; padding-left: 0; max-width: 270px; }
   .global-site[data-page="home"] .journey-body h3 { font-size: 28px; }
 }

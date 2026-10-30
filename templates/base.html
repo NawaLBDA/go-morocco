@@ -10,14 +10,14 @@
 <link rel="stylesheet" href="{% static 'css/style.css' %}?v={{ static_version }}">
 <link rel="stylesheet" href="{% static 'css/global.css' %}?v={{ static_version }}-culture-hop-ch-1-memories-1">
 <link rel="stylesheet" href="{% static 'css/readability.css' %}?v=1">
-<link rel="stylesheet" href="{% static 'css/brand-consistency.css' %}?v=2">
+<link rel="stylesheet" href="{% static 'css/brand-consistency.css' %}?v=3">
 {% block extra_head %}{% endblock %}
 </head>
 <body class="site-body global-site{% if festive_theme %} festive{% endif %}" data-page="{% block page %}default{% endblock %}" data-scheduled-tours="{{ scheduled_tours|yesno:'true,false' }}">
 <a class="skip-link" href="#main-content">Skip to content</a>
 {% if active_promotion %}<div class="global-promo"><span>{% if active_promotion.christmas %}✦ A little festive wanderlust{% else %}Your next adventure awaits{% endif %}</span><a href="{% url 'home' %}?country={{ active_promotion.country }}#journeys">{{ active_promotion.name }} · {{ active_promotion.percent }}% off base tour prices in {{ active_promotion.region.name }} →</a>{% if active_promotion.ends_on %}<span>Until {{ active_promotion.ends_on|date:'j M Y' }}</span>{% endif %}</div>{% endif %}
 <nav class="navbar navbar-expand-xl global-nav" aria-label="Main navigation"><div class="container">
-<a class="navbar-brand global-brand" href="{% url 'home' %}"><span class="brand-label">{% include 'partials/brand_wordmark.html' %}</span><small>Many Cultures. Unforgettable Journeys.</small></a>
+<a class="navbar-brand global-brand" href="{% url 'home' %}">{% include 'partials/brand_wordmark.html' with show_tagline=True %}</a>
 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav" aria-controls="main-nav" aria-expanded="false" aria-label="Toggle menu"><span class="navbar-toggler-icon"></span></button>
 <div class="collapse navbar-collapse" id="main-nav"><ul class="navbar-nav mx-auto gap-xl-3">
 <li class="nav-item"><a class="nav-link{% if request.resolver_match.url_name == 'home' %} active{% endif %}" href="{% url 'home' %}">Home</a></li>

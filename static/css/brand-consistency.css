@@ -1,13 +1,24 @@
 /* Shared identity and footer on every public page. */
 .global-site[data-page="blog"] .memory-intro .text-link { font-size: 20px; line-height: 1.6; }
 .global-site[data-page="blog"] .moments-grid a > span { font-size: 18px; line-height: 1.6; padding: 16px 18px; }
-.global-site .country-coming-soon { font-size: 17px; line-height: 1.6; color: #204f46; font-weight: 700; }
+.global-site .country-coming-soon { font-size: calc(17px + 1pt); line-height: 1.6; color: #204f46; font-weight: 700; }
+.global-site .country-pack-image > span { font-size: calc(12px + 1pt); }
+.global-site .country-pack, .global-site .journey-card { box-shadow: 0 8px 24px #17303920; }
+.global-site .country-pack:hover, .global-site .journey-card:hover { box-shadow: 0 12px 30px #17303930; }
+.global-site .journey-image-badges { justify-content: space-between; align-items: center; }
+.global-site .journey-image-badges .country-badge,
+.global-site .journey-image-badges .deaf-travel-badge { display: inline-flex; align-items: center; min-height: 40px; margin: 0; }
 .global-site .global-brand .culture-hop-wordmark {
   text-transform: none; letter-spacing: -.02em; font-size: 24px; gap: 8px;
 }
 .global-site .global-brand .culture-hop-wordmark > img {
-  width: 38px; height: 38px; overflow: visible; flex-shrink: 0;
+  width: 44px; height: 44px; overflow: visible; flex-shrink: 0;
 }
+.global-site .global-brand .brand-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.global-site .global-brand .brand-name { font-size: 24px; line-height: 1.2; }
+.global-site .global-brand .brand-tagline { font: 600 14px/1.3 "DM Sans", sans-serif; letter-spacing: 0; white-space: normal; }
+.global-site .global-nav .global-brand { display: inline-flex; align-items: center; padding-top: 0; padding-bottom: 0; }
+.global-site .global-brand .culture-hop-wordmark { align-items: center; }
 .global-site .global-brand small {
   font-size: 14px; line-height: 1.5; letter-spacing: 0; padding-left: 46px;
   text-transform: none; white-space: normal;
@@ -30,6 +41,15 @@
 .global-site[data-page="blog"] .memory-demo-badge { font-size: 15px; }
 .global-site[data-page="blog"] .memory-demo-note { font-size: 15px !important; }
 @media(max-width:600px) {
+  .global-site .global-nav .global-brand { margin-right: 0; }
+  .global-site .navbar-toggler { padding: 7px; width: 44px; height: 42px; }
   .global-site .global-brand .culture-hop-wordmark { font-size: 22px; }
+  .global-site .global-brand .brand-name { font-size: 22px; }
+  .global-site .global-brand .brand-tagline { font-size: 12px; max-width: 250px; }
   .global-site .global-brand small { font-size: 13px; padding-left: 0; max-width: 270px; }
+}
+@media(max-width:360px) {
+  .global-site .global-brand .brand-name { font-size: 19px; }
+  .global-site .global-brand .brand-tagline { font-size: 11px; max-width: 175px; }
+  .global-site .global-brand .culture-hop-wordmark > img { width: 38px; height: 38px; }
 }
