@@ -1,71 +1,15 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load static widget_tweaks %}
 {% block page %}auth{% endblock %}
-
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/auth.css' %}?v=1">{% endblock %}
 {% block content %}
-<section class="auth-hero">
-  <div class="auth-overlay"></div>
-
-  <div class="auth-container">
-    <div class="auth-card">
-
-      <div class="mb-3 text-center">
-        <div class="text-uppercase small" style="letter-spacing:.16em;opacity:.8;">Welcome back</div>
-        <h2 class="auth-title mb-1">Sign in to {{ brand_name }}</h2>
-        <p class="auth-subtitle mb-0">Access your bookings, reservations, and travel details.</p>
-      </div>
-
-      {% if messages %}
-      <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        {% for message in messages %}
-          <div>{{ message }}</div>
-        {% endfor %}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-      {% endif %}
-
-      {% if form.non_field_errors %}
-      <div class="alert alert-danger">
-        {% for error in form.non_field_errors %}
-          <div>{{ error }}</div>
-        {% endfor %}
-      </div>
-      {% endif %}
-
-      <form method="post" novalidate>
-        {% csrf_token %}
-
-        <div class="mb-3">
-          <label for="id_username" class="form-label">Username</label>
-          {{ form.username }}
-          {% if form.username.errors %}
-            <div class="invalid-feedback d-block">{{ form.username.errors.0 }}</div>
-          {% endif %}
-        </div>
-
-        <div class="mb-3">
-          <label for="id_password" class="form-label">Password</label>
-          {{ form.password }}
-          {% if form.password.errors %}
-            <div class="invalid-feedback d-block">{{ form.password.errors.0 }}</div>
-          {% endif %}
-        </div>
-
-        <button class="btn btn-primary w-100 py-2 mt-2">
-          Sign in
-        </button>
-      </form>
-
-      <p class="auth-footer mt-3">
-        Don’t have an account?
-        <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Create one</a>
-      </p>
-
-      <div class="text-center mt-3 small" style="opacity:.85;">
-        {{ brand_name }} · {{ site_settings.tagline }}
-      </div>
-
-    </div>
-  </div>
-</section>
-<p class="text-center pb-4"><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
-{% endblock %}
+<section class="auth-hero"><div class="auth-overlay"></div><div class="auth-container auth-container--login">
+{% include 'partials/auth_intro.html' %}
+<div class="auth-card auth-card--login">
+<p class="auth-kicker">WELCOME BACK</p><h1 class="auth-title">Good to see you.</h1><p class="auth-subtitle">Sign in to view your reservations and travel details.</p>
+{% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>{% endif %}
+<form method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+<div class="auth-field"><label for="{{ form.username.id_for_label }}">Username</label>{{ form.username|add_class:"form-control"|attr:"autocomplete:username" }}{% for error in form.username.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+<div class="auth-field"><div class="auth-password-label"><label for="{{ form.password.id_for_label }}">Password</label><a href="{% url 'password_reset' %}">Forgot password?</a></div>{{ form.password|add_class:"form-control"|attr:"autocomplete:current-password" }}{% for error in form.password.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+<button class="btn btn-primary auth-submit" type="submit">Sign in <span aria-hidden="true">&nearr;</span></button></form>
+<p class="auth-footer">New here? <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Create an account</a></p>
+</div></div></section>{% endblock %}

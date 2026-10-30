@@ -1,145 +1,25 @@
-{% extends "base.html" %}
-{% load widget_tweaks %}
+{% extends "base.html" %}{% load static widget_tweaks %}
 {% block page %}auth{% endblock %}
-
-{% block extra_head %}
-<style>
-.deaf-toggle-row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 14px; border:1px solid #d9e3e5; border-radius:12px; }
-.deaf-toggle-row label { margin:0!important; }
-.auth-card #register-is-deaf { appearance:none; -webkit-appearance:none; position:relative; float:none; flex:0 0 46px; width:46px!important; height:26px!important; min-height:0; padding:0!important; margin:0!important; border:0; border-radius:20px; background:#85949b; cursor:pointer; }
-.auth-card #register-is-deaf::after { content:''; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:white; transition:transform .15s; }
-.auth-card #register-is-deaf:checked { background:#23796d; }
-.auth-card #register-is-deaf:checked::after { transform:translateX(20px); }
-.auth-card #register-is-deaf:focus-visible { outline:3px solid #b4dcd6; outline-offset:3px; }
-</style>
-{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/auth.css' %}?v=1">{% endblock %}
 {% block content %}
-<section class="auth-hero">
-  <div class="auth-overlay"></div>
-
-  <div class="auth-container">
-    <div class="auth-card">
-
-      <h2 class="auth-title">Create account</h2>
-      <p class="auth-subtitle">
-        Start planning your journey with {{ brand_name }}
-      </p>
-
-      {% if messages %}
-      <div class="alert alert-success alert-dismissible fade show" role="alert">
-        {% for message in messages %}
-          <div>{{ message }}</div>
-        {% endfor %}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-      {% endif %}
-
-      {% if form.non_field_errors %}
-      <div class="alert alert-danger">
-        {% for error in form.non_field_errors %}
-          <div>{{ error }}</div>
-        {% endfor %}
-      </div>
-      {% endif %}
-
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ next }}">
-
-        <div class="row">
-          <!-- LEFT COLUMN -->
-          <div class="col-md-6">
-            <!-- USERNAME -->
-            <div class="mb-3">
-              <label>Username</label>
-              {{ form.username|add_class:"form-control" }}
-              {% if form.username.errors %}
-                <div class="invalid-feedback d-block">
-                  {% for error in form.username.errors %}
-                    <div>{{ error }}</div>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            </div>
-
-            <!-- EMAIL -->
-            <div class="mb-3">
-              <label>Email</label>
-              {{ form.email|add_class:"form-control" }}
-              {% for error in form.email.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-            </div>
-
-            <!-- FULL NAME -->
-            <div class="mb-3">
-              <label>Full Name</label>
-              <input type="text" name="full_name" class="form-control" required>
-            </div>
-
-            <!-- PHONE -->
-            <div class="mb-3">
-              <label>Phone</label>
-              <input type="tel" name="phone" class="form-control" required>
-            </div>
-          </div>
-
-          <!-- RIGHT COLUMN -->
-          <div class="col-md-6">
-            <!-- COUNTRY -->
-            <div class="mb-3">
-              <label>Country</label>
-              <input name="country" class="form-control" value="{{ request.POST.country|default:'' }}" maxlength="80" autocomplete="country-name" placeholder="Your country of residence" required>
-            </div>
-
-            <!-- POSTAL CODE -->
-            <div class="mb-3">
-              <label>Postal Code</label>
-              <input type="text" name="postal_code" class="form-control" required>
-            </div>
-
-            <div class="deaf-toggle-row mb-3">
-              <label for="register-is-deaf">Deaf <span class="text-muted small">(optional)</span></label>
-              <input type="checkbox" role="switch" name="is_deaf" id="register-is-deaf" {% if request.POST.is_deaf == 'on' %}checked{% endif %}>
-            </div>
-
-            <!-- PASSWORD -->
-            <div class="mb-3">
-              <label>Password</label>
-              {{ form.password1|add_class:"form-control" }}
-              {% if form.password1.errors %}
-                <div class="invalid-feedback d-block">
-                  {% for error in form.password1.errors %}
-                    <div>{{ error }}</div>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            </div>
-
-            <!-- CONFIRM PASSWORD -->
-            <div class="mb-3">
-              <label>Confirm password</label>
-              {{ form.password2|add_class:"form-control" }}
-              {% if form.password2.errors %}
-                <div class="invalid-feedback d-block">
-                  {% for error in form.password2.errors %}
-                    <div>{{ error }}</div>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-
-        <button class="btn btn-primary w-100 py-2 mt-2">
-          Create account
-        </button>
-      </form>
-
-      <p class="auth-footer mt-3">
-        Already registered?
-        <a href="{% url 'login' %}">Sign in</a>
-      </p>
-
-    </div>
-  </div>
-</section>
-{% endblock %}
+<section class="auth-hero"><div class="auth-overlay"></div><div class="auth-container">
+{% include 'partials/auth_intro.html' %}
+<div class="auth-card auth-card--register">
+<h1 class="auth-title">Create your account</h1><p class="auth-subtitle">A few details to start your next journey.</p>
+{% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>{% endif %}
+<form method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+<fieldset><legend>Your details</legend><div class="auth-field-grid">
+<div class="auth-field"><label for="register-full-name">Full name</label><input id="register-full-name" type="text" name="full_name" class="form-control" autocomplete="name" value="{{ request.POST.full_name|default:'' }}" required></div>
+<div class="auth-field"><label for="register-phone">Phone number</label><input id="register-phone" type="tel" name="phone" class="form-control" autocomplete="tel" value="{{ request.POST.phone|default:'' }}" required></div>
+<div class="auth-field"><label for="register-country">Country of residence</label><input id="register-country" name="country" class="form-control" autocomplete="country-name" maxlength="80" value="{{ request.POST.country|default:'' }}" required></div>
+<div class="auth-field"><label for="register-postal">Postal code</label><input id="register-postal" type="text" name="postal_code" class="form-control" autocomplete="postal-code" value="{{ request.POST.postal_code|default:'' }}" required></div>
+</div><div class="deaf-toggle-row"><label for="register-is-deaf">I am deaf <span class="auth-optional">(optional)</span></label><input type="checkbox" role="switch" name="is_deaf" id="register-is-deaf" {% if request.POST.is_deaf == 'on' %}checked{% endif %}></div></fieldset>
+<fieldset><legend>Your account</legend><div class="auth-field-grid">
+<div class="auth-field"><label for="{{ form.username.id_for_label }}">Username</label>{{ form.username|add_class:"form-control"|attr:"autocomplete:username" }}{% for error in form.username.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+<div class="auth-field"><label for="{{ form.email.id_for_label }}">Email address</label>{{ form.email|add_class:"form-control"|attr:"autocomplete:email" }}{% for error in form.email.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+<div class="auth-field"><label for="{{ form.password1.id_for_label }}">Password</label>{{ form.password1|add_class:"form-control"|attr:"autocomplete:new-password" }}{% for error in form.password1.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+<div class="auth-field"><label for="{{ form.password2.id_for_label }}">Confirm password</label>{{ form.password2|add_class:"form-control"|attr:"autocomplete:new-password" }}{% for error in form.password2.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+</div>{% if form.password1.help_text %}<details class="auth-password-help"><summary>Password requirements</summary>{{ form.password1.help_text|safe }}</details>{% endif %}</fieldset>
+<button class="btn btn-primary auth-submit" type="submit">Create account <span aria-hidden="true">&nearr;</span></button></form>
+<p class="auth-footer">Already have an account? <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Sign in</a></p>
+</div></div></section>{% endblock %}
