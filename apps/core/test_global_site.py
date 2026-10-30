@@ -119,6 +119,7 @@ class GlobalSiteTests(TestCase):
         staff = User.objects.create_superuser('manager', 'manager@example.com', 'test')
         self.client.force_login(staff)
         self.assertEqual(self.client.get('/admin/core/country/').status_code, 200)
+        self.client.post('/admin/workspace/select/', {'country': 'morocco'})
         self.assertEqual(self.client.get('/admin/core/tour/add/').status_code, 200)
         self.assertRedirects(self.client.get('/ireland-admin/'), '/admin/')
 

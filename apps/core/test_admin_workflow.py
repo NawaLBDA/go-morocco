@@ -11,6 +11,7 @@ class AdminWorkflowTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_superuser('site-manager', 'manager@example.test', 'test-password')
         self.client.force_login(self.user)
+        self.client.post("/admin/workspace/select/", {"country": "morocco"})
         Country.objects.filter(slug='ireland').update(is_active=True)
         self.day = date.today() + timedelta(days=60)
         self.rabat = Tour.objects.create(title='Rabat programme', price_per_night=100,
@@ -94,20 +95,22 @@ class AdminWorkflowTests(TestCase):
         self.assertNotContains(response, 'name="program_days-0-day_number"')
         self.assertFalse(response.context['inline_admin_formsets'][0].has_add_permission)
 
-    def test_global_admin_lists_and_edits_all_countries_with_explicit_filters(self):
+    def test_admin_lists_keep_one_selected_country_with_explicit_switches(self):
         response = self.client.get('/admin/core/tour/')
         self.assertContains(response, self.rabat.title)
-        self.assertContains(response, self.dublin.title)
+        self.assertNotContains(response, self.dublin.title)
         response = self.client.get('/admin/core/tour/', {'country': 'morocco'})
         self.assertContains(response, self.rabat.title)
         self.assertNotContains(response, self.dublin.title)
         response = self.client.get('/admin/core/tourdeparture/add/')
         field = response.context['adminform'].form.fields['tour']
         self.assertIn(self.rabat, field.queryset)
-        self.assertIn(self.dublin, field.queryset)
+        self.assertNotIn(self.dublin, field.queryset)
+        self.client.post("/admin/workspace/select/", {"country": "ireland"})
         self.assertEqual(self.client.get(f'/admin/core/tour/{self.dublin.pk}/change/').status_code, 200)
 
     def test_irish_destination_creation_stays_in_irish_site(self):
+        self.client.post("/admin/workspace/select/", {"country": "ireland"})
         response = self.client.post('/admin/core/destination/add/', {'country': 'ireland',
             'name': 'Cork', 'description': '', 'gallery-TOTAL_FORMS': 0, 'gallery-INITIAL_FORMS': 0,
             'gallery-MIN_NUM_FORMS': 0, 'gallery-MAX_NUM_FORMS': 1000, '_save': 'Save'})

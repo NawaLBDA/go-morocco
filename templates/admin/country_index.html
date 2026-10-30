@@ -1,0 +1,13 @@
+{% extends "admin/index.html" %}
+{% block content_title %}<h1>{% if admin_workspace_country %}{{ admin_workspace_country.name }} workspace{% else %}Choose a country to manage{% endif %}</h1>{% endblock %}
+{% block content %}
+<div class="workspace-intro"><p>{% if admin_workspace_country %}Tours, dates, teams and messages below belong to <strong>{{ admin_workspace_country.name }}</strong>.{% else %}Choose a country first to keep its tours, dates, teams and messages together.{% endif %}</p></div>
+{% if admin_workspace_country %}
+<div class="workspace-links">{% for link in admin_workspace_links %}<a href="{{ link.url }}">{{ link.label }} <span aria-hidden="true">&rarr;</span></a>{% endfor %}</div>
+<div class="workspace-tools"><a href="{% url 'admin_reservations' %}?country={{ admin_workspace_country.slug }}">Open {{ admin_workspace_country.name }} bookings</a>{% if perms.core.change_country %}<a href="{% url 'admin:core_country_change' admin_workspace_country.pk %}">Country settings and visibility</a>{% endif %}</div>
+{% else %}
+<div class="workspace-country-grid">{% for destination in admin_workspace_countries %}<form method="post" action="{% url 'admin_workspace_select' %}">{% csrf_token %}<input type="hidden" name="country" value="{{ destination.slug }}"><button type="submit"><strong>{{ destination.name }}</strong><span>{% if not destination.is_visible %}Hidden from website{% elif destination.coming_soon %}Coming soon{% else %}Country content{% endif %}</span><span class="workspace-open">Manage country &rarr;</span></button></form>{% endfor %}</div>
+{% endif %}
+<section class="workspace-global"><h2>Global administration</h2><p>These settings apply to the whole website.</p><div class="workspace-tools">{% if perms.core.view_sitesettings or perms.core.change_sitesettings %}<a href="{% url 'admin:core_sitesettings_changelist' %}">Website settings</a>{% endif %}{% if perms.core.view_country or perms.core.change_country %}<a href="{% url 'admin:core_country_changelist' %}">Countries and visibility</a>{% endif %}{% if perms.auth.view_user or perms.auth.change_user %}<a href="{% url 'admin:auth_user_changelist' %}">User accounts</a>{% endif %}</div></section>
+{% endblock %}
+{% block sidebar %}{% endblock %}

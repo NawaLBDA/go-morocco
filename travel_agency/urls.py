@@ -5,10 +5,12 @@ from django.conf.urls.static import static
 
 from apps.core.seo_views import country_sitemap, robots_txt
 from django.views.generic import RedirectView
+from apps.core.admin_workspace import select_country
 
 urlpatterns = [
     path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico?v=3', permanent=False), name='favicon'),
     path('ireland-admin/', RedirectView.as_view(url='/admin/', permanent=False)),
+    path('admin/workspace/select/', select_country, name='admin_workspace_select'),
     path('admin/', admin.site.urls),
     path('robots.txt', robots_txt, name='robots_txt'),
     path('sitemap.xml', country_sitemap, name='sitemap'),

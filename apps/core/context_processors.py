@@ -32,10 +32,12 @@ def get_country_from_site(request):
 
 def sections_processor(request):
     from .catalogue import active_promotions
+    from .admin_workspace import workspace_context
     site = SiteSettings.objects.filter(pk=1).first() or SiteSettings()
     country = get_country_from_site(request)
     promotion = active_promotions().filter(apply_to_all=True).order_by('-percent').first()
     return {
+        **workspace_context(request),
         'site_settings': site, 'brand_name': site.brand_name,
         'footer_destinations': ' \u2022 '.join(Country.objects.filter(is_active=True, is_visible=True).values_list('name', flat=True)),
         'footer_brand_name': site.brand_name, 'about_brand_name': site.brand_name,

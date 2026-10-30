@@ -200,12 +200,89 @@ class CountryScopedAdmin(admin.ModelAdmin):
     country_lookup = 'country'
 
     def get_list_filter(self, request):
-        return (self.country_lookup,) + tuple(super().get_list_filter(request))
+        return tuple(dict.fromkeys((self.country_lookup,) + tuple(super().get_list_filter(request))))
+
+    def _workspace(self, request, object_id=None):
+        from .admin_workspace import selected_country, SESSION_KEY
+        from .models import Country
+        candidate = request.GET.get(self.country_lookup) or request.GET.get(self.country_lookup + '__exact') or request.GET.get('country')
+        country = Country.objects.filter(slug=candidate).first() if candidate else None
+        if not country:
+            identity = request.GET.get(self.country_lookup + '__id__exact')
+            country = Country.objects.filter(pk=identity).first() if identity and identity.isdigit() else None
+        country = country or selected_country(request)
+        if not country and object_id:
+            try:
+                obj = admin.ModelAdmin.get_queryset(self, request).filter(pk=object_id).first()
+            except (ValueError, ValidationError):
+                obj = None
+            if obj:
+                value = obj
+                for part in self.country_lookup.split('__'):
+                    value = getattr(value, part, None)
+                    if value is None:
+                        break
+                slug = getattr(value, 'slug', value)
+                country = Country.objects.filter(slug=slug).first() if slug else None
+        if not country and request.method == 'POST':
+            country = Country.objects.filter(slug=request.POST.get('country', '')).first()
+        if country:
+            request.session[SESSION_KEY] = country.slug
+        return country
+
+    def changelist_view(self, request, extra_context=None):
+        if not self._workspace(request):
+            from django.shortcuts import redirect
+            return redirect('admin:index')
+        return super().changelist_view(request, extra_context)
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        if not self._workspace(request, object_id):
+            from django.shortcuts import redirect
+            return redirect('admin:index')
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def get_queryset(self, request):
+        from .admin_workspace import selected_country
+        queryset = super().get_queryset(request)
+        country = selected_country(request)
+        return queryset.filter(**{self.country_lookup: country.slug}) if country else queryset
+
+    def get_changeform_initial_data(self, request):
+        from .admin_workspace import selected_country
+        initial = super().get_changeform_initial_data(request)
+        country = selected_country(request)
+        if country and any(field.name == 'country' for field in self.model._meta.fields):
+            initial['country'] = country.slug
+        return initial
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        from .admin_workspace import selected_country
+        country = selected_country(request)
+        if country:
+            model = db_field.remote_field.model
+            if model.__name__ == 'Country':
+                kwargs['queryset'] = model.objects.filter(slug=country.slug)
+            elif model.__name__ in ('Destination', 'Tour', 'Guide'):
+                kwargs['queryset'] = model.objects.filter(country=country.slug)
+            elif model.__name__ in ('TourDeparture', 'TourActivity', 'Reservation'):
+                kwargs['queryset'] = model.objects.filter(tour__country=country.slug)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        from .admin_workspace import selected_country
+        country = selected_country(request)
+        if country and db_field.remote_field.model.__name__ == 'Guide':
+            kwargs['queryset'] = Guide.objects.filter(country_id=country.slug)
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
-        if db_field.name == 'country':
+        if db_field.name == 'country' and not db_field.is_relation:
             from .models import Country
-            return forms.ChoiceField(choices=[(c.slug, c.name) for c in Country.objects.all()], label='Country')
+            from .admin_workspace import selected_country
+            country = selected_country(request)
+            countries = Country.objects.filter(pk=country.pk) if country else Country.objects.all()
+            return forms.ChoiceField(choices=[(c.slug, c.name) for c in countries], label='Country')
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
@@ -479,7 +556,7 @@ class TourTeamAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        country = self.data.get('country') if self.is_bound else (self.instance.country if self.instance.pk else None)
+        country = self.data.get('country') if self.is_bound else (self.instance.country if self.instance.pk else self.initial.get('country'))
         if country and 'guides' in self.fields:
             self.fields['guides'].queryset = Guide.objects.filter(country_id=country)
 
@@ -732,7 +809,7 @@ class CountryGuideInline(admin.StackedInline):
 
 
 @admin.register(Guide)
-class GuideAdmin(admin.ModelAdmin):
+class GuideAdmin(CountryScopedAdmin):
     list_display = ('name', 'country', 'is_active', 'order')
     list_filter = ('country', 'is_active')
     search_fields = ('name', 'description', 'country__name')
@@ -811,3 +888,7 @@ class WaitlistAdmin(CountryScopedAdmin):
         from apps.reservations.waitlist import send_decision_email
         for entry in queryset.exclude(status='waiting').filter(email_sent_at__isnull=True):
             send_decision_email(entry.pk)
+
+admin.site.index_template = "admin/country_index.html"
+admin.site.site_header = "CultureHop.Tours administration"
+admin.site.site_title = "CultureHop.Tours admin"

@@ -2,5 +2,5 @@
 {% load static %}
 {% block title %}{{ title }} | {{ site_title }}{% endblock %}
 {% block branding %}<div id="site-name"><a href="{% url 'admin:index' %}">{{ site_header }}</a></div>{% endblock %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/country_admin.css' %}">{% endblock %}
-{% block nav-global %}<nav class="admin-country-switch" aria-label="Content management"><a href="{% url 'admin:core_country_changelist' %}">Countries</a><a href="{% url 'admin:core_sitesettings_changelist' %}">Global settings</a><a href="/">View website</a></nav>{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/country_admin.css' %}?v=2">{% endblock %}
+{% block nav-global %}{% if user.is_staff %}<nav class="admin-country-switch" aria-label="Content management"><form action="{% url 'admin_workspace_select' %}" method="post">{% csrf_token %}<label for="admin-workspace-country">Country workspace</label><select id="admin-workspace-country" name="country"><option value="">Choose a country / global settings</option>{% for destination in admin_workspace_countries %}<option value="{{ destination.slug }}" {% if destination.pk == admin_workspace_country.pk %}selected{% endif %}>{{ destination.name }}</option>{% endfor %}</select><button type="submit">Open</button></form><a href="{% url 'admin:index' %}">{% if admin_workspace_country %}{{ admin_workspace_country.name }} workspace{% else %}Country workspaces{% endif %}</a><a href="/">View website</a></nav>{% endif %}{% endblock %}

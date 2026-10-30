@@ -661,8 +661,9 @@ def admin_reservations(request):
         'tour',
         'tour__destination',
     ).order_by("-created_at")
-    if request.GET.get('country') or getattr(request, 'site_country', None):
-        reservations_qs = reservations_qs.filter(tour__country=get_country_from_site(request))
+    from apps.core.admin_workspace import reservation_country
+    active_country = reservation_country(request)
+    reservations_qs = reservations_qs.filter(tour__country=active_country.slug)
 
     query = (request.GET.get('q') or request.POST.get('q') or '').strip()
     if query:
@@ -706,9 +707,9 @@ def admin_reservations(request):
     page = Paginator(reservations_qs, 7).get_page(request.GET.get('page'))
     from apps.core.models import WaitlistEntry
     waiting = WaitlistEntry.objects.select_related('user', 'departure__tour', 'reservation').order_by('-created_at')
-    if request.GET.get('country') or getattr(request, 'site_country', None):
-        waiting = waiting.filter(departure__tour__country=get_country_from_site(request))
+    waiting = waiting.filter(departure__tour__country=active_country.slug)
     return render(request, "admin_reservations.html", {
+        'admin_country': active_country,
         'waitlist_entries': waiting[:100],
         "reservations": page,
         "page_obj": page,

@@ -46,14 +46,16 @@ class ContactDeliveryTests(TestCase):
         self.assertEqual(ContactMessage.objects.count(), 0)
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_global_admin_lists_recipients_with_country_filters(self):
+    def test_admin_lists_recipients_in_the_selected_country(self):
         staff = User.objects.create_superuser('staff', 'staff@example.com', 'test-password')
         self.client.force_login(staff)
+        self.client.post('/admin/workspace/select/', {'country': 'morocco'})
         response = self.client.get('/admin/core/contactemailsettings/')
         self.assertContains(response, 'morocco@example.com')
-        self.assertContains(response, 'ireland@example.com')
+        self.assertNotContains(response, 'ireland@example.com')
         filtered = self.client.get('/admin/core/contactemailsettings/', {'country': 'morocco'})
         self.assertNotContains(filtered, 'ireland@example.com')
+        self.client.post('/admin/workspace/select/', {'country': 'ireland'})
         other = ContactEmailSettings.objects.get(country='ireland')
         response = self.client.get(f'/admin/core/contactemailsettings/{other.pk}/change/')
         self.assertContains(response, 'ireland@example.com')

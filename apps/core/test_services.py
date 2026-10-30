@@ -97,6 +97,7 @@ class ServiceTests(TestCase):
         response = self.client.get('/admin/')
         self.assertNotContains(response, '/admin/core/section/')
         self.assertNotContains(response, '/admin/core/countrycontent/')
+        self.client.post('/admin/workspace/select/', {'country': 'morocco'})
         response = self.client.get('/admin/core/tour/add/')
         self.assertNotContains(response, 'Transport and accommodation')
         self.assertNotContains(response, 'name="transport"')
@@ -123,6 +124,7 @@ class ServiceTests(TestCase):
         notice = BookingNotification.objects.create(reservation=booking, channel='email', recipient='private@example.com')
         staff = User.objects.create_superuser('staff', 'staff@example.com', 'test-password')
         self.client.force_login(staff)
+        self.client.post('/admin/workspace/select/', {'country': 'morocco'})
         self.assertContains(self.client.get('/admin/core/bookingnotification/'), 'private@example.com')
         self.assertNotContains(self.client.get('/admin/core/bookingnotification/', {'reservation__tour__country': 'ireland'}), 'private@example.com')
 

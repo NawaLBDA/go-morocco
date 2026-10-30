@@ -1,0 +1,32 @@
+.global-site .global-nav .container { gap: 16px; }
+.global-site .global-nav .global-brand { flex-shrink: 0; margin-right: 0; }
+.global-site .global-nav .global-brand .culturehop-logo { width: clamp(280px, 22vw, 340px); }
+.global-site .global-nav .navbar-collapse { min-width: 0; }
+.global-site .global-nav .nav-link { font-size: 18px; white-space: nowrap; }
+.global-site .global-nav .nav-account { gap: 16px; flex-shrink: 0; margin-left: 12px; }
+.global-site .global-nav .nav-sign-in { font-size: 18px; white-space: nowrap; }
+.global-site .global-nav .nav-account .global-button { font-size: 17px; padding: 13px 18px; gap: 12px; white-space: nowrap; }
+.account-menu { position: relative; }
+.account-menu summary { display: flex; align-items: center; gap: 9px; padding: 12px 0; font-size: 18px; font-weight: 600; cursor: pointer; white-space: nowrap; list-style: none; color: #183d47; }
+.account-menu summary::-webkit-details-marker { display: none; }
+.account-menu summary::marker { content: ''; }
+.account-chevron { font-size: 20px; }
+.account-menu-panel { position: absolute; z-index: 1100; top: calc(100% + 8px); right: 0; width: 250px; padding: 10px; margin: 0; list-style: none; border: 1px solid #d9e2da; border-radius: 12px; background: #fffefb; box-shadow: 0 14px 35px #17303926; }
+.global-site .account-menu-panel a { display: block; padding: 10px 12px; font-size: 18px; line-height: 1.5; color: #183d47; border-radius: 6px; text-decoration: none; }
+.account-menu-panel a:hover, .account-menu-panel a:focus-visible { background: #eaf1eb; outline-offset: 2px; }
+.account-menu-heading { font-size: 15px; font-weight: 700; color: #5d7169; padding: 14px 12px 4px; margin-top: 4px; border-top: 1px solid #e1e5de; }
+.account-menu-logout { border-top: 1px solid #e1e5de; margin-top: 6px; padding-top: 6px; }
+.account-menu summary:focus-visible { outline: 3px solid #2588c9; outline-offset: 4px; border-radius: 4px; }
+.staff-country-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.staff-country-tabs a { padding: 9px 16px; font-size: 17px; border: 1px solid #b8ccc1; border-radius: 8px; background: #fff; color: #204f46; text-decoration: none; }
+.staff-country-tabs a[aria-current="page"] { color: #fff; background: #204f46; }
+@media(min-width:1400px) { .global-site .global-nav .navbar-nav { gap: 8px !important; } }
+@media(max-width:1399px) {
+  .global-site .global-nav .navbar-collapse { flex-basis: 100%; border-top: 1px solid #e1e5de; margin-top: 8px; padding-top: 12px; }
+  .global-site .global-nav .nav-link { padding: 10px 0; }
+  .global-site .global-nav .nav-account { display: grid; grid-template-columns: 1fr; gap: 12px; padding: 12px 0 0; margin: 0; }
+  .account-menu-panel { position: static; width: 100%; box-shadow: none; margin: 6px 0 12px; }
+  .account-menu summary { justify-content: flex-start; }
+  .global-site .global-nav .nav-account .global-button { justify-content: center; }
+}
+@media(max-width:600px) { .global-site .global-nav .container { gap: 8px; } .global-site .global-nav .global-brand .culturehop-logo { width: min(300px, calc(100vw - 100px)); } }

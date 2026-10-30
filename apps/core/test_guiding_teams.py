@@ -68,6 +68,7 @@ class GuidingTeamTests(TestCase):
         field = response.context['adminform'].form.fields['guides']
         self.assertIn(self.first, field.queryset)
         self.assertNotIn(self.foreign, field.queryset)
+        self.client.post('/admin/workspace/select/', {'country': 'ireland'})
         self.assertContains(self.client.get('/admin/core/guide/'), 'Irish guide')
 
     def test_brand_slogan_and_horizons_appear_without_changing_the_domain(self):

@@ -28,3 +28,34 @@
   .inline-group .tabular { overflow-x: auto; }
   .submit-row > * { flex: 1 1 auto; text-align: center; }
 }
+
+/* Country workspaces remain distinct from global website settings. */
+#header { flex-wrap: wrap; gap: 16px; }
+.admin-country-switch { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; width: 100%; }
+.admin-country-switch form { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; }
+.admin-country-switch label, .admin-country-switch a { font-size: 16px; }
+.admin-country-switch select, .admin-country-switch button { font-size: 16px; padding: 9px 12px; border-radius: 6px; }
+.admin-country-switch button { background: #fff; color: #173b45; border: 0; cursor: pointer; }
+.workspace-intro p, .workspace-global p { font-size: 17px; line-height: 1.7; }
+.workspace-country-grid, .workspace-links { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; margin: 24px 0; }
+.workspace-country-grid form { margin: 0; }
+.workspace-country-grid button { display: flex; flex-direction: column; gap: 12px; padding: 26px; width: 100%; text-align: left; border: 1px solid var(--hairline-color); border-radius: 12px; background: var(--body-bg); color: var(--body-fg); cursor: pointer; box-shadow: 0 5px 18px #17303912; }
+.workspace-country-grid strong { font-size: 24px; }
+.workspace-country-grid span { font-size: 16px; }
+.workspace-open { color: var(--link-fg); font-weight: 600; }
+.workspace-links a { display: flex; justify-content: space-between; gap: 12px; padding: 20px; font-size: 18px; border: 1px solid var(--hairline-color); border-radius: 8px; background: var(--body-bg); }
+.workspace-tools { display: flex; flex-wrap: wrap; gap: 16px; margin: 20px 0; }
+.workspace-tools a { font-size: 17px; text-decoration: underline; }
+.workspace-global { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--hairline-color); }
+.workspace-global h2 { font-size: 22px; }
+@media(max-width:767px) { .workspace-country-grid, .workspace-links { grid-template-columns: minmax(0,1fr); } .admin-country-switch form { width: 100%; } .admin-country-switch select { max-width: 100%; } }
+
+.dashboard #content { width: auto; max-width: 1280px; margin: 0 auto; }
+.dashboard #content-main { float: none; width: 100%; }
+.admin-country-switch select { min-height: 44px; height: auto; line-height: 1.4; color: #173b45; background: #fff; }
+#content h1 { font-size: 28px; line-height: 1.35; }
+#content .aligned label, #content .aligned input, #content .aligned select,
+#content .aligned textarea, #content .aligned .readonly { font-size: 16px; line-height: 1.5; }
+#content .aligned select { min-height: 38px; height: auto; }
+#changelist td, #changelist th { font-size: 15px; line-height: 1.5; }
+@media(min-width:1100px) { .workspace-country-grid { grid-template-columns: repeat(4,minmax(0,1fr)); } .workspace-links { grid-template-columns: repeat(3,minmax(0,1fr)); } }

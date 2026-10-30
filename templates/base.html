@@ -11,12 +11,13 @@
 <link rel="stylesheet" href="{% static 'css/global.css' %}?v={{ static_version }}-culture-hop-ch-1-memories-1">
 <link rel="stylesheet" href="{% static 'css/readability.css' %}?v=1">
 <link rel="stylesheet" href="{% static 'css/brand-consistency.css' %}?v=7">
+<link rel="stylesheet" href="{% static 'css/navigation.css' %}?v=1">
 {% block extra_head %}{% endblock %}
 </head>
 <body class="site-body global-site{% if festive_theme %} festive{% endif %}" data-page="{% block page %}default{% endblock %}" data-scheduled-tours="{{ scheduled_tours|yesno:'true,false' }}">
 <a class="skip-link" href="#main-content">Skip to content</a>
 {% if active_promotion %}<div class="global-promo"><span>{% if active_promotion.christmas %}✦ A little festive wanderlust{% else %}Your next adventure awaits{% endif %}</span><a href="{% url 'home' %}?country={{ active_promotion.country }}#journeys">{{ active_promotion.name }} · {{ active_promotion.percent }}% off base tour prices in {{ active_promotion.region.name }} →</a>{% if active_promotion.ends_on %}<span>Until {{ active_promotion.ends_on|date:'j M Y' }}</span>{% endif %}</div>{% endif %}
-<nav class="navbar navbar-expand-xl global-nav" aria-label="Main navigation"><div class="container">
+<nav class="navbar navbar-expand-xxl global-nav" aria-label="Main navigation"><div class="container">
 <a class="navbar-brand global-brand" href="{% url 'home' %}">{% include 'partials/brand_wordmark.html' with show_tagline=True %}</a>
 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav" aria-controls="main-nav" aria-expanded="false" aria-label="Toggle menu"><span class="navbar-toggler-icon"></span></button>
 <div class="collapse navbar-collapse" id="main-nav"><ul class="navbar-nav mx-auto gap-xl-3">
@@ -25,7 +26,7 @@
 <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#about-us">Our approach</a></li>
 <li class="nav-item"><a class="nav-link{% if request.resolver_match.url_name == 'blog_list' or request.resolver_match.url_name == 'blog_detail' %} active{% endif %}" href="{% url 'blog_list' %}">Travel stories</a></li>
 <li class="nav-item"><a class="nav-link" href="{% url 'contact' %}">Contact</a></li></ul>
-<div class="nav-account">{% if user.is_authenticated %}<a href="{% url 'profile' %}">My profile</a>{% if user.is_staff %}<a href="/admin/">Admin</a><a href="{% url 'admin_reservations' %}">Bookings</a>{% endif %}<a href="{% url 'logout' %}">Log out</a>{% else %}<a href="{% url 'login' %}">Log in</a>{% endif %}<a class="global-button small-button" href="{% url 'contact' %}">Let’s plan a trip <span aria-hidden="true">↗</span></a></div>
+{% include 'partials/account_menu.html' %}
 </div></div></nav>
 <div id="site-toast-stack" class="site-toast-stack" aria-label="Notifications"></div>
 {% if messages %}<div class="site-messages">{% for message in messages %}<span data-site-message data-level="{% if 'error' in message.tags %}error{% else %}info{% endif %}" hidden>{{ message }}</span><noscript><div class="alert alert-info">{{ message }}</div></noscript>{% endfor %}</div>{% endif %}
@@ -33,6 +34,7 @@
 <footer class="global-footer"><div class="container"><div class="footer-top"><div><a class="global-brand footer-brand" href="/">{% include 'partials/brand_wordmark.html' with footer_logo=True %}</a><p class="footer-regions">{{ footer_destinations }}</p></div><div><h3>Explore</h3><a href="{% url 'home' %}#journeys">Our destinations</a><a href="{% url 'home' %}#journeys">Upcoming departures</a><a href="{% url 'blog_list' %}">Travel stories</a></div><div><h3>Let’s connect</h3><a href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to={{ support_email|urlencode }}" target="_blank" rel="noopener noreferrer">{{ support_email }}</a><a href="{% url 'contact' %}">Send us a message ↗</a></div></div><div class="footer-bottom"><span>© {% now 'Y' %} {{ brand_name }}. All rights reserved.</span><span>{{ site_settings.tagline }}</span></div></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" defer></script>
 <script src="{% static 'js/site-notifications.js' %}" defer></script>
+<script src="{% static 'js/account-menu.js' %}?v=1" defer></script>
 <script src="{% static 'js/global.js' %}" defer></script>
 {% block extra_js %}{% endblock %}
 </body></html>

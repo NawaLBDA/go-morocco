@@ -22,11 +22,12 @@
 <div class="admin-reservations-shell my-5">
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
     <div>
-      <h2 class="mb-0">{{ country|title }} reservations</h2>
+      <h2 class="mb-0">{{ admin_country.name }} reservations</h2>
       <div class="text-muted small">{{ reservations_count }} items</div>
     </div>
   </div>
 
+  <nav class="staff-country-tabs" aria-label="Booking country">{% for destination in admin_workspace_countries %}<a href="{% url 'admin_reservations' %}?country={{ destination.slug }}" {% if destination.pk == admin_country.pk %}aria-current="page"{% endif %}>{{ destination.name }}</a>{% endfor %}</nav>
   <form method="get" class="d-flex flex-wrap gap-2 mb-3" role="search">
     <label class="visually-hidden" for="reservation-search">Search reservations</label>
     <input type="search" class="form-control flex-grow-1" style="width:auto;min-width:220px" id="reservation-search" name="q" value="{{ search_query }}" placeholder="Search name, phone, email, tour, status or booking number">
