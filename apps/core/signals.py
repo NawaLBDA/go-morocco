@@ -15,6 +15,8 @@ def booking_created(sender, instance, created, raw=False, **kwargs):
         queue_booking_notifications(instance, event='requested')
     if instance.status == 'booked' and (created or previous.get('status') != 'booked') and (fields is None or 'status' in fields):
         queue_booking_notifications(instance, event='approved')
+    if instance.deposit_status == 'received' and (created or previous.get('deposit_status') != 'received') and (fields is None or 'deposit_status' in fields):
+        queue_booking_notifications(instance, event='deposit_received')
     if instance.payment_status == 'paid' and (created or previous.get('payment_status') != 'paid') and (fields is None or 'payment_status' in fields):
         queue_booking_notifications(instance, event='paid')
     if not created and instance.status in {'rejected', 'cancelled', 'completed'} and previous.get('status') != instance.status and (fields is None or 'status' in fields):
@@ -24,7 +26,7 @@ def booking_created(sender, instance, created, raw=False, **kwargs):
 @receiver(pre_save, sender=Reservation)
 def remember_booking_state(sender, instance, raw=False, **kwargs):
     if not raw:
-        instance._notification_previous = Reservation.objects.filter(pk=instance.pk).values('status', 'payment_status').first() if instance.pk else None
+        instance._notification_previous = Reservation.objects.filter(pk=instance.pk).values('status', 'payment_status', 'deposit_status').first() if instance.pk else None
 
 
 @receiver(m2m_changed, sender=Tour.guides.through)

@@ -509,6 +509,7 @@ class TourAdmin(GuideScheduleAdmin):
     inlines = [TourActivityInline, TourItineraryLegInline, TourExtraActivityInline, TourDepartureInline]
     fieldsets = (
         ('Tour essentials', {'fields': ('country', 'title', 'destination', 'image', 'description', 'package_price', 'package_days', 'min_travelers', 'max_travelers', 'max_days', 'deaf_only', 'explanation_video_url')}),
+        ('Deposit before approval', {'fields': ('deposit_enabled', 'deposit_amount', 'deposit_min_travelers', 'deposit_per_person'), 'classes': ('collapse',)}),
         ('Legacy daily pricing', {'fields': ('price_per_night',), 'classes': ('collapse',), 'description': 'Used only when the complete package price is empty.'}),
         ('Guiding team', {'fields': ('guides',), 'description': 'Choose one or more guides, or leave empty to show the active team for this country.'}),
         ('What is included', {'fields': ('included', 'not_included', 'activities'), 'classes': ('collapse',)}),
@@ -557,8 +558,27 @@ class ReservationTeamAdminForm(forms.ModelForm):
 class ReservationAdmin(CountryScopedAdmin):
     form = ReservationTeamAdminForm
     country_lookup = 'tour__country'
-    readonly_fields = ('account_deaf_status',)
+    readonly_fields = ('account_deaf_status', 'traveler_contact', 'deposit_status', 'deposit_required_amount', 'deposit_received_at', 'deposit_received_by')
     exclude = ('full_package', 'include_transport', 'include_hotel', 'transport_price_per_night', 'hotel_price_per_night')
+
+    actions = ['record_selected_deposits']
+
+    @admin.display(description='Traveler contact')
+    def traveler_contact(self, obj):
+        if not obj or not obj.user_id:
+            return 'Not provided'
+        profile = getattr(obj.user, 'profile', None)
+        return format_html('{} / {}', obj.user.email, profile.phone if profile else 'No phone provided')
+
+    @admin.action(description='Record selected deposits as received (verify payment first)')
+    def record_selected_deposits(self, request, queryset):
+        from apps.reservations.deposits import record_deposit_received
+        for booking in queryset:
+            try:
+                record_deposit_received(booking.pk, request.user)
+                self.message_user(request, f'Deposit recorded for reservation #{booking.pk}.')
+            except ValidationError as exc:
+                self.message_user(request, f'#{booking.pk}: ' + ' '.join(exc.messages), level='error')
 
     @admin.display(description='Deaf (account holder)')
     def account_deaf_status(self, obj):
@@ -584,10 +604,10 @@ class ReservationAdmin(CountryScopedAdmin):
         'start_date', 'end_date',
         'extras_total',
         'total_price', 'status',
-        'payment_method', 'payment_status',
+        'payment_method', 'payment_status', 'deposit_status', 'deposit_required_amount',
         'created_at'
     )
-    list_filter = ('status', 'payment_method', 'payment_status', 'created_at')
+    list_filter = ('status', 'deposit_status', 'payment_method', 'payment_status', 'created_at')
     search_fields = ('user__username', 'user__email', 'tour__title', 'guest_full_name', 'guest_phone')
 
 

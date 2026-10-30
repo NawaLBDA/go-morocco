@@ -14,7 +14,7 @@ from apps.reservations.views import _create_pending_reservation
 class PackageRolloutTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('package-traveler', email='traveler@example.com')
-        self.tour = Tour.objects.create(title='Rabat package', country='morocco', price_per_night=100,
+        self.tour = Tour.objects.create(title='Rabat package', country='morocco', price_per_night=100, min_travelers=5,
             destination=Destination.objects.create(name='Rabat'))
         start = timezone.localdate() + timedelta(days=80)
         self.departure = TourDeparture.objects.create(tour=self.tour, start_date=start,

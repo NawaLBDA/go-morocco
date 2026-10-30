@@ -24,6 +24,8 @@ def send_decision_email(entry_id):
         body += f'Booking reference: {entry.reservation_id}. Confirmed total: ${entry.reservation.total_price}. Our team will contact you with payment details.\n\n'
     if entry.decision_note:
         body += entry.decision_note + '\n\n'
+    if entry.reservation_id and entry.reservation.deposit_pending:
+        body += 'A deposit is required before approval. Our team will contact you with payment instructions. This is not yet an approved booking.\n\n'
     body += brand
     try:
         if settings.EMAIL_BACKEND in ('django.core.mail.backends.console.EmailBackend',
@@ -58,8 +60,9 @@ def decide_waitlist(entry_id, *, accept, staff, note=''):
                 include_transport=False, include_hotel=False, extra_activity_ids=[], departure_id=departure.pk)
             if error:
                 raise ValidationError(error)
-            reservation.status = 'booked'
-            reservation.save()
+            if not reservation.deposit_pending:
+                reservation.status = 'booked'
+                reservation.save()
             entry.reservation = reservation
         entry.status = 'accepted' if accept else 'rejected'
         entry.decision_note = note.strip()[:3000]

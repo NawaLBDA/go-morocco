@@ -17,7 +17,10 @@ def queue_booking_notifications(booking, event='requested'):
         'country': booking.tour.region.name, 'start': booking.start_date.strftime('%d %b %Y'),
         'end': booking.end_date.strftime('%d %b %Y'), 'persons': booking.num_persons,
         'amount': f'{booking.total_price} USD', 'payment_method': booking.get_payment_method_display(),
-        'email': booking.user.email, 'inbox': inbox, 'event': event}
+        'email': booking.user.email, 'phone': getattr(getattr(booking.user, 'profile', None), 'phone', ''),
+        'deposit_amount': f'{booking.deposit_required_amount} USD' if booking.deposit_required_amount else '',
+        'deposit_pending': booking.deposit_pending, 'deposit_status': booking.get_deposit_status_display(),
+        'balance_due': f'{booking.balance_due} USD', 'inbox': inbox, 'event': event}
     recipients = [('email', booking.user.email, 'traveler')] if booking.user.email else []
     config = BookingNotificationSettings.objects.filter(country=booking.tour.country).first()
     staff_emails = [inbox] + (config.email_recipients.splitlines() if config else [])
@@ -63,11 +66,15 @@ def deliver_notification(pk):
             title, introduction, next_step = {
                 'requested': ('Booking request received', 'Thank you for choosing us. We have received your booking request and our team is reviewing it.', 'Your booking is pending approval. We will email you as soon as our team confirms it. Please wait for approval before arranging payment.'),
                 'approved': ('Your journey is confirmed', 'Our team has approved your booking. We look forward to welcoming you on your journey.', 'If your balance is unpaid, please contact our team to arrange your selected payment method. Approval does not mean payment has been received.'),
+                'deposit_received': ('Deposit received', 'Thank you. Our team has recorded your deposit as received. Your booking is now awaiting team approval.', 'The deposit is part of your booking total. The remaining balance will be arranged after approval.'),
                 'paid': ('Payment received', 'Thank you. Our team has recorded your booking payment as received.', 'Keep this confirmation with your travel details. Contact us if you have any questions about your journey.'),
                 'rejected': ('Booking request declined', 'Our team has reviewed your request and is unable to confirm this booking.', 'Reply to this email if you would like to discuss another departure. This notice does not confirm or reverse a payment.'),
                 'cancelled': ('Booking cancelled', 'Your booking has been marked as cancelled by our team.', 'Contact us with any questions about the cancellation or any payment arrangements. This notice does not itself confirm a refund.'),
                 'completed': ('Journey completed', 'Your journey has been marked as completed. Thank you for traveling with us.', 'We hope to welcome you on another journey. Reply to this email if you need any help with this booking.'),
             }[notice.event]
+            if notice.event == 'requested' and context.get('deposit_pending'):
+                introduction = 'Your request has been received. You need to pay the required deposit before our team can approve your booking.'
+                next_step = 'This deposit applies to this group reservation. We will contact you by email with payment instructions. Your request is not yet approved.'
             if notice.audience == 'staff':
                 introduction = f'Booking #{booking.pk}: {title.lower()}. Review the reservation in your administration dashboard.'
                 next_step = 'This is an operational notification for your team.'

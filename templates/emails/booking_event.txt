@@ -12,8 +12,11 @@ Dates: {{ start }} – {{ end }}
 Travelers: {{ persons }}
 {% if event == 'paid' %}Payment recorded{% else %}Booking total{% endif %}: {{ amount }}
 Payment method: {{ payment_method }}
+{% if deposit_amount %}Deposit: {{ deposit_amount }} - {{ deposit_status }}
+Balance due: {{ balance_due }}{% endif %}
 {% if audience == 'staff' %}Traveler: {{ name }}
-Traveler email: {{ email }}{% endif %}
+Traveler email: {{ email }}
+Traveler phone: {{ phone|default:"Not provided" }}{% endif %}
 
 {{ next_step }}
 

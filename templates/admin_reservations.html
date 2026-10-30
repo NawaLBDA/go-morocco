@@ -80,7 +80,7 @@
               <td>{{ r.id }}</td>
               <td>
                 <div>{{ r.user.get_full_name|default:r.user.username }}</div>
-                <div class="text-muted small">{{ r.user.username }}</div>
+                <div class="text-muted small">{{ r.user.username }}<br>{{ r.user.email }}</div>
               </td>
               <td class="text-nowrap">{{ r.user.profile.phone|default:'Not provided' }}</td>
               <td>{% if r.user.profile %}{{ r.user.profile.is_deaf|yesno:'Yes,No' }}{% else %}Not provided{% endif %}</td>
@@ -88,7 +88,7 @@
                 <div>{{ r.tour.title }}</div>
               </td>
               <td>{{ r.start_date|date:"d M Y" }} - {{ r.end_date|date:"d M Y" }}</td>
-              <td>{{ r.total_price }} $</td>
+              <td>{{ r.total_price }} ${% if r.deposit_required_amount %}<div class="small mt-1">Deposit: {{ r.deposit_required_amount }} $ - {{ r.get_deposit_status_display }}<br>Balance due: {{ r.balance_due }} $</div>{% endif %}</td>
 
               <td>
                 <span class="badge text-bg-secondary">{{ r.payment_method|upper }}</span>
@@ -107,12 +107,12 @@
                   {% elif r.status == 'cancelled' %}text-bg-secondary
                   {% endif %}
                 ">
-                  {{ r.status|upper }}
+                  {{ r.workflow_stage }}
                 </span>
               </td>
 
               <td>
-                <div class="reservation-actions">
+                <div class="reservation-actions">{% if r.deposit_pending and r.status == 'pending' %}<button type="submit" formaction="{% url 'mark_deposit_received' r.id %}" class="btn btn-outline-primary btn-sm">Record verified deposit received</button>{% endif %}
                   <button
                     type="button"
                     class="btn btn-outline-secondary btn-sm reservation-action"
@@ -140,13 +140,13 @@
                     <i class="fa-solid fa-pen" aria-hidden="true"></i>
                   </button>
 
-                  {% if r.status == 'pending' %}
+                  {% if r.status == 'pending' and not r.deposit_pending %}
                     <button type="submit" formaction="{% url 'validate_reservation' r.id %}" class="btn btn-outline-success btn-sm reservation-action" title="Validate" aria-label="Validate reservation {{ r.id }}"><i class="fa-solid fa-check" aria-hidden="true"></i></button>
                     <button type="submit" formaction="{% url 'reject_reservation' r.id %}" class="btn btn-outline-danger btn-sm reservation-action" title="Reject" aria-label="Reject reservation {{ r.id }}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                   {% endif %}
 
                   {% if r.payment_method == 'cash' or r.payment_method == 'transfer' %}
-                    {% if r.payment_status != 'paid' %}
+                    {% if r.payment_status != 'paid' and not r.deposit_pending %}
                       <button type="submit" formaction="{% url 'mark_paid_reservation' r.id %}" class="btn btn-outline-primary btn-sm reservation-action" title="Mark paid" aria-label="Mark paid reservation {{ r.id }}"><i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i></button>
                     {% endif %}
                   {% endif %}

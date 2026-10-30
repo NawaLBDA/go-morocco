@@ -289,7 +289,7 @@ class BookingNotification(models.Model):
     reservation = models.ForeignKey('Reservation', on_delete=models.CASCADE, related_name='notifications')
     channel = models.CharField(max_length=10, choices=[('email', 'Email'), ('whatsapp', 'WhatsApp')])
     recipient = models.CharField(max_length=254)
-    event = models.CharField(max_length=20, default='requested', choices=[('requested', 'Request received'), ('approved', 'Booking approved'), ('paid', 'Payment received'), ('rejected', 'Booking declined'), ('cancelled', 'Booking cancelled'), ('completed', 'Journey completed')])
+    event = models.CharField(max_length=20, default='requested', choices=[('requested', 'Request received'), ('approved', 'Booking approved'), ('paid', 'Payment received'), ('rejected', 'Booking declined'), ('cancelled', 'Booking cancelled'), ('completed', 'Journey completed'), ('deposit_received', 'Deposit received')])
     audience = models.CharField(max_length=12, default='staff', choices=[('staff', 'Team'), ('traveler', 'Traveler')])
     context = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=12, default='pending', choices=[('pending', 'Pending'), ('sending', 'Sending'), ('sent', 'Accepted by provider'), ('failed', 'Failed')])
@@ -362,10 +362,14 @@ class Tour(CountryLinkedModel):
 
     package_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
         validators=[MinValueValidator(4000)], help_text='USD per person for the complete 14-day journey. Minimum $4,000. Empty only for legacy daily-priced tours.')
-    min_travelers = models.PositiveIntegerField(default=5, db_default=5, validators=[MinValueValidator(1)],
+    min_travelers = models.PositiveIntegerField(default=1, db_default=1, validators=[MinValueValidator(1)],
         verbose_name='Minimum travelers per group', help_text='Minimum group size for this package. The total is the price per person multiplied by the number of travelers.')
     max_travelers = models.PositiveIntegerField(default=20, db_default=20, validators=[MinValueValidator(1)],
         verbose_name='Maximum travelers per group', help_text='Maximum for this package. An individual departure may have a lower capacity.')
+    deposit_enabled = models.BooleanField(default=False, db_default=False, help_text='Require a deposit before approval for new bookings that meet the traveler threshold. Existing bookings are unchanged.')
+    deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, default=500, db_default=500, validators=[MinValueValidator(1)])
+    deposit_min_travelers = models.PositiveIntegerField(default=2, db_default=2, validators=[MinValueValidator(1)], help_text='Apply the deposit starting at this number of travelers; independent of the minimum group size.')
+    deposit_per_person = models.BooleanField(default=False, db_default=False, help_text='Multiply the deposit by the number of travelers. Otherwise it is one deposit for the reservation.')
     package_days = models.PositiveIntegerField(default=14, db_default=14, validators=[MinValueValidator(14), MaxValueValidator(14)])
     price_per_night = models.DecimalField(max_digits=8, decimal_places=2)
     max_days = models.PositiveIntegerField(default=14, validators=[MinValueValidator(1)],
@@ -808,6 +812,11 @@ class Reservation(models.Model):
         blank=True,
         default=None,
     )
+    deposit_status = models.CharField(max_length=12, default='not_required', db_default='not_required',
+        choices=[('not_required', 'Not required'), ('awaiting', 'Awaiting deposit'), ('received', 'Deposit received')])
+    deposit_required_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, db_default=0, editable=False)
+    deposit_received_at = models.DateTimeField(null=True, blank=True, editable=False)
+    deposit_received_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, editable=False, related_name='deposits_recorded')
     payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS, default='unpaid')
 
     stripe_payment_intent = models.CharField(max_length=255, blank=True, null=True)
@@ -818,14 +827,47 @@ class Reservation(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.tour.title} ({self.status})"
 
+    @property
+    def deposit_pending(self):
+        return self.deposit_required_amount > 0 and self.deposit_status != 'received'
+
+    @property
+    def workflow_stage(self):
+        if self.status == 'pending' and self.deposit_pending:
+            return 'Awaiting deposit before approval'
+        if self.status == 'pending' and self.deposit_status == 'received':
+            return 'Awaiting team approval (deposit received)'
+        return self.get_status_display()
+
+    @property
+    def balance_due(self):
+        from decimal import Decimal
+        if self.payment_status == 'paid':
+            return Decimal('0.00')
+        return max(Decimal('0.00'), self.total_price - (self.deposit_required_amount if self.deposit_status == 'received' else 0))
+
+    def validate_deposit(self):
+        if self.total_price is None:
+            return
+        if self.deposit_required_amount < 0 or self.deposit_required_amount > self.total_price:
+            raise ValidationError('The deposit must be between zero and the booking total.')
+        if self.status in ('booked', 'completed') and self.deposit_pending:
+            raise ValidationError('Record the required deposit as received before approving this booking.')
+        if self.payment_status == 'paid' and self.deposit_pending:
+            raise ValidationError('Record the required deposit before marking the complete booking paid.')
+        if self.payment_status == 'paid' and self.deposit_required_amount > 0 and self.status not in ('booked', 'completed'):
+            raise ValidationError('Approve this booking before recording the final payment.')
+
     def clean(self):
         super().clean()
         from apps.reservations.availability import validate_reservation
         validate_reservation(self)
+        self.validate_deposit()
         if self.departure_id and self.num_persons > self.departure.max_participants:
             raise ValidationError({'num_persons': 'The group exceeds this departure capacity.'})
 
     def save(self, *args, **kwargs):
+        self.validate_deposit()
         if self.tour_id and uses_scheduled_departures(self.tour.country):
             from apps.reservations.availability import lock_guide_calendar, validate_reservation
             with lock_guide_calendar(self.tour.country):

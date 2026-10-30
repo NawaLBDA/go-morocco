@@ -201,6 +201,8 @@ def _create_pending_reservation_checked(
         charge_days=(departure.duration_days if tour.package_price is not None else departure.active_days) if departure else None,
     )
 
+    from .deposits import deposit_terms
+    deposit = deposit_terms(tour, persons, total)
     with transaction.atomic():
         existing_qs = Reservation.objects.select_for_update().filter(
             user=user,
@@ -215,6 +217,7 @@ def _create_pending_reservation_checked(
             user=user,
             tour=tour,
             departure=departure,
+            **deposit,
             package_priced=tour.package_price is not None,
             priced_per_day=bool(departure),
             booked_days=(departure.duration_days if tour.package_price is not None else departure.active_days) if departure else None,
@@ -237,6 +240,8 @@ def _create_pending_reservation_checked(
         )
 
     info_message = "Your previous booking was updated with new dates." if replaced_existing else None
+    if reservation.deposit_pending:
+        info_message = f'A deposit of ${reservation.deposit_required_amount} is required before approval. Our team will contact you by email with payment instructions.'
     return reservation, None, info_message, 200
 
 
@@ -873,7 +878,11 @@ def mark_paid_reservation(request, id):
     # ✅ allow manual marking for cash and transfer methods
     if (r.payment_method in ["cash", "transfer"]) and r.payment_status != "paid":
         r.payment_status = "paid"
-        r.save()
+        try:
+            r.save()
+        except ValidationError as exc:
+            messages.error(request, ' '.join(exc.messages))
+            return redirect('admin_reservations')
         messages.success(request, "✅ Payment marked as PAID.")
     else:
         messages.info(request, "Nothing to update.")

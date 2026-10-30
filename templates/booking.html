@@ -389,6 +389,7 @@
       <span id="live-price">0 $</span>
     </div>
 
+{% if tour.deposit_enabled %}<p class="small booking-deposit-notice">For groups of {{ tour.deposit_min_travelers }} or more, a deposit of ${{ tour.deposit_amount }} {% if tour.deposit_per_person %}per traveler{% else %}for the reservation{% endif %} is required before approval. It is part of your total. Our team will contact you by email with payment instructions.</p>{% endif %}
     <div class="booking-form-heading mb-2">
 
       <div>
