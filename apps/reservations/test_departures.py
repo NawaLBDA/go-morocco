@@ -140,7 +140,7 @@ class ScheduledDepartureTests(TestCase):
         self.assertEqual(response.context['itinerary_days'], [])
         response = self.client.get(path, {'departure_id': self.departure.pk})
         self.assertContains(response, 'type="hidden" name="departure_id" value="' + str(self.departure.pk) + '"')
-        self.assertContains(response, 'class="fixed-departure')
+        self.assertNotContains(response, 'class="fixed-departure')
         self.assertContains(response, 'Bank transfer')
         self.assertNotContains(response, 'id="departure-choice"')
         self.assertEqual(len(response.context['itinerary_days']), 5)

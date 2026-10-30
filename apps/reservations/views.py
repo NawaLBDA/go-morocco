@@ -152,8 +152,10 @@ def _create_pending_reservation_checked(
         return None, 'This tour is not available to this account.', None, 404
     if departure and Reservation.objects.filter(user=user, departure=departure, status__in=['pending', 'booked']).exists():
         return None, 'You already have an active request for this departure.', None, 409
-    if departure and persons > departure.max_participants:
-        return None, 'This departure cannot accommodate this group size.', None, 400
+    minimum = departure.group_minimum if departure else tour.group_minimum
+    maximum = departure.group_maximum if departure else tour.max_travelers
+    if not minimum <= persons <= maximum:
+        return None, f'Choose between {minimum} and {maximum} travelers for this package.', None, 400
     if uses_scheduled_departures(tour.country):
         from .availability import has_conflict, UNAVAILABLE_MESSAGE
         if has_conflict(start_date, end_date, country=tour.country, departure=departure):

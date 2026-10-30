@@ -503,12 +503,12 @@ class TourAdmin(GuideScheduleAdmin):
         return initial
 
     form = TourTeamAdminForm
-    list_display = ('title', 'destination', 'package_price', 'price_per_night', 'is_promotion', 'discount_percent')
+    list_display = ('title', 'destination', 'package_price', 'min_travelers', 'max_travelers', 'price_per_night', 'is_promotion', 'discount_percent')
     list_filter = (('destination', admin.RelatedOnlyFieldListFilter), 'is_promotion')
     search_fields = ('title', 'description', 'activities', 'included', 'not_included')
     inlines = [TourActivityInline, TourItineraryLegInline, TourExtraActivityInline, TourDepartureInline]
     fieldsets = (
-        ('Tour essentials', {'fields': ('country', 'title', 'destination', 'image', 'description', 'package_price', 'package_days', 'max_days', 'deaf_only', 'explanation_video_url')}),
+        ('Tour essentials', {'fields': ('country', 'title', 'destination', 'image', 'description', 'package_price', 'package_days', 'min_travelers', 'max_travelers', 'max_days', 'deaf_only', 'explanation_video_url')}),
         ('Legacy daily pricing', {'fields': ('price_per_night',), 'classes': ('collapse',), 'description': 'Used only when the complete package price is empty.'}),
         ('Guiding team', {'fields': ('guides',), 'description': 'Choose one or more guides, or leave empty to show the active team for this country.'}),
         ('What is included', {'fields': ('included', 'not_included', 'activities'), 'classes': ('collapse',)}),

@@ -1,7 +1,7 @@
 {% if selected_departure %}
 <section class="departure-status card p-4 mb-4" id="departure-status" aria-labelledby="departure-status-title">
   <h2 id="departure-status-title" class="h4">Departure availability</h2>
-  <p><strong>Up to {{ selected_departure.max_participants }} travelers per private group.</strong> You can book for fewer people.</p>
+  <p><strong>{{ selected_departure.group_minimum }}&ndash;{{ selected_departure.group_maximum }} travelers per private group.</strong> The minimum group size is {{ selected_departure.group_minimum }}.</p>
   <p>{{ selected_departure.booked_travelers|default:0 }} travelers · {{ selected_departure.booked_groups|default:0 }} group{{ selected_departure.booked_groups|pluralize }} already booked or awaiting confirmation.</p>
   {% if reservation %}<a href="{% url 'my_reservations' %}">View your requests in My reservations</a>
   {% elif selected_departure.is_past %}<p class="mb-0">This departure has ended. <a href="{% url 'reservations' %}?country={{ tour.country }}">Explore upcoming journeys.</a></p>
@@ -10,7 +10,7 @@
   {% else %}
   <h3 class="h5">Join the waiting list</h3><p>This departure is fully reserved. Our team can review another group if guiding capacity becomes available and will email you its decision.</p>
   {% if user.is_authenticated %}<form method="post" action="{% url 'join_waitlist' selected_departure.pk %}" class="waitlist-form">{% csrf_token %}
-    <label class="form-label" for="waitlist-persons">Travelers in your group (maximum {{ selected_departure.max_participants }})</label><input class="form-control mb-3" type="number" name="persons" id="waitlist-persons" min="1" max="{{ selected_departure.max_participants }}" value="1" required>
+    <label class="form-label" for="waitlist-persons">Travelers in your group ({{ selected_departure.group_minimum }}&ndash;{{ selected_departure.group_maximum }})</label><input class="form-control mb-3" type="number" name="persons" id="waitlist-persons" min="{{ selected_departure.group_minimum }}" max="{{ selected_departure.group_maximum }}" value="{{ selected_departure.group_minimum }}" required>
     <label class="form-label" for="waitlist-email">Email for our response</label><input class="form-control mb-3" type="email" name="email" id="waitlist-email" value="{{ user.email }}" required maxlength="254">
     <label class="form-label" for="waitlist-message">Tell us about your group (optional)</label><textarea class="form-control mb-3" name="message" id="waitlist-message" rows="3" maxlength="3000"></textarea>
     <button class="btn btn-primary" type="submit">Join waiting list</button><p class="small mt-2 mb-0">Joining the waiting list does not reserve a place.</p>

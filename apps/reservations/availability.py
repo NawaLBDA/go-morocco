@@ -83,15 +83,22 @@ def departure_capacity(departure, *, rows=None, country_limit=None, exclude_id=N
         country_limit=country_limit, exclude_id=exclude_id)
     return {'available': available, 'booked_groups': len(exact),
         'booked_travelers': sum(r['num_persons'] for r in exact),
-        'max_participants': departure.max_participants,
+        'min_participants': departure.group_minimum,
+        'max_participants': departure.group_maximum,
         'max_groups': min(departure.max_concurrent_bookings, country_limit)}
 
 
 def validate_reservation(reservation):
-    if not reservation.pk and reservation.num_persons > 20:
-        raise ValidationError("Groups are limited to 20 travelers.")
-    if reservation.departure_id and not 1 <= reservation.num_persons <= reservation.departure.max_participants:
-        raise ValidationError('Choose a group size between 1 and the departure maximum.')
+    if reservation.tour_id:
+        minimum = reservation.departure.group_minimum if reservation.departure_id else reservation.tour.group_minimum
+        maximum = reservation.departure.group_maximum if reservation.departure_id else reservation.tour.max_travelers
+        changed_group = not reservation.pk
+        if reservation.pk:
+            from apps.core.models import Reservation
+            changed_group = not Reservation.objects.filter(pk=reservation.pk, num_persons=reservation.num_persons,
+                tour_id=reservation.tour_id, departure_id=reservation.departure_id).exists()
+        if changed_group and not minimum <= reservation.num_persons <= maximum:
+            raise ValidationError(f'Choose between {minimum} and {maximum} travelers for this package.')
     if not reservation.tour_id or not uses_scheduled_departures(reservation.tour.country):
         return
     if not reservation.start_date or not reservation.end_date:

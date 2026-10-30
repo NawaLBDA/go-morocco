@@ -362,6 +362,10 @@ class Tour(CountryLinkedModel):
 
     package_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
         validators=[MinValueValidator(4000)], help_text='USD per person for the complete 14-day journey. Minimum $4,000. Empty only for legacy daily-priced tours.')
+    min_travelers = models.PositiveIntegerField(default=5, db_default=5, validators=[MinValueValidator(1)],
+        verbose_name='Minimum travelers per group', help_text='Minimum group size for this package. The total is the price per person multiplied by the number of travelers.')
+    max_travelers = models.PositiveIntegerField(default=20, db_default=20, validators=[MinValueValidator(1)],
+        verbose_name='Maximum travelers per group', help_text='Maximum for this package. An individual departure may have a lower capacity.')
     package_days = models.PositiveIntegerField(default=14, db_default=14, validators=[MinValueValidator(14), MaxValueValidator(14)])
     price_per_night = models.DecimalField(max_digits=8, decimal_places=2)
     max_days = models.PositiveIntegerField(default=14, validators=[MinValueValidator(1)],
@@ -397,6 +401,10 @@ class Tour(CountryLinkedModel):
     country = models.CharField(max_length=50, default='morocco')
 
     @property
+    def group_minimum(self):
+        return self.min_travelers if self.package_price is not None else 1
+
+    @property
     def display_price(self):
         return self.package_price if self.package_price is not None else self.price_per_night
 
@@ -422,6 +430,10 @@ class Tour(CountryLinkedModel):
 
     def clean(self):
         super().clean()
+        if self.min_travelers and self.max_travelers and self.min_travelers > self.max_travelers:
+            raise ValidationError({'max_travelers': 'The maximum must be at least the minimum group size.'})
+        if self.pk and self.package_price is not None and self.departures.filter(is_published=True, max_participants__lt=self.min_travelers).exists():
+            raise ValidationError({'min_travelers': 'A published departure has a lower capacity. Increase its capacity or unpublish it first.'})
         if self.pk and self.guides.exclude(country_id=self.country).exists():
             raise ValidationError({'country': 'Remove the guides from the previous country before changing this tour country.'})
         if self.destination_id and self.destination.country != self.country:
@@ -457,13 +469,21 @@ class TourDeparture(models.Model):
     start_date = models.DateField()
     end_date = models.DateField(help_text="For a one-day tour, use the same start and end date.")
     is_published = models.BooleanField(default=False)
-    max_participants = models.PositiveIntegerField(default=20, validators=[MinValueValidator(1), MaxValueValidator(20)])
+    max_participants = models.PositiveIntegerField(default=20, validators=[MinValueValidator(1)])
     max_concurrent_bookings = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)],
         help_text='Maximum independent groups on this departure. Also limited by the country team capacity. Each group has its own maximum participants.')
 
     class Meta:
         ordering = ['start_date', 'end_date', 'pk']
         constraints = [models.UniqueConstraint(fields=['tour', 'start_date', 'end_date'], name='unique_tour_departure')]
+
+    @property
+    def group_minimum(self):
+        return self.tour.group_minimum
+
+    @property
+    def group_maximum(self):
+        return min(self.max_participants, self.tour.max_travelers)
 
     @property
     def duration_days(self):
@@ -493,6 +513,8 @@ class TourDeparture(models.Model):
         super().clean()
         if not self.start_date or not self.end_date or not self.tour_id:
             return
+        if self.max_participants and self.max_participants < self.tour.group_minimum:
+            raise ValidationError({'max_participants': 'Departure capacity must be at least the package minimum group size.'})
         if self.end_date < self.start_date:
             raise ValidationError({'end_date': 'End date cannot be before start date.'})
         if self.tour.package_price is not None and self.duration_days != self.tour.package_days and not (self.pk and self.reservations.exists()):

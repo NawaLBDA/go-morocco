@@ -46,6 +46,33 @@ class PackageRolloutTests(TestCase):
         self.assertEqual(reservation.booked_days, 14)
         self.assertEqual(reservation.base_price_per_night, Decimal('4100'))
 
+    def test_package_starts_at_five_and_prices_are_multiplied_per_person(self):
+        apply_package_rollout(apps)
+        self.assertEqual(self.book(4)[3], 400)
+        self.tour.refresh_from_db()
+        self.tour.package_price = 4000
+        self.tour.save()
+        response = self.client.get(f'/tour/{self.tour.slug}/', {'departure_id': self.departure.pk})
+        self.assertContains(response, 'name="persons" value="5" min="5"')
+        booking, error, _, status = self.book(5)
+        self.assertIsNone(error)
+        self.assertEqual(status, 200)
+        self.assertEqual(booking.total_price, Decimal('20000'))
+
+    def test_administrator_can_change_both_group_limits(self):
+        apply_package_rollout(apps)
+        self.tour.refresh_from_db()
+        self.tour.min_travelers, self.tour.max_travelers = 6, 12
+        self.tour.full_clean()
+        self.tour.save()
+        self.assertEqual(self.book(5)[3], 400)
+        self.assertEqual(self.book(13)[3], 400)
+        booking = self.book(7)[0]
+        self.assertEqual(booking.total_price, Decimal('28700'))
+        self.tour.min_travelers = 13
+        with self.assertRaises(ValidationError):
+            self.tour.full_clean()
+
     def test_existing_booking_dates_and_total_remain_unchanged(self):
         booking = self.book()[0]
         original = (booking.start_date, booking.end_date, booking.total_price)

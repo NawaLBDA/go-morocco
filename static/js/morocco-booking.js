@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function localError() {
     if (!departure.value || !count) return 'Choose a scheduled departure to see your programme and total.';
-    if (!Number.isInteger(Number(persons.value)) || Number(persons.value) < 1) return 'Enter at least one traveler.';
+    if (!Number.isInteger(Number(persons.value)) || Number(persons.value) < Number(persons.min || 1)) return `This package requires at least ${persons.min || 1} travelers.`;
     if (persons.max && Number(persons.value) > Number(persons.max)) return `This departure accommodates up to ${persons.max} travelers.`;
     return '';
   }
@@ -88,7 +88,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   [persons, ...extras].forEach(el => {
     el.addEventListener('input', changed);
-    el.addEventListener('change', changed);
+    el.addEventListener('change', () => {
+      if (el === persons && persons.value && Number(persons.value) < Number(persons.min || 1)) {
+        persons.value = persons.min || '1';
+        window.showSiteToast?.(`Minimum ${persons.min || 1} travelers for this package.`, 'info');
+      }
+      changed();
+    });
   });
   form.addEventListener('submit', async event => {
     event.preventDefault();

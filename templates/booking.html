@@ -286,7 +286,7 @@
         
 
 {% if scheduled_tours %}<p class="text-muted small mb-1">{% if tour.package_price %}Price per person / complete {{ tour.package_days }}-day journey{% else %}Price per person / per day{% endif %}</p>{% endif %}
-{% if selected_departure %}<div class="booking-capacity-pill"><strong>Max {{ selected_departure.max_participants }} travelers</strong><span>per private group · smaller groups welcome</span></div>{% endif %}
+{% if selected_departure %}<div class="booking-capacity-pill"><strong>{{ selected_departure.group_minimum }}&ndash;{{ selected_departure.group_maximum }} travelers</strong><span>per private group &middot; price per person</span></div>{% endif %}
 {% if tour.effective_discount > 0 %}
   <div class="mb-3 booking-price-panel">
     <div class="text-muted small">Promo -{{ tour.effective_discount }}%</div>
@@ -376,7 +376,7 @@
           <div class="booking-form-hint">Number of travelers</div>
         </div>
       </div>
-      <input type="number" id="persons" name="persons" value="1" min="1" {% if selected_departure %}max="{{ selected_departure.max_participants }}"{% endif %}
+      <input type="number" id="persons" name="persons" value="{{ tour.group_minimum }}" min="{{ tour.group_minimum }}" {% if selected_departure %}max="{{ selected_departure.group_maximum }}"{% endif %}
              class="form-control booking-person-input mt-3">
     </div>
 
@@ -2259,6 +2259,6 @@ async function openAndInitStripe(){
 
 {% if scheduled_tours %}
   {{ disabled_ranges|json_script:"guide-disabled-ranges" }}
-  <script src="{% static 'js/morocco-booking.js' %}?v={{ static_version }}-package-1" defer></script>
+  <script src="{% static 'js/morocco-booking.js' %}?v={{ static_version }}-package-2" defer></script>
 {% endif %}
 {% endblock %}

@@ -28,8 +28,8 @@ def join_waitlist(request, departure_id):
         persons = int(request.POST.get('persons', '1'))
         email = request.POST.get('email', request.user.email).strip()
         validate_email(email)
-        if not 1 <= persons <= departure.max_participants:
-            raise ValidationError(f'Choose between 1 and {departure.max_participants} travelers.')
+        if not departure.group_minimum <= persons <= departure.group_maximum:
+            raise ValidationError(f'Choose between {departure.group_minimum} and {departure.group_maximum} travelers.')
         if not departure.active_days or departure.duration_days > departure.tour.max_days:
             raise ValidationError('This departure is not currently available.')
         with lock_guide_calendar(departure.tour.country):
